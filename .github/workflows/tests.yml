@@ -6,6 +6,12 @@ on:
       - 'charts/**'
       - '!**/README.md'
       - '.github/workflows/tests.yaml'
+  
+  push:
+    paths:
+      - 'charts/**'
+      - '!**/README.md'
+      - '.github/workflows/tests.yaml'
 
 jobs:
   lint-test:
