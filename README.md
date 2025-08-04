@@ -153,6 +153,8 @@ The configuration for external supporting charts are generally added as part of 
         ```
 
         Any ConfigMaps or other resources not installed directly as part of this process, must be deleted manually.
+    
+    7. If you have enabled Role-Based Access Control (RBAC), you must perform an additional Keycloak configuration step. While the default realm import handles the basic setup (roles and users), it does not configure an OIDC client. You will need to create this [client](https://www.keycloak.org/docs/latest/server_admin/index.html#assembly-managing-clients_server_administration_guide) manually.
 
 ## Linting and testing
 
