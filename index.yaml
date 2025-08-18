@@ -3,6 +3,50 @@ entries:
   aas-basyx-v2-full:
   - apiVersion: v2
     appVersion: 2.0.0-milestone-06
+    created: "2025-08-18T14:06:16.290206171Z"
+    dependencies:
+    - condition: aas-registry.enabled
+      name: aas-registry
+      repository: file://dependency_charts/aas-registry
+      version: 0.0.1
+    - condition: sm-registry.enabled
+      name: sm-registry
+      repository: file://dependency_charts/sm-registry
+      version: 0.0.1
+    - condition: aas-discovery.enabled
+      name: aas-discovery
+      repository: file://dependency_charts/aas-discovery
+      version: 0.0.1
+    - condition: aas-environment.enabled
+      name: aas-environment
+      repository: file://dependency_charts/aas-environment
+      version: 0.0.1
+    - condition: aas-web-ui.enabled
+      name: aas-web-ui
+      repository: file://dependency_charts/aas-web-ui
+      version: 0.0.1
+    - condition: mqtt.enabled
+      name: mqtt
+      repository: file://dependency_charts/mqtt
+      version: 0.0.1
+    - alias: mongodb
+      condition: mongodb.enabled
+      name: mongodb
+      repository: https://charts.bitnami.com/bitnami
+      version: 14.5.0
+    - condition: keycloak.enabled
+      name: keycloak
+      repository: https://charts.bitnami.com/bitnami
+      version: 24.4.11
+    description: Umbrella chart for the AAS Basyx v2 Environment
+    digest: 059b58aa6900bb6d6c6ee0529acd8b3a7470e45048706cb2cc008541af99591c
+    name: aas-basyx-v2-full
+    type: application
+    urls:
+    - https://github.com/eclipse-basyx/charts/releases/download/aas-basyx-v2-full-2.0.7/aas-basyx-v2-full-2.0.7.tgz
+    version: 2.0.7
+  - apiVersion: v2
+    appVersion: 2.0.0-milestone-06
     created: "2025-07-30T06:55:21.061782174Z"
     dependencies:
     - condition: aas-registry.enabled
@@ -309,4 +353,4 @@ entries:
     urls:
     - https://github.com/eclipse-basyx/charts/releases/download/aas-basyx-v2-full-2.0.0/aas-basyx-v2-full-2.0.0.tgz
     version: 2.0.0
-generated: "2025-07-30T06:55:21.061836928Z"
+generated: "2025-08-18T14:06:16.290235987Z"
