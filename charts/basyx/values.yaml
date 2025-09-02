@@ -31,6 +31,12 @@ mongodb:
   ## @param mongodb.enabled Enable MongoDB
   ##
   enabled: true
+  ## MongoDB image version
+  image:
+    ## @param image.repository [default: REPOSITORY_NAME/mongodb] MongoDB(&reg;) image registry
+    repository: bitnamilegacy/mongodb
+    ## @skip image.tag MongoDB(&reg;) image tag (immutable tags are recommended)
+    tag: 8.0.13-debian-12-r0
   ## MongoDB auth parameters
   ##
   auth:
@@ -67,6 +73,12 @@ keycloak:
   ## @param keycloak.enabled Enable Keycloak
   ##
   enabled: false
+  ## Keycloak image version
+  image:
+    ## @param image.repository [default: REPOSITORY_NAME/keycloak] Keycloak image repository
+    repository: bitnamilegacy/keycloak
+    ## @skip image.tag Keycloak image tag (immutable tags are recommended)
+    tag: 26.3.3-debian-12-r0
   ## Keycloak PostgreSQL parameters
   ##
   postgresql:
