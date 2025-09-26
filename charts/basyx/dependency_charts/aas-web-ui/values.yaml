@@ -29,6 +29,8 @@ image:
   name: eclipsebasyx/aas-gui:v2-240125
   pullPolicy: IfNotPresent
 
+resources: {}
+
 service:
   type: ClusterIP
   port: 3000

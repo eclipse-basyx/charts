@@ -86,6 +86,8 @@ spec:
         - name: http
           containerPort: {{ .Values.service.port }}
           protocol: TCP
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
         volumeMounts:
         {{- if .Values.logo.relativePath }}
         - mountPath: /app/src/assets/

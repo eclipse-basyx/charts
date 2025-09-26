@@ -75,6 +75,8 @@ spec:
         - name: http
           containerPort: {{ .Values.service.port }}
           protocol: TCP
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
         volumeMounts:
         - mountPath: /workspace/config/application.properties
           name: {{ template "aas-registry.fullname" $ }}-config
