@@ -28,7 +28,7 @@ apiVersion: v2
 name: aas-basyx-v2-full
 description: Umbrella chart for the AAS Basyx v2 Environment
 type: application
-version: 2.0.10
+version: 2.0.11
 appVersion: 2.0.0-milestone-06
 
 dependencies:
