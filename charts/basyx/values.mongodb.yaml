@@ -26,6 +26,9 @@
 ---
 # MongoDB - used by new Basyx - both Registry, Environment and other aspects.
 architecture: standalone
+image:
+  repository: bitnamilegacy/mongodb
+  tag: 8.0.13-debian-12-r0
 auth:
   rootUser: adminUser
   rootPassword: adminPassword
