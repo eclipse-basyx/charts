@@ -3,6 +3,50 @@ entries:
   aas-basyx-v2-full:
   - apiVersion: v2
     appVersion: 2.0.0-milestone-06
+    created: "2025-10-06T10:21:34.234374707Z"
+    dependencies:
+    - condition: aas-registry.enabled
+      name: aas-registry
+      repository: file://dependency_charts/aas-registry
+      version: 0.0.1
+    - condition: sm-registry.enabled
+      name: sm-registry
+      repository: file://dependency_charts/sm-registry
+      version: 0.0.1
+    - condition: aas-discovery.enabled
+      name: aas-discovery
+      repository: file://dependency_charts/aas-discovery
+      version: 0.0.1
+    - condition: aas-environment.enabled
+      name: aas-environment
+      repository: file://dependency_charts/aas-environment
+      version: 0.0.1
+    - condition: aas-web-ui.enabled
+      name: aas-web-ui
+      repository: file://dependency_charts/aas-web-ui
+      version: 0.0.1
+    - condition: mqtt.enabled
+      name: mqtt
+      repository: file://dependency_charts/mqtt
+      version: 0.0.1
+    - alias: mongodb
+      condition: mongodb.enabled
+      name: mongodb
+      repository: https://charts.bitnami.com/bitnami
+      version: 14.5.0
+    - condition: keycloak.enabled
+      name: keycloak
+      repository: https://charts.bitnami.com/bitnami
+      version: 24.4.11
+    description: Umbrella chart for the AAS Basyx v2 Environment
+    digest: 8ccb0ae3312023e6fe3d26699009c271a254de66a7b7fedac3d8b3bba4c1b3c3
+    name: aas-basyx-v2-full
+    type: application
+    urls:
+    - https://github.com/eclipse-basyx/charts/releases/download/aas-basyx-v2-full-2.0.11/aas-basyx-v2-full-2.0.11.tgz
+    version: 2.0.11
+  - apiVersion: v2
+    appVersion: 2.0.0-milestone-06
     created: "2025-10-02T06:16:04.118939317Z"
     dependencies:
     - condition: aas-registry.enabled
@@ -485,4 +529,4 @@ entries:
     urls:
     - https://github.com/eclipse-basyx/charts/releases/download/aas-basyx-v2-full-2.0.0/aas-basyx-v2-full-2.0.0.tgz
     version: 2.0.0
-generated: "2025-10-02T06:16:04.118968482Z"
+generated: "2025-10-06T10:21:34.234411035Z"
