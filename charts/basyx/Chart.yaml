@@ -53,6 +53,10 @@ dependencies:
   version: "0.0.1"
   repository: file://dependency_charts/aas-web-ui
   condition: aas-web-ui.enabled
+- name: aas-digitaltwinregistry
+  version: "0.0.1"
+  repository: file://dependency_charts/aas-digitaltwinregistry
+  condition: aas-digitaltwinregistry.enabled
 - name: mqtt
   version: "0.0.1"
   repository: file://dependency_charts/mqtt
