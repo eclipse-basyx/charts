@@ -1385,7 +1385,7 @@ aas-digitaltwinregistry:
       - "OPTIONS"
       - "TRACE"
       - "PATCH"
-    corsPolicy: 
+    corsPolicy:
       allowMethods:
         - POST
         - GET
@@ -1413,10 +1413,8 @@ aas-digitaltwinregistry:
         web:
           exposure:
             include: health,metrics,mappings
-    
     server:
       port: 8081
-    
     spring:
       profiles:
         active: logEvents,${SPRING_PROFILE:InMemory}
@@ -1424,15 +1422,12 @@ aas-digitaltwinregistry:
         allow-bean-definition-overriding: true
       application:
         name: BaSyx Digital Twin Registry
-    
     description:
       profiles: https://admin-shell.io/aas/API/3/0/AssetAdministrationShellRegistryServiceSpecification/SSP-001,https://admin-shell.io/aas/API/3/0/AssetAdministrationShellRegistryServiceSpecification/SSP-002,https://admin-shell.io/aas/API/3/0/DiscoveryServiceSpecification/SSP-001
-    
     logging:
       level:
         root: ${LOGGING_LEVEL:INFO}
         org.eclipse.digitaltwin.basyx: ${LOGGING_LEVEL:INFO}
-    
     springdoc:
       api-docs:
         enabled: true
@@ -1454,13 +1449,11 @@ aas-digitaltwinregistry:
           port: ${DATABASE_PORT:27017}
           username: ${DATABASE_USERNAME:db-username}
           password: ${DATABASE_PASSWORD:db-password}
-    
     basyx:
       backend: MongoDB
       aasdiscoveryservice:
         mongodb:
           collectionName: ${AUTHENTICATION_DATABASE:db-name}
-    
     registry:
       type: MongoDB
       discovery:
@@ -1474,10 +1467,8 @@ aas-digitaltwinregistry:
         exclude:
           - org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration
           - org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration
-    
     basyx:
       backend: InMemory
-    
     registry:
       type: InMemory
       discovery:
