@@ -1473,4 +1473,3 @@ aas-digitaltwinregistry:
       type: InMemory
       discovery:
         enabled: true
-        
