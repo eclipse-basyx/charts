@@ -1,0 +1,89 @@
+#################################################################################
+ # Copyright (C) 2025 the Eclipse BaSyx Authors
+ # Copyright (C) 2025 SAP SE
+ #
+ # Permission is hereby granted, free of charge, to any person obtaining
+ # a copy of this software and associated documentation files (the
+ # "Software"), to deal in the Software without restriction, including
+ # without limitation the rights to use, copy, modify, merge, publish,
+ # distribute, sublicense, and/or sell copies of the Software, and to
+ # permit persons to whom the Software is furnished to do so, subject to
+ # the following conditions:
+ #
+ # The above copyright notice and this permission notice shall be
+ # included in all copies or substantial portions of the Software.
+ #
+ # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ # EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ # MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ # NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+ # LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+ # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+ # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ #
+ # SPDX-License-Identifier: MIT
+#################################################################################
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "aas-digitaltwinregistry.fullname" . }}
+  labels:
+    {{- include "aas-digitaltwinregistry.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "aas-digitaltwinregistry.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- if .Values.apirule.enabled }}
+        sidecar.istio.io/inject: "true"
+        {{ end -}}
+        {{- include "aas-digitaltwinregistry.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: {{ .Chart.Name }}
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 12 }}
+        image: {{ .Values.image.name }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        env:
+        - name: SERVER_PORT
+          value: {{ .Values.service.port | quote }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.service.port }}
+          protocol: TCP
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+        volumeMounts:
+        volumeMounts:
+        - mountPath: /application/application.yml
+          name: {{ template "aas-digitaltwinregistry.fullname" $ }}-config
+          subPath: application.yml
+        - mountPath: /application/application-MongoDB.yml
+          name: {{ template "aas-digitaltwinregistry.fullname" $ }}-config
+          subPath: application-MongoDB.yml
+        - mountPath: /application/application-InMemory.yml
+          name: {{ template "aas-digitaltwinregistry.fullname" $ }}-config
+          subPath: application-InMemory.yml
+      volumes:
+      - name: {{ template "aas-digitaltwinregistry.fullname" $ }}-config
+        configMap:
+          name: {{ template "aas-digitaltwinregistry.fullname" $ }}-config
+      - name: {{ template "aas-digitaltwinregistry.fullname" $ }}-rbac-rules
+        configMap:
+          name: {{ template "aas-digitaltwinregistry.fullname" $ }}-rbac-rules
