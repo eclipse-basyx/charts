@@ -52,7 +52,7 @@ securityContext: {}
 
 apirule:
   enabled: true
-  host: dtr.c-27d7c36.kyma.ondemand.com
+  host: aas-digitaltwinregistry.local
   methods: 
     - "GET" 
     - "HEAD" 
