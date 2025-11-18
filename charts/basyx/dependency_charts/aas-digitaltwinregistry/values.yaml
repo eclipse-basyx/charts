@@ -51,7 +51,7 @@ podSecurityContext: {}
 securityContext: {}
 
 apirule:
-  enabled: true
+  enabled: false
   host: aas-digitaltwinregistry.local
   methods: 
     - "GET" 
