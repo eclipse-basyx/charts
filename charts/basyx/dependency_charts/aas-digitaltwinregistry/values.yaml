@@ -76,90 +76,191 @@ apirule:
     allowOrigins:
       - regex: ".*" 
     allowCredentials: true
-
+rbac:
+  rules: |
+        [
+          {
+            "role": "basyx-assetid-creator",
+            "action": "CREATE",
+            "targetInformation": {
+              "@type": "aas-discovery-service",
+              "aasIds": "*",
+              "assetIds": []
+            }
+          },
+          {
+            "role": "basyx-assetid-discoverer",
+            "action": "READ",
+            "targetInformation": {
+              "@type": "aas-discovery-service",
+              "aasIds": "*",
+              "assetIds": []
+            }
+          },
+          {
+            "role": "basyx-assetid-deleter",
+            "action": "DELETE",
+            "targetInformation": {
+              "@type": "aas-discovery-service",
+              "aasIds": "*",
+              "assetIds": []
+            }
+          },
+          {
+            "role": "basyx-aas-discoverer",
+            "action": "READ",
+            "targetInformation": {
+              "@type": "aas-discovery-service",
+              "aasIds": null,
+              "assetIds": [
+                {
+                  "name": "*",
+                  "value": "*"
+                }
+              ]
+            }
+          },
+          {
+            "role": "admin",
+            "action": ["CREATE", "READ", "UPDATE", "DELETE"],
+            "targetInformation": {
+              "@type": "aas-discovery-service",
+              "aasIds": "*",
+              "assetIds": [
+                {
+                  "name": "*",
+                  "value": "*"
+                }
+              ]
+            }
+          },
+          {
+            "role": "basyx-reader",
+            "action": "READ",
+            "targetInformation": {
+              "@type": "aas-registry",
+              "aasIds": "*"
+            }
+          },
+          {
+            "role": "admin",
+            "action": ["CREATE", "READ", "UPDATE", "DELETE"],
+            "targetInformation": {
+              "@type": "aas-registry",
+              "aasIds": "*"
+            }
+          },
+          {
+            "role": "basyx-reader-two",
+            "action": "READ",
+            "targetInformation": {
+              "@type": "aas-registry",
+              "aasIds": "dummyShellId_3"
+            }
+          },
+          {
+            "role": "basyx-creator",
+            "action": "CREATE",
+            "targetInformation": {
+              "@type": "aas-registry",
+              "aasIds": "*"
+            }
+          },
+          {
+            "role": "basyx-updater",
+            "action": "UPDATE",
+            "targetInformation": {
+              "@type": "aas-registry",
+              "aasIds": "*"
+            }
+          },
+          {
+            "role": "basyx-updater-two",
+            "action": "UPDATE",
+            "targetInformation": {
+              "@type": "aas-registry",
+              "aasIds": "dummyShellId_3"
+            }
+          },
+          {
+            "role": "basyx-asset-updater",
+            "action": "UPDATE",
+            "targetInformation": {
+              "@type": "aas-registry",
+              "aasIds": "*"
+            }
+          },
+          {
+            "role": "basyx-asset-updater-two",
+            "action": "UPDATE",
+            "targetInformation": {
+              "@type": "aas-registry",
+              "aasIds": "specificAasId-2"
+            }
+          },
+          {
+            "role": "basyx-deleter",
+            "action": "DELETE",
+            "targetInformation": {
+              "@type": "aas-registry",
+              "aasIds": "*"
+            }
+          },
+          {
+            "role": "basyx-deleter-two",
+            "action": "DELETE",
+            "targetInformation": {
+              "@type": "aas-registry",
+              "aasIds": "specificAasId-2"
+            }
+          },
+          {
+            "role": "basyx-uploader",
+            "action": "READ",
+            "targetInformation": {
+              "@type": "aas-registry",
+              "aasIds": "*"
+            }
+          }
+        ]
 
 application: |
-    basyx:
-      aasdiscoveryservice:
-        name: digital-twin-registry
-      cors:
-        allowed-methods: GET,POST,PATCH,DELETE,PUT,OPTIONS,HEAD
-        allowed-origins: '*'
-      aasregistry:
-        feature:
-          discoveryintegration:
-            enabled: true
-            baseUrl: http://localhost:8081
-      endpoints:
-        web:
-          exposure:
-            include: health,metrics,mappings
-    
-    server:
-      port: 8081
-    
-    spring:
-      profiles:
-        active: logEvents,${SPRING_PROFILE:InMemory}
-      main:
-        allow-bean-definition-overriding: true
-      application:
-        name: BaSyx Digital Twin Registry
-    
-    description:
-      profiles: https://admin-shell.io/aas/API/3/0/AssetAdministrationShellRegistryServiceSpecification/SSP-001,https://admin-shell.io/aas/API/3/0/AssetAdministrationShellRegistryServiceSpecification/SSP-002,https://admin-shell.io/aas/API/3/0/DiscoveryServiceSpecification/SSP-001
-    
-    logging:
-      level:
-        root: ${LOGGING_LEVEL:INFO}
-        org.eclipse.digitaltwin.basyx: ${LOGGING_LEVEL:INFO}
-    
-    springdoc:
-      api-docs:
-        enabled: true
-      swagger-ui:
-        enabled: true
-        path: /swagger-ui.html
-        csrf:
-          enabled: false
+    spring.application.name=BaSyx Digital Twin Registry
+    spring.profiles.active=logEvents,${SPRING_PROFILE:InMemory}
+    spring.main.allow-bean-definition-overriding=true
+    basyx.cors.allowed-methods=GET,POST,PATCH,DELETE,PUT,OPTIONS,HEAD
+    basyx.cors.allowed-origins=*
+    basyx.feature.authorization.enabled=false
+    basyx.feature.authorization.type=rbac
+    basyx.feature.authorization.jwtBearerTokenProvider=keycloak
+    basyx.feature.authorization.rbac.file = file:/application/rbac-rules.json
+    basyx.aasregistry.feature.discoveryintegration.enabled=true
+    basyx.aasregistry.feature.discoveryintegration.baseUrl=http://localhost:8081
+    basyx.endpoints.web.exposure.include=health,metrics,mappings
+    description.profiles=https://admin-shell.io/aas/API/3/0/AssetAdministrationShellRegistryServiceSpecification/SSP-001, https://admin-shell.io/aas/API/3/0/AssetAdministrationShellRegistryServiceSpecification/SSP-002, https://admin-shell.io/aas/API/3/0/DiscoveryServiceSpecification/SSP-001
+    logging.level.root=${LOGGING_LEVEL:INFO}
+    logging.level.org.eclipse.digitaltwin.basyx=${LOGGING_LEVEL:INFO}
+    server.port=8081
+    spring.security.oauth2.resourceserver.jwt.issuer-uri=https://dummy/realms/BaSyx
+    springdoc.api-docs.enabled=true
+    springdoc.swagger-ui.enabled=true
+    springdoc.swagger-ui.path=/swagger-ui.html
+    springdoc.swagger-ui.csrf.enabled=false
 application-MongoDB: |
-    spring:
-      config:
-        activate:
-          on-profile: MongoDB
-      data:
-        mongodb:
-          authentication-database: ${AUTHENTICATION_DATABASE:db-name}
-          database: ${AUTHENTICATION_DATABASE:db-name}
-          host: ${DATABASE_HOST:localhost}
-          port: ${DATABASE_PORT:27017}
-          username: ${DATABASE_USERNAME:db-username}
-          password: ${DATABASE_PASSWORD:db-password}
-    
-    basyx:
-      backend: MongoDB
-      aasdiscoveryservice:
-        mongodb:
-          collectionName: ${AUTHENTICATION_DATABASE:db-name}
-    
-    registry:
-      type: MongoDB
-      discovery:
-        enabled: true
+  basyx.backend=MongoDB
+  basyx.aasdiscoveryservice.mongodb.collectionName=${AUTHENTICATION_DATABASE:db-name}
+  registry.type=MongoDB
+  registry.discovery.enabled=true
+  spring.config.activate.on-profile=MongoDB
+  spring.data.mongodb.authentication-database=${AUTHENTICATION_DATABASE:db-name}
+  spring.data.mongodb.database=${AUTHENTICATION_DATABASE:db-name}
+  spring.data.mongodb.host=${DATABASE_HOST:hostname}
+  spring.data.mongodb.port=${DATABASE_PORT:27017}
+  spring.data.mongodb.username=${DATABASE_USERNAME:username}
+  spring.data.mongodb.password=${DATABASE_PASSWORD:password}
 application-InMemory: |
-    spring:
-      config:
-        activate:
-          on-profile: InMemory
-      autoconfigure:
-        exclude:
-          - org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration
-          - org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration
-    
-    basyx:
-      backend: InMemory
-    
-    registry:
-      type: InMemory
-      discovery:
-        enabled: true
+    basyx.backend=InMemory
+    registry.type=InMemory
+    registry.discovery.enabled=true
+    spring.config.activate.on-profile=InMemory
+    spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration,org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration

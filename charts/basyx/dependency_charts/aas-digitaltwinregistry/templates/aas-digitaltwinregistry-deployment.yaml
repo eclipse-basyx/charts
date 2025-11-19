@@ -70,16 +70,18 @@ spec:
         resources:
           {{- toYaml .Values.resources | nindent 10 }}
         volumeMounts:
-        volumeMounts:
-        - mountPath: /application/application.yml
+        - mountPath: /application/application.properties
           name: {{ template "aas-digitaltwinregistry.fullname" $ }}-config
-          subPath: application.yml
-        - mountPath: /application/application-MongoDB.yml
+          subPath: application.properties
+        - mountPath: /application/application-MongoDB.properties
           name: {{ template "aas-digitaltwinregistry.fullname" $ }}-config
-          subPath: application-MongoDB.yml
-        - mountPath: /application/application-InMemory.yml
+          subPath: application-MongoDB.properties
+        - mountPath: /application/application-InMemory.properties
           name: {{ template "aas-digitaltwinregistry.fullname" $ }}-config
-          subPath: application-InMemory.yml
+          subPath: application-InMemory.properties
+        - mountPath: /application/rbac-rules.json
+          name: {{ template "aas-digitaltwinregistry.fullname" $ }}-rbac-rules
+          subPath: rbac-rules.json
       volumes:
       - name: {{ template "aas-digitaltwinregistry.fullname" $ }}-config
         configMap:

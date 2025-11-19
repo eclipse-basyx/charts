@@ -27,13 +27,9 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "aas-digitaltwinregistry.fullname" . }}-config
+  name: {{ include "aas-digitaltwinregistry.fullname" . }}-rbac-rules
   labels:
     {{- include "aas-digitaltwinregistry.labels" . | nindent 4 }}
 data:
-  application.properties: |-
-    {{ .Values.application | nindent 4 }}
-  application-InMemory.properties: |-
-    {{ index .Values "application-InMemory" | nindent 4 }}
-  application-MongoDB.properties: |-
-    {{ index .Values "application-MongoDB" | nindent 4 }}
+  rbac-rules.json: |-
+    {{ .Values.rbac.rules | nindent 4 }}
