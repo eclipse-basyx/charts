@@ -16,6 +16,7 @@ The configuration for all these components are added as part of `values.basyx.ya
 - AAS Registry
 - Submodel Registry
 - AAS Discovery
+- AAS Digital Twin Registry
 - AAS GUI
 
 ### External
@@ -91,6 +92,8 @@ The configuration for external supporting charts are generally added as part of 
         - Configuration for CORS also allows all host sources at this time.
     4. AAS-Discovery:
         - AAS Discovery may be enabled if necessary. An ingress with hostname is supported, and configuration is similarly done as for the AAS Environment (with fewer parameters and no startup scripts).
+    4. AAS-DIgital Twin Registry:
+        - AAS-DIgital Twin Registry may be enabled if necessary. An ingress with hostname is supported, and configuration is similarly done as for the AAS Discovery.
     5. AAS-GUI:
         - In the example values file, the ingress is enabled and is `aasdashboard.example.com`.
         - The environment variables for configuring the AAS environment and AAS registry paths currently works with HTTPS hosts only (plain HTTP, as would be possible with calls to pods in the same namespace in the same cluster, is not permitted and throws "not-secure" errors in console). As a result, both AAS environment and AAS registry must currently have an ingress and certificate each.
