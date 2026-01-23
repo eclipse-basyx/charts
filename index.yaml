@@ -3,6 +3,54 @@ entries:
   aas-basyx-v2-full:
   - apiVersion: v2
     appVersion: 2.0.0-milestone-06
+    created: "2026-01-23T19:29:39.092380791Z"
+    dependencies:
+    - condition: aas-registry.enabled
+      name: aas-registry
+      repository: file://dependency_charts/aas-registry
+      version: 0.0.1
+    - condition: sm-registry.enabled
+      name: sm-registry
+      repository: file://dependency_charts/sm-registry
+      version: 0.0.1
+    - condition: aas-discovery.enabled
+      name: aas-discovery
+      repository: file://dependency_charts/aas-discovery
+      version: 0.0.1
+    - condition: aas-environment.enabled
+      name: aas-environment
+      repository: file://dependency_charts/aas-environment
+      version: 0.0.1
+    - condition: aas-web-ui.enabled
+      name: aas-web-ui
+      repository: file://dependency_charts/aas-web-ui
+      version: 0.0.1
+    - condition: aas-digitaltwinregistry.enabled
+      name: aas-digitaltwinregistry
+      repository: file://dependency_charts/aas-digitaltwinregistry
+      version: 0.0.1
+    - condition: mqtt.enabled
+      name: mqtt
+      repository: file://dependency_charts/mqtt
+      version: 0.0.1
+    - alias: mongodb
+      condition: mongodb.enabled
+      name: mongodb
+      repository: https://charts.bitnami.com/bitnami
+      version: 14.5.0
+    - condition: keycloak.enabled
+      name: keycloak
+      repository: https://charts.bitnami.com/bitnami
+      version: 24.4.11
+    description: Umbrella chart for the AAS Basyx v2 Environment
+    digest: ba2d5afc962b02f0c29a16c6ddc0d3258ea50c2a5005c4ad657471429b7b93d4
+    name: aas-basyx-v2-full
+    type: application
+    urls:
+    - https://github.com/eclipse-basyx/charts/releases/download/aas-basyx-v2-full-2.1.13/aas-basyx-v2-full-2.1.13.tgz
+    version: 2.1.13
+  - apiVersion: v2
+    appVersion: 2.0.0-milestone-06
     created: "2025-11-24T09:42:40.496456595Z"
     dependencies:
     - condition: aas-registry.enabled
@@ -625,4 +673,4 @@ entries:
     urls:
     - https://github.com/eclipse-basyx/charts/releases/download/aas-basyx-v2-full-2.0.0/aas-basyx-v2-full-2.0.0.tgz
     version: 2.0.0
-generated: "2025-11-24T09:42:40.496558786Z"
+generated: "2026-01-23T19:29:39.092465518Z"
