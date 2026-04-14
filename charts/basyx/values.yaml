@@ -143,7 +143,7 @@ keycloak:
     ## @param keycloak.ingress.enabled Enable ingress for Keycloak
     ##
     enabled: false
-    ## @param keycloak.ingress.ingressClassName IngressClass for the ingress
+    ## @param keycloak.ingress.className IngressClass for the ingress
     ##
     className: nginx
     ## @param keycloak.ingress.hosts Ingress hosts configuration
@@ -187,7 +187,7 @@ keycloak:
     ## @param keycloak.service.httpPort Service HTTP port
     ##
     httpPort: 8080
-  ## @param keycloak.extraVolumes Adds volumes to the Keycloak StatefulSet
+  ## @param keycloak.extraVolumes Adds volumes to the Keycloak StatefulSet\n  ## NOTE: The configMap name must match "{{ keycloak.fullnameOverride }}-realm" (default: basyx-keycloak-realm)
   ##
   extraVolumes:
     - name: basyx-keycloak-realm
@@ -199,6 +199,13 @@ keycloak:
     - mountPath: /opt/keycloak/data/import/BaSyx-realm.json
       subPath: BaSyx-realm.json
       name: basyx-keycloak-realm
+
+  ## Technical User parameters
+  ##
+  ## @param keycloak.technicalUser.clientSecret Client secret for the basyx-technical-user service account
+  ##
+  technicalUser:
+    clientSecret: "changeme"
 
 ## MQTT parameters
 ##

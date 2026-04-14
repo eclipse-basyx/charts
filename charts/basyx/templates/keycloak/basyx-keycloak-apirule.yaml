@@ -36,7 +36,7 @@ spec:
     - {{ .Values.keycloak.apirule.host }}
   service:
     name: {{ .Values.keycloak.fullnameOverride }}
-    port: 8080
+    port: {{ .Values.keycloak.service.httpPort | default 8080 }}
   timeout: 360
   rules:
     - path: /*

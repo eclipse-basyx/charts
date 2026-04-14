@@ -31,5 +31,5 @@ metadata:
   name: {{ .Values.keycloak.fullnameOverride }}-realm
 data:
   BaSyx-realm.json: |-
-{{ .Files.Get "config/BaSyx-realm.json" | indent 4 }}
+{{ .Files.Get "config/BaSyx-realm.json" | replace "placeholder-to-be-replaced-by-realm-configmap" .Values.keycloak.technicalUser.clientSecret | indent 4 }}
 {{ end -}}

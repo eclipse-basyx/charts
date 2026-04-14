@@ -158,7 +158,7 @@
       "description": "Technical service account client for machine-to-machine access with admin role",
       "enabled": true,
       "clientAuthenticatorType": "client-secret",
-      "secret": "change-me-pls",
+      "secret": "placeholder-to-be-replaced-by-realm-configmap",
       "standardFlowEnabled": false,
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
