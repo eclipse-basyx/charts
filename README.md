@@ -4,6 +4,15 @@ To deploy the full example in a cloud-provider agnostic Kubernetes cluster, [Hel
 
 To support this, Helm charts are provided here to make it easier to deploy a working Basyx environment, registry and GUI, along with auxiliary services that may be necessary.
 
+## Helm Repository
+
+The charts are published to a Helm repository at **https://eclipse-basyx.github.io/charts/**. You can add it to Helm and install charts directly from there:
+
+```bash
+helm repo add basyx https://eclipse-basyx.github.io/charts/
+helm repo update
+```
+
 ## Components
 
 The Umbrella chart in this folder consists of the following component charts.
