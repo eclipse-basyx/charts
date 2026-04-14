@@ -73,28 +73,67 @@ keycloak:
   ## @param keycloak.enabled Enable Keycloak
   ##
   enabled: false
+  ## @param keycloak.fullnameOverride Overrides the release name for Keycloak
+  ##
+  fullnameOverride: basyx-keycloak
   ## Keycloak image version
   image:
+    ## @param image.registry Keycloak image registry
+    registry: docker.io
     ## @param image.repository [default: REPOSITORY_NAME/keycloak] Keycloak image repository
-    repository: bitnamilegacy/keycloak
+    repository: keycloak/keycloak
     ## @skip image.tag Keycloak image tag (immutable tags are recommended)
-    tag: 26.3.3-debian-12-r0
-  ## Keycloak PostgreSQL parameters
+    tag: "26.5.6@sha256:8d44614c74798322c4e07fbe0ecb15cfbb5879d69b484628555f58ade06f0d8c"
+  ## Keycloak admin and server parameters
   ##
-  postgresql:
-    ## @param keycloak.postgresql.enabled Enable PostgreSQL
+  keycloak:
+    ## @param keycloak.keycloak.adminUser Keycloak administrator user
+    ##
+    adminUser: user
+    ## @param keycloak.keycloak.adminPassword Keycloak administrator password
+    ##
+    adminPassword: password
+    ## @param keycloak.keycloak.hostname Public hostname for Keycloak
+    ## Depends on: @param keycloak.apirule.host or keycloak.ingress.hosts[0].host
+    ##
+    hostname: https://keycloak.basyx.local
+    ## @param keycloak.keycloak.hostnameStrict Enforce hostname matching
+    ##
+    hostnameStrict: false
+    ## @param keycloak.keycloak.httpEnabled Enable HTTP
+    ##
+    httpEnabled: true
+    ## @param keycloak.keycloak.production false = start-dev mode, true = production start
+    ##
+    production: false
+    ## @param keycloak.keycloak.proxyHeaders Set to "xforwarded" when behind nginx ingress
+    ##
+    proxyHeaders: "xforwarded"
+  ## Keycloak realm import parameters
+  ##
+  realm:
+    ## @param keycloak.realm.import Enable --import-realm startup flag
+    ##
+    import: true
+    ## @param keycloak.realm.configFile Inline realm JSON (leave empty when using extraVolumes)
+    ##
+    configFile: ""
+  ## Keycloak PostgreSQL parameters (sub-chart key is "postgres", not "postgresql")
+  ##
+  postgres:
+    ## @param keycloak.postgres.enabled Enable embedded PostgreSQL
     ##
     enabled: true
     ## PostgreSQL Auth parameters
     ##
     auth:
-      ## @param keycloak.postgresql.auth.username PostgreSQL user
+      ## @param keycloak.postgres.auth.username PostgreSQL user
       ##
       username: keycloak
-      ## @param keycloak.postgresql.auth.password PostgreSQL password
+      ## @param keycloak.postgres.auth.password PostgreSQL password
       ##
       password: password
-      ## @param keycloak.postgresql.auth.database PostgreSQL database
+      ## @param keycloak.postgres.auth.database PostgreSQL database
       ##
       database: keycloak
   ## Keycloak ingress parameters
@@ -106,13 +145,17 @@ keycloak:
     enabled: false
     ## @param keycloak.ingress.ingressClassName IngressClass for the ingress
     ##
-    ingressClassName: ""
-    ## @param keycloak.ingress.hostname Ingress hostname for Keycloak
+    className: nginx
+    ## @param keycloak.ingress.hosts Ingress hosts configuration
     ##
-    hostname: keycloak.basyx.local
-    ## @param keycloak.ingress.tls Enable tls
+    hosts:
+      - host: keycloak.basyx.local
+        paths:
+          - path: /
+            pathType: Prefix
+    ## @param keycloak.ingress.tls Ingress TLS configuration
     ##
-    tls: false
+    tls: []
   ## Keycloak apirule parameters
   ## ref: https://kyma-project.io/#/api-gateway/user/custom-resources/apirule/04-10-apirule-custom-resource
   ##
@@ -135,43 +178,27 @@ keycloak:
       - "OPTIONS"
       - "TRACE"
       - "PATCH"
-  ## Keycloak auth parameters
-  ## ref: https://github.com/bitnami/containers/tree/main/bitnami/keycloak#admin-credentials
-  ##
-  auth:
-    ## @param keycloak.auth.adminUser Keycloak administrator user
-    ##
-    adminUser: user
-    ## @param keycloak.auth.adminPassword Keycloak administrator password for the new user
-    ##
-    adminPassword: password
   ## Keycloak service parameters
   ##
   service:
     ## @param keycloak.service.type Kubernetes service type
     ##
     type: ClusterIP
-  ## @param keycloak.fullnameOverride Overrides the release name for Keycloak
-  ##
-  fullnameOverride: basyx-keycloak
-  ## @param keycloak.extraVolumes Adds volumes to the Keycloak deployment
+    ## @param keycloak.service.httpPort Service HTTP port
+    ##
+    httpPort: 8080
+  ## @param keycloak.extraVolumes Adds volumes to the Keycloak StatefulSet
   ##
   extraVolumes:
     - name: basyx-keycloak-realm
       configMap:
         name: basyx-keycloak-realm
-  ## @param keycloak.extraVolumes Mounts volumes to the Keycloak pod
+  ## @param keycloak.extraVolumeMounts Mounts volumes to the Keycloak container
   ##
   extraVolumeMounts:
     - mountPath: /opt/keycloak/data/import/BaSyx-realm.json
       subPath: BaSyx-realm.json
       name: basyx-keycloak-realm
-  ## @param keycloak.command Overrides container command
-  command: ["/bin/sh", "-c"]
-  ## @param keycloak.args Overrides container command args
-  ## Depends on: @param keycloak.apirule.hostname or keycloak.ingress.hostname (see flag hostname)
-  ##
-  args: ["kc.sh import --file /opt/keycloak/data/import/BaSyx-realm.json; kc.sh start-dev --hostname=https://keycloak.basyx.local --hostname-strict=false --hostname-debug=true"]
 
 ## MQTT parameters
 ##
@@ -483,14 +510,6 @@ aas-registry:
           }
         },
         {
-          "role": "basyx-reader-two",
-          "action": "READ",
-          "targetInformation": {
-            "@type": "aas-registry",
-            "aasIds": "dummyShellId_3"
-          }
-        },
-        {
           "role": "basyx-creator",
           "action": "CREATE",
           "targetInformation": {
@@ -507,14 +526,6 @@ aas-registry:
           }
         },
         {
-          "role": "basyx-updater-two",
-          "action": "UPDATE",
-          "targetInformation": {
-            "@type": "aas-registry",
-            "aasIds": "dummyShellId_3"
-          }
-        },
-        {
           "role": "basyx-asset-updater",
           "action": "UPDATE",
           "targetInformation": {
@@ -523,27 +534,11 @@ aas-registry:
           }
         },
         {
-          "role": "basyx-asset-updater-two",
-          "action": "UPDATE",
-          "targetInformation": {
-            "@type": "aas-registry",
-            "aasIds": "specificAasId-2"
-          }
-        },
-        {
           "role": "basyx-deleter",
           "action": "DELETE",
           "targetInformation": {
             "@type": "aas-registry",
             "aasIds": "*"
-          }
-        },
-        {
-          "role": "basyx-deleter-two",
-          "action": "DELETE",
-          "targetInformation": {
-            "@type": "aas-registry",
-            "aasIds": "specificAasId-2"
           }
         }
       ]
@@ -685,14 +680,6 @@ sm-registry:
           }
         },
         {
-          "role": "basyx-reader-two",
-          "action": "READ",
-          "targetInformation": {
-            "@type": "submodel-registry",
-            "submodelIds": "dummySubmodelId_3"
-          }
-        },
-        {
           "role": "basyx-creator",
           "action": "CREATE",
           "targetInformation": {
@@ -709,14 +696,6 @@ sm-registry:
           }
         },
         {
-          "role": "basyx-updater-two",
-          "action": "UPDATE",
-          "targetInformation": {
-            "@type": "submodel-registry",
-            "submodelIds": "dummySubmodelId_3"
-          }
-        },
-        {
           "role": "basyx-asset-updater",
           "action": "UPDATE",
           "targetInformation": {
@@ -725,27 +704,11 @@ sm-registry:
           }
         },
         {
-          "role": "basyx-asset-updater-two",
-          "action": "UPDATE",
-          "targetInformation": {
-            "@type": "submodel-registry",
-            "submodelIds": "specificSubmodelId-2"
-          }
-        },
-        {
           "role": "basyx-deleter",
           "action": "DELETE",
           "targetInformation": {
             "@type": "submodel-registry",
             "submodelIds": "*"
-          }
-        },
-        {
-          "role": "basyx-deleter-two",
-          "action": "DELETE",
-          "targetInformation": {
-            "@type": "submodel-registry",
-            "submodelIds": "specificSubmodelId-2"
           }
         }
       ]
@@ -1084,30 +1047,12 @@ aas-environment:
           }
         },
         {
-          "role": "basyx-reader-two",
-          "action": "READ",
-          "targetInformation": {
-            "@type": "submodel",
-            "submodelIds": "specificSubmodelId",
-            "submodelElementIdShortPaths": "*"
-          }
-        },
-        {
           "role": "basyx-sme-reader",
           "action": "READ",
           "targetInformation": {
             "@type": "submodel",
             "submodelIds": ["specificSubmodelId", "testSMId1", "testSMId2"],
             "submodelElementIdShortPaths": ["testSMEIdShortPath1","smc2.specificSubmodelElementIdShort","testSMEIdShortPath2"]
-          }
-        },
-        {
-          "role": "basyx-sme-reader-two",
-          "action": "READ",
-          "targetInformation": {
-            "@type": "submodel",
-            "submodelIds": "specificSubmodelId",
-            "submodelElementIdShortPaths": "smc2.specificFileSubmodelElementIdShort"
           }
         },
         {
@@ -1129,39 +1074,12 @@ aas-environment:
           }
         },
         {
-          "role": "basyx-updater-two",
-          "action": "UPDATE",
-          "targetInformation": {
-            "@type": "submodel",
-            "submodelIds": "specificSubmodelId",
-            "submodelElementIdShortPaths": "*"
-          }
-        },
-        {
           "role": "basyx-sme-updater",
           "action": "UPDATE",
           "targetInformation": {
             "@type": "submodel",
             "submodelIds": "specificSubmodelId",
             "submodelElementIdShortPaths": "smc2.specificFileSubmodelElementIdShort"
-          }
-        },
-        {
-          "role": "basyx-sme-updater-two",
-          "action": "UPDATE",
-          "targetInformation": {
-            "@type": "submodel",
-            "submodelIds": "specificSubmodelId",
-            "submodelElementIdShortPaths": "smc2"
-          }
-        },
-        {
-          "role": "basyx-sme-updater-three",
-          "action": "UPDATE",
-          "targetInformation": {
-            "@type": "submodel",
-            "submodelIds": "specificSubmodelId-2",
-            "submodelElementIdShortPaths": "smc1.specificSubmodelElementIdShort-2"
           }
         },
         {
@@ -1183,30 +1101,12 @@ aas-environment:
           }
         },
         {
-          "role": "basyx-deleter-two",
-          "action": "DELETE",
-          "targetInformation": {
-            "@type": "submodel",
-            "submodelIds": "specificSubmodelId-2",
-            "submodelElementIdShortPaths": "*"
-          }
-        },
-        {
           "role": "basyx-executor",
           "action": "EXECUTE",
           "targetInformation": {
             "@type": "submodel",
             "submodelIds": "*",
             "submodelElementIdShortPaths": "*"
-          }
-        },
-        {
-          "role": "basyx-executor-two",
-          "action": "EXECUTE",
-          "targetInformation": {
-            "@type": "submodel",
-            "submodelIds": "specificSubmodelId",
-            "submodelElementIdShortPaths": "square"
           }
         },
         {
@@ -1472,14 +1372,6 @@ aas-digitaltwinregistry:
             }
           },
           {
-            "role": "basyx-reader-two",
-            "action": "READ",
-            "targetInformation": {
-              "@type": "aas-registry",
-              "aasIds": "dummyShellId_3"
-            }
-          },
-          {
             "role": "basyx-creator",
             "action": "CREATE",
             "targetInformation": {
@@ -1496,14 +1388,6 @@ aas-digitaltwinregistry:
             }
           },
           {
-            "role": "basyx-updater-two",
-            "action": "UPDATE",
-            "targetInformation": {
-              "@type": "aas-registry",
-              "aasIds": "dummyShellId_3"
-            }
-          },
-          {
             "role": "basyx-asset-updater",
             "action": "UPDATE",
             "targetInformation": {
@@ -1512,27 +1396,11 @@ aas-digitaltwinregistry:
             }
           },
           {
-            "role": "basyx-asset-updater-two",
-            "action": "UPDATE",
-            "targetInformation": {
-              "@type": "aas-registry",
-              "aasIds": "specificAasId-2"
-            }
-          },
-          {
             "role": "basyx-deleter",
             "action": "DELETE",
             "targetInformation": {
               "@type": "aas-registry",
               "aasIds": "*"
-            }
-          },
-          {
-            "role": "basyx-deleter-two",
-            "action": "DELETE",
-            "targetInformation": {
-              "@type": "aas-registry",
-              "aasIds": "specificAasId-2"
             }
           },
           {
