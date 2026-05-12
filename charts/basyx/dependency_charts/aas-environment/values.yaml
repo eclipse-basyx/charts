@@ -49,6 +49,8 @@ ingress:
   ingressClassName: ""
   annotations: {}
   host: aas-environment.local
+  tls:
+    enabled: false
 
 podSecurityContext: {}
   # fsGroup: 2000
