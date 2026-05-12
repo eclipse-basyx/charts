@@ -40,10 +40,12 @@ spec:
   {{- with .Values.ingress.ingressClassName }}
   ingressClassName: {{ . }}
   {{- end }}
+  {{- if .Values.ingress.tls.enabled }}
   tls:
   - hosts:
       - {{ .Values.ingress.host }}
     secretName: {{ include "aas-environment.fullname" . }}-tls
+  {{- end }}
   rules:
   - host: {{ .Values.ingress.host }}
     http:
