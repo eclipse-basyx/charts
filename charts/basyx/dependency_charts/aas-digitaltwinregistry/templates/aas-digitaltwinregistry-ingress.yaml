@@ -41,9 +41,13 @@ spec:
   ingressClassName: {{ . }}
   {{- end }}
   tls:
+  {{- range .Values.ingress.tls }}
   - hosts:
-      - {{ .Values.ingress.host }}
-    secretName: {{ include "aas-digitaltwinregistry.fullname" . }}-tls
+    {{- range .hosts }}
+    - {{ tpl . $ | quote }}
+    {{- end }}
+    secretName: {{ tpl .secretName $ }}
+  {{- end }}
   rules:
   - host: {{ .Values.ingress.host }}
     http:

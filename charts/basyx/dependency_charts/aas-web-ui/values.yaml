@@ -73,6 +73,7 @@ ingress:
   ingressClassName: ""
   annotations: {}
   host: aas-web-ui.local
+  tls: []
 
 apirule:
   enabled: false

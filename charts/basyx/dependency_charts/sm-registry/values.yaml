@@ -68,6 +68,7 @@ ingress:
   ingressClassName: ""
   annotations: {}
   host: sm-registry.local
+  tls: []
 
 # Content of application.properties
 config: |

@@ -68,6 +68,7 @@ ingress:
   ingressClassName: ""
   annotations: {}
   host: aas-registry.local
+  tls: []
 
 apirule:
   enabled: false

@@ -45,6 +45,7 @@ ingress:
   ingressClassName: ""
   annotations: {}
   host: aas-digitaltwinregistry.local
+  tls: []
 
 podSecurityContext: {}
 

@@ -432,6 +432,9 @@ aas-registry:
     ## @param aas-registry.ingress.host Ingress hostname for AAS Registry
     ##
     host: registry.basyx.factory-x.catena-x.net
+    ## @param aas-registry.ingress.tls Ingress tls configuration for AAS Registry
+    ##
+    tls: []
   ## AAS Registry apirule parameters
   ## ref: https://kyma-project.io/#/api-gateway/user/custom-resources/apirule/04-10-apirule-custom-resource
   ##
@@ -602,6 +605,9 @@ sm-registry:
     ## @param sm-registry.ingress.host Ingress hostname for SM Registry
     ##
     host: smregistry.basyx.local
+    ## @param sm-registry.ingress.tls Ingress tls configuration for SM Registry
+    ##
+    tls: []
   ## SM Registry apirule parameters
   ## ref: https://kyma-project.io/#/api-gateway/user/custom-resources/apirule/04-10-apirule-custom-resource
   ##
@@ -793,6 +799,9 @@ aas-discovery:
     ## @param aas-discovery.ingress.host Ingress hostname for AAS Discovery
     ##
     host: discovery.basyx.local
+    ## @param aas-discovery.ingress.tls Ingress tls configuration for AAS Discovery
+    ##
+    tls: []
   ## AAS Discovery apirule parameters
   ## ref: https://kyma-project.io/#/api-gateway/user/custom-resources/apirule/04-10-apirule-custom-resource
   ##
@@ -985,6 +994,9 @@ aas-environment:
     ## @param aas-environment.ingress.host Ingress hostname for AAS Environment
     ##
     host: basyx.local
+    ## @param aas-environment.ingress.tls Ingress tls configuration for AAS Environment
+    ##
+    tls: []
   ## AAS Environment apirule parameters
   ## ref: https://kyma-project.io/#/api-gateway/user/custom-resources/apirule/04-10-apirule-custom-resource
   ##
@@ -1164,6 +1176,9 @@ aas-web-ui:
     ## @param aas-web-ui.ingress.host Ingress hostname for AAS Web UI
     ##
     host: ui.basyx.local
+    ## @param aas-web-ui.ingress.tls Ingress tls configuration for AAS Web UI
+    ##
+    tls: []
   ## AAS Web UI apirule parameters
   ## ref: https://kyma-project.io/#/api-gateway/user/custom-resources/apirule/04-10-apirule-custom-resource
   ##
@@ -1277,6 +1292,7 @@ aas-digitaltwinregistry:
     ingressClassName: ""
     annotations: {}
     host: aas-digitaltwinregistry.local
+    tls: []
   podSecurityContext: {}
   securityContext: {}
   apirule:

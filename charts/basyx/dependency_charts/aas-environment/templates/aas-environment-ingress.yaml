@@ -42,9 +42,12 @@ spec:
   {{- end }}
   {{- if .Values.ingress.tls.enabled }}
   tls:
+  {{- range .Values.ingress.tls }}
   - hosts:
-      - {{ .Values.ingress.host }}
-    secretName: {{ include "aas-environment.fullname" . }}-tls
+    {{- range .hosts }}
+    - {{ tpl . $ | quote }}
+    {{- end }}
+    secretName: {{ tpl .secretName $ }}
   {{- end }}
   rules:
   - host: {{ .Values.ingress.host }}
