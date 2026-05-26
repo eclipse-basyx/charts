@@ -22,10 +22,10 @@ serviceAccount:
 instanceName: "example"
 host: "basyx.example.com"
 
-tls: 
+tls:
   enabled: true
-  hosts: 
-   - "{{ .Values.host }}"
+  hosts:
+    - "{{ .Values.host }}"
 
 internal:
   CACertificates:
@@ -161,7 +161,7 @@ configurationService:
 keycloak:
   enabled: false
   realm: basyx
-  webUiClientId: basyx-ui  
+  webUiClientId: basyx-ui
   initJob:
     image:
       repository: peterevans/curl-jq
@@ -280,7 +280,7 @@ keycloak:
     # name for the creditals secret
     name: "keycloak-credentials"
     # configures admin user for keycloak
-    admin: 
+    admin:
       username: changme
       password: changme
     # configures client credentials for keycloak
@@ -315,7 +315,7 @@ keycloak:
     type: ClusterIP
     port: 9096
   managementPort: 9000
-    
+
   ingress:
     enabled: true
     className: nginx
@@ -1029,7 +1029,7 @@ aasDiscovery:
       - host: "{{ .Values.host }}"
         paths:
           - path: "{{ .Values.paths.aasDiscovery }}"
-            pathType: ImplementationSpecific      
+            pathType: ImplementationSpecific
 
   # central environment variables (will be set in configmap.yaml via tpl interpolation)
   environment: {}
