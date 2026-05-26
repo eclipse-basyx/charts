@@ -1,0 +1,12 @@
+{{- if .Values.cdRepository.enabled -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "basyx-cdRepository.fullname" . }}-config
+  labels:
+    {{- include "basyx-cdRepository.labels" . | nindent 4 }}
+data:
+  {{- range $key, $value := .Values.environment }}
+  {{ $key }}: {{ tpl (print $value) $ | quote }}
+  {{- end }}
+{{- end }}

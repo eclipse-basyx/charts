@@ -1,0 +1,103 @@
+{{- if .Values.aasWebGui.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "basyx-aasWebGui.fullname" . }}
+  labels:
+    {{- include "basyx-aasWebGui.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.aasWebGui.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "basyx-aasWebGui.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.aasWebGui.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "basyx-aasWebGui.labels" . | nindent 8 }}
+        {{- with .Values.aasWebGui.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.aasWebGui.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "basyx-aasWebGui.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.aasWebGui.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ include "basyx-aasWebGui.fullname" . }}
+          securityContext:
+            {{- toYaml .Values.aasWebGui.securityContext | nindent 12 }}
+          image: {{ include "basyx.image" (dict "image" .Values.aasWebGui.image "root" .) | quote }}
+          {{- if .Values.aasWebGui.command }}
+          command:
+            {{- toYaml .Values.aasWebGui.command | nindent 12 }}
+          {{- end }}
+          {{- if .Values.aasWebGui.args }}
+          args:
+            {{- toYaml .Values.aasWebGui.args | nindent 12 }}
+          {{- end }}
+          imagePullPolicy: {{ .Values.aasWebGui.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.aasWebGui.service.port }}
+              protocol: TCP
+          env:
+            - name: BASE_PATH
+              value: {{ .Values.paths.aasWebUiBasePath | quote }}
+            - name: ENDPOINT_CONFIG_AVAILABLE
+              value: {{ .Values.aasWebGui.enabled | quote }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "basyx-aasWebGui.fullname" . }}-config
+          resources:
+            {{- toYaml .Values.aasWebGui.resources | nindent 12 }}
+          {{- with .Values.aasWebGui.livenessProbe }}
+          livenessProbe:
+            {{- tpl (toYaml .) $ | nindent 12 }}
+          {{- end }}
+          {{- with .Values.aasWebGui.readinessProbe }}
+          readinessProbe:
+            {{- tpl (toYaml .) $ | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            {{- if .Values.aasWebGui.infrastructureConfig }}
+            - name: basyx-infra
+              mountPath: /basyx-infra.yml
+              subPath: basyx-infra.yml
+              readOnly: true
+            {{- end }}
+            {{- if .Values.aasWebGui.logos }}
+            - name: web-ui-logos
+              mountPath: /usr/src/app/dist/Logo
+              readOnly: false
+            {{- end }}
+      volumes:
+        {{- if .Values.aasWebGui.infrastructureConfig }}
+        - name: basyx-infra
+          configMap:
+            name: {{ include "basyx-aasWebGui.fullname" . }}-infrastructure
+        {{- end }}
+        {{- if .Values.aasWebGui.logos }}
+        - name: web-ui-logos
+          configMap:
+            name: {{ .Release.Name }}-logos
+        {{- end }}
+      {{- with .Values.aasWebGui.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.aasWebGui.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.aasWebGui.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

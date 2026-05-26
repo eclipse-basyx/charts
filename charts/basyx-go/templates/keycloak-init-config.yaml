@@ -1,0 +1,19 @@
+{{- if .Values.keycloak.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-init-config
+
+data:
+  user-profile.json: |
+{{ .Values.keycloak.initialization.userProfile | default (dict) | toJson | indent 4 }}
+
+  roles.json: |
+{{ .Values.keycloak.initialization.roles | default (list) | toJson | indent 4 }}
+
+  clients.json: |
+{{ tpl (.Values.keycloak.initialization.clients | default (list) | toJson) . | indent 4 }}
+
+  users.json: |
+{{ .Values.keycloak.initialization.users | default (list) | toJson | indent 4 }}
+{{- end }}

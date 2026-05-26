@@ -1,0 +1,108 @@
+{{- if .Values.aasDiscovery.enabled -}}
+{{- $abac := dict "root" . "component" "aasDiscovery" "nameSuffix" "aas-discovery" -}}
+{{- $abacEnabled := eq (include "basyx.abac.enabled" $abac) "true" -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "basyx-aasDiscovery.fullname" . }}
+  labels:
+    {{- include "basyx-aasDiscovery.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.aasDiscovery.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "basyx-aasDiscovery.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        {{- with .Values.aasDiscovery.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        checksum/common-config: {{ include "common.config.checksum" . }}
+        {{- if $abacEnabled }}
+        checksum/abac-config: {{ include "basyx.abac.checksum" $abac }}
+        {{- end }}
+      labels:
+        {{- include "basyx-aasDiscovery.labels" . | nindent 8 }}
+        {{- with .Values.aasDiscovery.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.aasDiscovery.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "basyx-aasDiscovery.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.aasDiscovery.podSecurityContext | nindent 8 }}
+
+      containers:
+        - name: aas-discovery
+          securityContext:
+            {{- toYaml .Values.aasDiscovery.securityContext | nindent 12 }}
+          image: {{ include "basyx.image" (dict "image" .Values.aasDiscovery.image "root" .) | quote }}
+          {{- if .Values.aasDiscovery.command }}
+          command:
+            {{- toYaml .Values.aasDiscovery.command | nindent 12 }}
+          {{- end }}
+          {{- if .Values.aasDiscovery.args }}
+          args:
+            {{- toYaml .Values.aasDiscovery.args | nindent 12 }}
+          {{- end }}
+          imagePullPolicy: {{ .Values.aasDiscovery.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.aasDiscovery.service.port }}
+              protocol: TCP
+          env:
+            {{- include "common-database-config" . | nindent 12 }}
+            - name: SERVER_PORT
+              value: "{{ .Values.aasDiscovery.service.port }}"
+            - name: SERVER_CONTEXTPATH
+              value: "{{ .Values.paths.aasDiscovery }}"
+            {{- include "basyx.abac.env" $abac | nindent 12 }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "basyx-aasDiscovery.fullname" . }}-config
+            - secretRef:
+                name: {{ include "basyx.fullname" . }}-common-config
+          {{- with .Values.aasDiscovery.livenessProbe }}
+          livenessProbe:
+            {{- tpl (toYaml .) $ | nindent 12 }}
+          {{- end }}
+          {{- with .Values.aasDiscovery.readinessProbe }}
+          readinessProbe:
+            {{- tpl (toYaml .) $ | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.aasDiscovery.resources | nindent 12 }}
+          {{- if or $.Values.aasDiscovery.volumeMounts $.Values.tls.enabled $abacEnabled }}
+          volumeMounts:
+            {{- with $.Values.aasDiscovery.volumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+            {{- include "common.certs.volumeMounts" . | nindent 12 }}
+            {{- include "basyx.abac.volumeMounts" $abac | nindent 12 }}
+          {{- end }}
+      {{- if or $.Values.aasDiscovery.volumes $.Values.tls.enabled $abacEnabled }}
+      volumes:
+        {{- with $.Values.aasDiscovery.volumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- include "common.certs.volume" . | nindent 8 }}
+        {{- include "basyx.abac.volume" $abac | nindent 8 }}
+      {{- end }}
+
+      {{- with .Values.aasDiscovery.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.aasDiscovery.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.aasDiscovery.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

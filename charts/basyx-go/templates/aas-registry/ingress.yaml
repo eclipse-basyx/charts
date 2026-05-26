@@ -1,0 +1,33 @@
+{{- if .Values.aasRegistry.enabled -}}
+{{- if .Values.aasRegistry.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "basyx-aasRegistry.fullname" . }}
+  labels:
+    {{- include "basyx-aasRegistry.labels" . | nindent 4 }}
+  annotations: &commonIngressAnnotations
+  {{- include "common.ingressTLS.annotations" . | nindent 2}}
+  {{- with .Values.aasRegistry.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  ingressClassName: {{ .Values.aasRegistry.ingress.className | quote }}
+  {{- include "common.ingressTLS" .  | indent 2}}
+  rules:
+    {{- range .Values.aasRegistry.ingress.hosts }}
+    - host: {{ tpl .host $ | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ tpl .path $ | quote }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                name: {{ include "basyx-aasRegistry.fullname" $ }}
+                port:
+                  number: {{ $.Values.aasRegistry.service.port }}
+          {{- end }}
+    {{- end }}
+{{- end }}
+{{- end }}

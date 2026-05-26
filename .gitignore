@@ -1,0 +1,84 @@
+# General
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.bak
+*.tmp
+*.log
+
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Java
+*.class
+*.jar
+*.war
+*.ear
+*.iml
+*.ipr
+*.iws
+.idea/
+out/
+
+# Go
+bin/
+*.exe
+*.test
+
+dist/
+
+# Rust
+target/
+Cargo.lock
+
+# Ruby
+*.gem
+vendor/bundle/
+
+# PHP
+vendor/
+*.lock
+
+# Dotnet
+bin/
+obj/
+*.dll
+*.pdb
+*.exe
+*.nuget
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+.terraform.lock.hcl
+
+# Kubernetes & Helm
+**/charts/*.tgz
+keycloak/charts/
+*.lock
+!charts/**/Chart.lock
+
+# Misc
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+.env.*.local
+
+# IDE Specific
+.vscode/
+.idea/
+*.sublime-workspace
+*.code-workspace

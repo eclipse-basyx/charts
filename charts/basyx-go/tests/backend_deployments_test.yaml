@@ -1,0 +1,129 @@
+suite: backend deployments
+release:
+  name: basyx
+templates:
+  - templates/aas-repository/deployment.yaml
+  - templates/company-lookup/deployment.yaml
+  - templates/keycloak/deployment.yaml
+tests:
+  - it: mounts ABAC config and rollout checksum for aas repository
+    template: templates/aas-repository/deployment.yaml
+    set:
+      aasRepository.enabled: true
+      abac.enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: ABAC_ENABLED
+            value: "true"
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: ABAC_MODELPATH
+            value: /security_env/access-rules.json
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_TRUSTLISTPATH
+            value: /security_env/trustlist.json
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: abac-config
+            mountPath: /security_env
+            readOnly: true
+          count: 1
+      - exists:
+          path: spec.template.metadata.annotations["checksum/abac-config"]
+
+  - it: prefers image digests over tags for aas repository
+    template: templates/aas-repository/deployment.yaml
+    set:
+      aasRepository.enabled: true
+      aasRepository.image.digest: sha256:0123456789abcdef
+      aasRepository.image.tag: ignored
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: eclipsebasyx/aasrepository-go@sha256:0123456789abcdef
+
+  - it: renders backend health probes below the configured service context path
+    template: templates/aas-repository/deployment.yaml
+    set:
+      aasRepository.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.path
+          value: /aas-repository/health
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /aas-repository/health
+
+  - it: renders numeric keycloak image tags cleanly
+    template: templates/keycloak/deployment.yaml
+    set:
+      keycloak.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: keycloak/keycloak:26.5
+
+  - it: probes keycloak health on the management port below the relative path
+    template: templates/keycloak/deployment.yaml
+    set:
+      keycloak.enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: management
+            containerPort: 9000
+            protocol: TCP
+          count: 1
+      - equal:
+          path: spec.template.spec.containers[0].startupProbe.httpGet.path
+          value: /identity-management/health/started
+      - equal:
+          path: spec.template.spec.containers[0].startupProbe.httpGet.port
+          value: management
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /identity-management/health/ready
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.port
+          value: management
+
+  - it: renders company lookup as an optional BaSyx Go backend
+    template: templates/company-lookup/deployment.yaml
+    set:
+      companyLookup.enabled: true
+      abac.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: company-lookup
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: "^eclipsebasyx/companylookup-go:[^:]+$"
+      - notMatchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ":SNAPSHOT$"
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 5080
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SERVER_CONTEXTPATH
+            value: /company-lookup
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: ABAC_ENABLED
+            value: "true"
+          count: 1

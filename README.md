@@ -1,180 +1,650 @@
-# Deployment of BaSyx-v2 in Kubernetes clusters using Helm
+# BaSyx Go Helm Charts
 
-To deploy the full example in a cloud-provider agnostic Kubernetes cluster, [Helm](https://helm.sh/) is a useful orchestration tool to minimize complexity.
+This repository contains a Helm chart for deploying an Eclipse BaSyx Go based environment on Kubernetes.
 
-To support this, Helm charts are provided here to make it easier to deploy a working Basyx environment, registry and GUI, along with auxiliary services that may be necessary.
+The chart installs the BaSyx Go backend services, a PostgreSQL database, optional Keycloak-based authentication, optional ABAC authorization, ingress resources, certificates, the AAS Web UI and optional supporting runtime tests.
 
-## Helm Repository
+The repository follows the common Helm multi-chart layout:
 
-The charts are published to a Helm repository at **https://eclipse-basyx.github.io/charts/**. You can add it to Helm and install charts directly from there:
-
-```bash
-helm repo add basyx https://eclipse-basyx.github.io/charts/
-helm repo update
+```text
+charts/basyx-go/        Helm chart for BaSyx Go
+values/                 Custom values examples and deployment overlays
 ```
 
-## Components
+The main chart is located at `charts/basyx-go`. All commands below are written from the repository root.
 
-The Umbrella chart in this folder consists of the following component charts.
+## What Gets Deployed
 
-### Basyx
+The `basyx-go` chart can deploy these components:
 
-The configuration for all these components are added as part of `values.basyx.yaml`.
+| Component | Purpose |
+| --- | --- |
+| `keycloak` | Identity provider for the Web UI and secured BaSyx services |
+| `aasDiscovery` | AAS discovery service |
+| `aasRegistry` | AAS registry service |
+| `aasRepository` | AAS repository service |
+| `submodelRegistry` | Submodel registry service |
+| `submodelRepository` | Submodel repository service |
+| `cdRepository` | Concept description repository |
+| `companyLookup` | Company endpoint directory for dataspace participants |
+| `digitalTwinRegistry` | Digital twin registry |
+| `aasWebGui` | Web UI for browsing and uploading AAS data |
+| `database` | PostgreSQL cluster managed by CloudNativePG |
+| `configurationService` | One-shot BaSyx Go job that initializes and migrates the PostgreSQL schema |
 
-- AAS Environment
-- AAS Registry
-- Submodel Registry
-- AAS Discovery
-- AAS Digital Twin Registry
-- AAS GUI
+## How The Deployment Works
 
-### External
+A deployment is one Helm release, usually named `basyx`, installed into one Kubernetes namespace.
 
-The configuration for external supporting charts are generally added as part of `values.external.yaml` or `values.<service-name>.yaml`
+The default chart values live in:
 
-- MongoDB (separate due to external issues)
-- Kafka (WIP)
-- Mosquitto
-- others (not currently in scope)
+```text
+charts/basyx-go/values.yaml
+```
 
-## Caveats
+Custom values files live outside the chart, for example:
 
-- MongoDB has some issues with being deployed as part of a Composite chart. The instructions thus install this chart separately at first, and then install the remaining altogether.
-- With a MongoDB configuration and pre-seeded AASX files, restarting the Basyx AAS Environment is currently broken: the AAS Environment finds conflicting AAS IDs in MongoDB, is unable to make a choice regarding overwriting or accepting the existing AAS shells and submodels, and fails.
+```text
+values/values.example.yaml
+values/values.secured.example.yaml
+```
 
-## Steps
+A custom values file usually defines the public host, enabled services, image tags, TLS settings, and optional security settings such as Keycloak users or ABAC rules.
 
-0. Ensure that you have a working Kubernetes cluster with adequate resources, and access to `kubectl` and `helm` as binaries. A useful UI for visualizing the status of a Kubernetes cluster is Lens (check [OpenLens](https://github.com/MuhammedKalkan/OpenLens)). An Nginx ingress is mandatory to expose services as needed.
+## Prerequisites
 
-    Another nice-to-have tool for identifying differences between deployed releases and local configuration/chart changes is the [helm-diff](https://github.com/databus23/helm-diff) tool.
+You need:
 
-1. Create a namespace. We use the example namespace `basyx`.
+- A Kubernetes cluster and a working `kubectl` context
+- Helm 3
+- An ingress controller, usually nginx ingress
+- cert-manager, because the chart renders `cert-manager.io/v1` resources
+- CloudNativePG, because the chart renders `postgresql.cnpg.io/v1` database clusters
+- Optional: `helm-unittest` for local chart tests
 
-    ```bash
-    kubectl create namespace basyx
-    ```
+Check the current cluster context before installing:
 
-2. MongoDB must be deployed separately, due to a conflict/bug in the chart when it is included as part of an Umbrella chart. (release name is `mongodb`). As part of the first step, also add the repo to Helm. Both commands are mentioned below. Change version as necessary.
+```bash
+kubectl config current-context
+kubectl get nodes
+```
 
-    ```bash
-    helm repo add bitnami https://charts.bitnami.com/bitnami
+If you work with multiple clusters, pass the context explicitly:
 
-    helm install -n basyx mongodb bitnami/mongodb --version 14.4.9 -f values.mongodb.yaml
-    ```
+```bash
+--kube-context custom-rke
+```
 
-    Currently both the AAS Environment and AAS Registry need admin/root user rights.
-    All other parameters may be set based on the charts.
-    TODO: Investigate enabling non-admin users.
+## Install Required Operators
 
-    It is not mandatory that the MongoDB service be publicly exposed.
+Install CloudNativePG if it is not already installed:
 
-3. (WIP) Add as many external services as needed in the Chart.yaml. Configuration for these must be integrated into the Basyx dependency charts, as parameters or configuration files. Examples for the Kafka and MQTT chart values are commented out in the Chart.yaml file.
+```bash
+helm repo add cnpg https://cloudnative-pg.github.io/charts
+helm repo update
 
-    Configurations for all these external services are described in `values.external.yaml`
+helm upgrade --install cnpg cnpg/cloudnative-pg \
+  --namespace cnpg-system \
+  --create-namespace
+```
 
-    With just MongoDB, the core Basyx services will still run.
+Install cert-manager if it is not already installed:
 
-4. At this point, it is ideal that a LetsEncrypt ClusterIssuer is available on the cluster to provide TLS certificates to the services. Additionally, a domain name is mandatory. For this demo, we work with `example.com` and use subdomains to describe all values. Update this with a proper domain-name for your use-case.
+```bash
+helm repo add jetstack https://charts.jetstack.io --force-update
+helm repo update
 
-    Also, all ingress templates currently include default annotations for TLS, which may be converted into a configurable form in a later update.
+helm upgrade --install cert-manager jetstack/cert-manager \
+  --namespace cert-manager \
+  --create-namespace \
+  --version v1.19.3 \
+  --set crds.enabled=true
+```
 
-    Thus, the endpoints we will deploy shall be available at:
-    - AAS-GUI: `https://aasdashboard.example.com`
-    - AAS-Environment: `https://basyx.example.com`
-    - AAS-Registry: `https://basyxregistry.example.com`
-    - Submodel-Registry: `https://basyxsmregistry.example.com`
-    - AAS-Discovery: `https://basyxdiscovery.example.com`
+Verify the required CRDs are available:
 
-5. In `values.basyx.yaml`, we must define the configuration for all the Basyx services. While most of the values are self-explanatory and drawn directly from the docker-compose example in the sibling folder, some considerations here include:
+```bash
+kubectl api-resources | grep cert-manager.io
+kubectl api-resources | grep postgresql.cnpg.io
+```
 
-    1. AAS-Registry:
-        - Choose an appropriate image for the AAS-Registry based on whether a MongoDB   and a Kafka broker are deployed alongside the cluster. (default is `eclipsebasyx/aas-registry-log-mongodb:2.0.0-SNAPSHOT`)
-        - In the example values file, the ingress is enabled and is `basyxregistry.example.com`.
-        - Configuration for CORS is not perfect, and temporarily may be set to allow all traffic. Upcoming [RBAC support](https://github.com/eclipse-basyx/basyx-java-server-sdk/pull/159) may help solve access-control issues.
-    2. SM-Registry:
-        - Choose an appropriate image (examples are available in the values file) and ingress hostname similar to that for the AAS-Registry.
-        - Configuration for CORS is also done as above.
-    3. AAS-Environment:
-        - `startup.enabled = true` is a snippet that does a particularly specific seeding of initial AAS/AASX files from a Git repository into a Kubernetes emptyDir, and then mounts them to the AAS Environment. This is temporary, and further updates may expand the range of initial sources for initial AASX files.
-        `startup.repo` is then a string with the link to the Git repository containing the files.
-        - In the example values file, the ingress is enabled and is `basyx.example.com`.
-        - Configuration for CORS also allows all host sources at this time.
-    4. AAS-Discovery:
-        - AAS Discovery may be enabled if necessary. An ingress with hostname is supported, and configuration is similarly done as for the AAS Environment (with fewer parameters and no startup scripts).
-    4. AAS-DIgital Twin Registry:
-        - AAS-DIgital Twin Registry may be enabled if necessary. An ingress with hostname is supported, and configuration is similarly done as for the AAS Discovery.
-    5. AAS-GUI:
-        - In the example values file, the ingress is enabled and is `aasdashboard.example.com`.
-        - The environment variables for configuring the AAS environment and AAS registry paths currently works with HTTPS hosts only (plain HTTP, as would be possible with calls to pods in the same namespace in the same cluster, is not permitted and throws "not-secure" errors in console). As a result, both AAS environment and AAS registry must currently have an ingress and certificate each.
+## Create A Custom Values File
 
-            Examples for the configuration endpoint variables are provided.
+Start by copying one of the provided example values files:
 
-        - External plugins are possible, and currently supported through ConfigMaps (other possibilities may be added later). An example plugin based on the[TimeSeriesVisualizerPlugin](https://github.com/abhishekmaha23/basyx-gui-timeseries-plugin) example may be added as follows (in this case, it is downloaded locally):
+```bash
+# Unsecured deployment without Keycloak and ABAC.
+cp values/values.example.yaml values/values.my-environment.yaml
 
-        ```bash
-        kubectl create configmap -n basyx time-series-ui-plugin --from-file=config_files/basyx-web-ui/TimeSeriesVisualizerPlugin.vue
-        ```
+# Secured deployment with Keycloak and ABAC.
+cp values/values.secured.example.yaml values/values.my-secured-environment.yaml
+```
 
-        Now this may be referenced in the `values.basyx.yaml` as follows:
+The unsecured example enables the core BaSyx Go services and the Web UI:
 
-        ```yaml
-        externalPlugins:
-            enabled: true
-            plugins:
-            - fileName: TimeSeriesVisualizerPlugin.vue
-              configMapName: time-series-ui-plugin
-        ```
+```yaml
+instanceName: example
+host: basyx.example.com
 
-    6. Now, the full release may be installed. First, add the remote repositories you may need to Helm.
+tls:
+  enabled: true
+  hosts:
+    - basyx.example.com
 
-        ```bash
-        # For bitnami charts, Kafka, MongoDB, Influx, Grafana and others
-        helm repo add bitnami https://charts.bitnami.com/bitnami
-        # For Mosquitto
-        helm repo add t3n https://storage.googleapis.com/t3n-helm-charts
-        ```
+ingress:
+  issuer: internal-issuer
 
-        Then, considering that all necessary configurations have been set, comment-out or delete the unused subcharts in `Chart.yaml`.
+internal:
+  certificateIssuer:
+    name: internal-issuer
+    autocreateCa: true
+    autocreateCaSecretName: internal-issuer-ca
 
-        Next, do a dependency update to pull the latest version of all charts, including the local ones.
+keycloak:
+  enabled: false
 
-        ```bash
-        helm dep update
-        ```
+aasDiscovery:
+  enabled: true
+aasRegistry:
+  enabled: true
+aasRepository:
+  enabled: true
+submodelRegistry:
+  enabled: true
+submodelRepository:
+  enabled: true
+cdRepository:
+  enabled: true
+companyLookup:
+  enabled: false
+aasWebGui:
+  enabled: true
+  infrastructureConfig:
+    infrastructures:
+      default: main
+      main:
+        security:
+          type: None
 
-        Make sure the current Kubernetes context is the right one. For the first release, the following command may be used to install the release on the Kubernetes cluster (release name is `basyxv2`):
+abac:
+  enabled: false
+```
 
-        ```bash
-        helm install -n basyx basyxv2 -f values.external.yaml -f values.basyx.yaml . 
-        ```
+The `aasWebGui.infrastructureConfig...security.type: None` override is intentional for unsecured deployments. Without it, the Web UI would inherit the chart's secured default configuration.
 
-        Subsquent updates may use the following commdands.
+Use `values/values.secured.example.yaml` when you want authentication and authorization enabled from the start. It enables Keycloak, initializes an example admin user and enables ABAC with the chart default rule that grants full access to users with token claim `role=admin`.
 
-        ```bash
-        helm upgrade -n basyx basyxv2 -f values.external.yaml -f values.basyx.yaml .
-        
-        helm diff upgrade -n basyx basyxv2 -f values.external.yaml -f values.basyx.yaml .
-        ```
+Do not publish production passwords or client secrets. For public examples, use placeholders and inject real credentials through your deployment pipeline or an external secret management solution.
 
-        To uninstall the releases, use the following commands:
+## Render Before Installing
 
-        ```bash
-        helm uninstall -n basyx mongodb
-        
-        helm uninstall -n basyx basyxv2
-        ```
+Always render the chart before the first install. This catches schema errors and missing CRDs early:
 
-        Any ConfigMaps or other resources not installed directly as part of this process, must be deleted manually.
-    
-    7. If you have enabled Role-Based Access Control (RBAC), you must perform an additional Keycloak configuration step. While the default realm import handles the basic setup (roles and users), it does not configure an OIDC client. You will need to create this [client](https://www.keycloak.org/docs/latest/server_admin/index.html#assembly-managing-clients_server_administration_guide) manually.
+```bash
+helm lint charts/basyx-go -f values/values.example.yaml
+helm lint charts/basyx-go -f values/values.secured.example.yaml
 
-## Linting and testing
+helm template basyx charts/basyx-go \
+  -n basyx-custom \
+  -f values/values.example.yaml
+```
 
-The linting and testing of the Helm Chart is done with [Helm Chart Testing](https://github.com/helm/chart-testing). Please run this tool locally before commiting your changes.
+If you use chart-local custom certificates, render from the repository root so the chart can read files under `charts/basyx-go/config-files/`.
 
-## TODOs
+## Install BaSyx Go
 
-1. Add other auxiliary services and integrating them in charts.
-2. Configure all features and requirements for AAS Environment.
-3. Enable Logo, theming and plugins in a better way in the AAS-GUI.
-4. Make the Ingress and TLS configuration a bit more modular.
+Install the release:
+
+```bash
+helm upgrade --install basyx charts/basyx-go \
+  --kube-context custom-rke \
+  -n basyx-custom \
+  --create-namespace \
+  -f values/values.example.yaml
+```
+
+If you are already on the correct Kubernetes context, `--kube-context` is optional:
+
+```bash
+helm upgrade --install basyx charts/basyx-go \
+  -n basyx-custom \
+  --create-namespace \
+  -f values/values.example.yaml
+```
+
+## Check The Deployment
+
+Check the Helm release:
+
+```bash
+helm --kube-context custom-rke status basyx -n basyx-custom
+helm --kube-context custom-rke history basyx -n basyx-custom
+```
+
+Check Kubernetes resources:
+
+```bash
+kubectl --context custom-rke get pods,svc,ingress \
+  -n basyx-custom
+```
+
+Wait for a service rollout:
+
+```bash
+kubectl --context custom-rke rollout status \
+  deployment/basyx-aas-registry \
+  -n basyx-custom
+```
+
+Check logs:
+
+```bash
+kubectl --context custom-rke logs \
+  -n basyx-custom \
+  deploy/basyx-aas-registry \
+  -c aas-registry
+```
+
+Run runtime Helm tests:
+
+```bash
+helm --kube-context custom-rke test basyx \
+  -n basyx-custom \
+  --logs
+```
+
+## Access The Services
+
+With the default paths, services are exposed below one host:
+
+| Service | URL pattern |
+| --- | --- |
+| AAS Web UI | `https://<host>/aas-gui/` |
+| Keycloak | `https://<host>/identity-management` |
+| AAS Discovery | `https://<host>/aas-discovery` |
+| AAS Registry | `https://<host>/aas-registry` |
+| AAS Repository | `https://<host>/aas-repository` |
+| Submodel Registry | `https://<host>/submodel-registry` |
+| Submodel Repository | `https://<host>/submodel-repo` or your custom override |
+| Concept Description Repository | `https://<host>/cd-repository` |
+| Company Lookup | `https://<host>/company-lookup/companies` |
+
+Company Lookup intentionally has no resource at the bare `/company-lookup` path. Use `/company-lookup/companies`, `/company-lookup/description`, `/company-lookup/swagger` or `/company-lookup/health`.
+
+## Upgrade A Deployment
+
+Change the custom values and run:
+
+```bash
+helm upgrade basyx charts/basyx-go \
+  --kube-context custom-rke \
+  -n basyx-custom \
+  -f values/values.example.yaml
+```
+
+For safer upgrades, render first and optionally use the Helm diff plugin:
+
+```bash
+helm diff upgrade basyx charts/basyx-go \
+  --kube-context custom-rke \
+  -n basyx-custom \
+  -f values/values.example.yaml
+```
+
+## Uninstall
+
+Uninstall the Helm release:
+
+```bash
+helm uninstall basyx \
+  --kube-context custom-rke \
+  -n basyx-custom
+```
+
+CloudNativePG database PVCs and manually created secrets may need separate cleanup, depending on your cluster retention policy.
+
+## Configuration Overview
+
+### Global Values
+
+| Value | Description |
+| --- | --- |
+| `instanceName` | Logical deployment name. Useful for templated certificate paths and UI labels. |
+| `host` | Public DNS host used by ingress, Keycloak issuer URLs and Web UI URLs. |
+| `nameOverride` | Overrides the chart name used in generated resource names. |
+| `fullnameOverride` | Overrides the generated release name. |
+| `paths.*` | Public URL paths for the services. All paths should start with `/`. |
+| `environment.common.*` | Shared environment variables loaded by BaSyx backend services. |
+
+### TLS And Certificates
+
+| Value | Description |
+| --- | --- |
+| `tls.enabled` | Enables TLS-related mounts and ingress TLS rendering. |
+| `tls.hosts` | Hosts included in rendered TLS resources. |
+| `ingress.issuer` | Existing namespaced cert-manager issuer for ingress certificates. |
+| `ingress.clusterIssuer` | Existing cluster issuer for ingress certificates. |
+| `internal.certificateIssuer.autocreateCa` | Creates an internal self-signed CA and issuer. |
+| `internal.certificateIssuer.name` | Internal issuer name used by generated certificates. |
+
+The chart sets `spec.privateKey.rotationPolicy: Always` on the generated CA certificate to avoid cert-manager v1.18+ default-change warnings.
+
+### Additional CA Certificates
+
+BaSyx services sometimes need to call HTTPS endpoints that use private CAs. Add those CAs with `internal.CACertificates.trustStore`.
+
+Inline certificate bundle:
+
+```yaml
+internal:
+  CACertificates:
+    trustStore:
+      additionalCACertificates: |-
+        -----BEGIN CERTIFICATE-----
+        ...
+        -----END CERTIFICATE-----
+```
+
+Chart-local certificate directory:
+
+```yaml
+instanceName: custom
+
+internal:
+  CACertificates:
+    trustStore:
+      chartFileDirectory: /config-files/certs/{{ .Values.instanceName }}
+```
+
+Expected directory inside the chart:
+
+```text
+charts/basyx-go/config-files/certs/custom/
+  partner-root-ca.crt
+  external-service-ca.crt
+```
+
+The chart projects configured certificate sources into the pods and updates `SSL_CERT_DIR` automatically.
+
+### Database
+
+The chart creates a CloudNativePG cluster:
+
+```yaml
+database:
+  clusterName: basyx-database
+  database: basyx
+  owner: basyx
+  instances: 3
+  storage:
+    size: 10Gi
+```
+
+For smaller development deployments, reduce the number of database instances and storage size:
+
+```yaml
+database:
+  instances: 1
+  storage:
+    size: 5Gi
+```
+
+### BaSyx Configuration Service
+
+Current BaSyx Go snapshots require the database schema to be prepared before DB-backed services start. The chart enables `configurationService` by default for this. It renders a Kubernetes `Job` using `eclipsebasyx/basyxconfigurationservice-go` and the same CloudNativePG application secret as the runtime services.
+
+The Configuration Service image is versioned independently from the BaSyx runtime service images. Set `configurationService.image.tag` or, preferably for reproducible deployments, `configurationService.image.digest` explicitly when a schema migration image changes.
+
+The default job runs as a Helm hook:
+
+```yaml
+configurationService:
+  enabled: true
+  image:
+    tag: SNAPSHOT
+  waitForDatabase:
+    enabled: true
+  hook:
+    enabled: true
+    events:
+      - post-install
+      - pre-upgrade
+```
+
+`pre-upgrade` runs schema migrations before updated runtime pods are rolled out. `post-install` is used for fresh installs because the PostgreSQL cluster is created by the same chart and must exist before the job can connect.
+
+On fresh installs, CloudNativePG may need some time before the database accepts connections. The chart therefore adds a `wait-for-database` init container that polls PostgreSQL with `pg_isready` before starting the Configuration Service. This avoids slow Kubernetes Job backoff loops when the database is simply not ready yet.
+
+After deployment, verify the job and logs with:
+
+```bash
+kubectl -n basyx-custom get job basyx-configuration
+kubectl -n basyx-custom logs job/basyx-configuration
+```
+
+The successful database state is stored in the `basyxsystem` table with `state=clean`.
+
+### Keycloak
+
+Keycloak is disabled in the unsecured example and enabled in `values/values.secured.example.yaml`. When enabling it, configure at least admin and client credentials:
+
+```yaml
+keycloak:
+  enabled: true
+  realm: basyx
+  secrets:
+    admin:
+      username: admin
+      password: change-me
+    client:
+      name: basyx-ui
+      clientPassword: change-me
+```
+
+The chart can also create roles, clients, protocol mappers and users through `keycloak.initialization.*`.
+
+### BaSyx Services
+
+Each backend service has a similar values structure:
+
+```yaml
+aasRepository:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: eclipsebasyx/aasrepository-go
+    tag: SNAPSHOT
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: "8080"
+  ingress:
+    enabled: true
+```
+
+Supported service blocks:
+
+- `aasDiscovery`
+- `aasRegistry`
+- `aasRepository`
+- `submodelRegistry`
+- `submodelRepository`
+- `cdRepository`
+- `companyLookup`
+- `digitalTwinRegistry`
+
+Most service blocks support `enabled`, `replicaCount`, `image.*`, `imagePullSecrets`, `service.*`, `ingress.*`, `resources`, `nodeSelector`, `tolerations`, `affinity`, `podAnnotations`, `podLabels`, `podSecurityContext`, `securityContext`, `volumes`, `volumeMounts` and optional service-local `abac` overrides.
+
+### AAS Web UI
+
+Enable the Web UI with:
+
+```yaml
+aasWebGui:
+  enabled: true
+  image:
+    tag: SNAPSHOT
+```
+
+The Web UI infrastructure is rendered from `aasWebGui.infrastructureConfig`. The defaults derive service URLs from `host` and `paths.*`.
+
+Logo files are read from the chart-local `config-files/logos` directory.
+
+### ABAC Authorization
+
+ABAC is controlled globally with:
+
+```yaml
+abac:
+  enabled: true
+```
+
+The default rule grants full access to users with token claim `role=admin`.
+
+You can override rules globally:
+
+```yaml
+abac:
+  accessRules: |
+    {
+      "AllAccessPermissionRules": {
+        "DEFATTRIBUTES": [],
+        "DEFOBJECTS": [],
+        "DEFACLS": [],
+        "DEFFORMULAS": [],
+        "rules": []
+      }
+    }
+```
+
+Or per service:
+
+```yaml
+aasRepository:
+  abac:
+    enabled: true
+    accessRules: |
+      { }
+    trustList: |
+      [ ]
+```
+
+The default trust list is derived from `host`, `paths.keycloak`, `keycloak.realm` and `environment.common.OIDC_AUDIENCE`.
+
+## Network Policies
+
+Network Policies are not included in this chart. For production deployments, restrict
+east-west traffic between pods by deploying NetworkPolicy resources separately. Your
+cluster must have a Network Policy controller installed (e.g. Calico, Cilium, or Weave).
+Standard managed Kubernetes offerings (GKE, EKS, AKS) support this natively.
+
+Recommended rules:
+
+- Allow ingress controller → all BaSyx services (HTTP)
+- Allow all BaSyx services → PostgreSQL (port 5432)
+- Allow all BaSyx services → Keycloak (port 8080, when enabled)
+- Deny all other ingress by default
+
+Example policy restricting ingress to the AAS Registry:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-aas-registry
+  namespace: basyx-custom
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: aas-registry
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - port: 8080
+```
+
+## Development And Testing
+
+Install the Helm unittest plugin once:
+
+```bash
+helm plugin install https://github.com/helm-unittest/helm-unittest --verify=false
+```
+
+Run local chart checks:
+
+```bash
+helm lint charts/basyx-go
+helm unittest charts/basyx-go
+```
+
+Run lint with custom values:
+
+```bash
+helm lint charts/basyx-go -f values/values.example.yaml
+helm lint charts/basyx-go -f values/values.secured.example.yaml
+```
+
+Runtime smoke tests after deployment:
+
+```bash
+helm test basyx -n <namespace> --logs
+```
+
+## Debugging
+
+Many BaSyx images are intentionally slim. Prefer ephemeral debug containers:
+
+```bash
+kubectl -n <namespace> debug -it pod/<pod-name> \
+  --image=nicolaka/netshoot \
+  --target=<container-name>
+```
+
+## Troubleshooting
+
+| Symptom | What to check |
+| --- | --- |
+| `no matches for kind "Certificate"` | cert-manager CRDs are missing. Install cert-manager with CRDs enabled. |
+| `no matches for kind "Cluster" in version "postgresql.cnpg.io/v1"` | CloudNativePG CRDs are missing. Install CloudNativePG. |
+| Ingress returns 404 | Check `host`, `paths.*`, ingress class and whether the service itself has a route for that path. |
+| Pods cannot verify Keycloak TLS | Check the internal CA secret, custom CA mounts and `SSL_CERT_DIR`. |
+| `Token verification failed: expected audience ...` | Check Keycloak protocol mappers and `environment.common.OIDC_AUDIENCE`. |
+| `ABAC(model): NO_MATCH` | Check token claims, ABAC object definitions, route patterns and whether pods rolled after config changes. |
+| Custom CA not visible in pod | Run `helm test <release> -n <namespace> --logs` and inspect `/etc/ssl/certs/custom`. |
+| Upgrade targets the wrong cluster | Pass `--kube-context <context>` explicitly. |
+
+## Repository Layout
+
+```text
+charts/basyx-go/                    Helm chart
+charts/basyx-go/Chart.yaml          Chart metadata
+charts/basyx-go/values.yaml         Default chart values
+charts/basyx-go/templates/          Kubernetes templates
+charts/basyx-go/tests/              helm-unittest suites
+charts/basyx-go/config-files/       Chart-local files such as logos and optional certs
+values/                             Custom values overlays
+```
+
+## Open Source Notes
+
+Before publishing publicly:
+
+- Keep real deployment values, passwords, client secrets and private certificates out of the public repository.
+- Provide sanitized example values instead of production overlays.
+- Prefer fixed image tags or digests over mutable `SNAPSHOT` tags for reproducible deployments.
+- Review ABAC defaults and document deployment-specific rule sets outside the public chart when needed.
+
+## References
+
+This README follows the deployment-oriented structure of the Eclipse BaSyx Helm chart documentation while adapting it for the BaSyx Go chart and its current dependencies.
+
+- Eclipse BaSyx charts: https://github.com/eclipse-basyx/charts
+- Helm documentation: https://helm.sh/docs/
+- CloudNativePG: https://cloudnative-pg.io/
+- cert-manager: https://cert-manager.io/

@@ -1,0 +1,17 @@
+{{- if .Values.keycloak.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "basyx-keycloak.fullname" . }}
+  labels:
+    {{- include "basyx-keycloak.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.keycloak.service.type }}
+  ports:
+    - port: {{ .Values.keycloak.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "basyx-keycloak.selectorLabels" . | nindent 4 }}
+{{- end }}

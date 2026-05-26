@@ -1,0 +1,33 @@
+{{- if .Values.companyLookup.enabled -}}
+{{- if .Values.companyLookup.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "basyx-companyLookup.fullname" . }}
+  labels:
+    {{- include "basyx-companyLookup.labels" . | nindent 4 }}
+  annotations: &commonIngressAnnotations
+  {{- include "common.ingressTLS.annotations" . | nindent 2}}
+  {{- with .Values.companyLookup.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  ingressClassName: {{ .Values.companyLookup.ingress.className | quote }}
+  {{- include "common.ingressTLS" .  | indent 2}}
+  rules:
+    {{- range .Values.companyLookup.ingress.hosts }}
+    - host: {{ tpl .host $ | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ tpl .path $ | quote }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                name: {{ include "basyx-companyLookup.fullname" $ }}
+                port:
+                  number: {{ $.Values.companyLookup.service.port }}
+          {{- end }}
+    {{- end }}
+{{- end }}
+{{- end }}

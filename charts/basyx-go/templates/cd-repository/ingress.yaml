@@ -1,0 +1,33 @@
+{{- if .Values.cdRepository.enabled -}}
+{{- if .Values.cdRepository.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "basyx-cdRepository.fullname" . }}
+  labels:
+    {{- include "basyx-cdRepository.labels" . | nindent 4 }}
+  annotations: &commonIngressAnnotations
+  {{- include "common.ingressTLS.annotations" . | nindent 2}}
+  {{- with .Values.cdRepository.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  ingressClassName: {{ .Values.cdRepository.ingress.className | quote }}
+  {{- include "common.ingressTLS" .  | indent 2}}
+  rules:
+    {{- range .Values.cdRepository.ingress.hosts }}
+    - host: {{ tpl .host $ | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ tpl .path $ | quote }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                name: {{ include "basyx-cdRepository.fullname" $ }}
+                port:
+                  number: {{ $.Values.cdRepository.service.port }}
+          {{- end }}
+    {{- end }}
+{{- end }}
+{{- end }}

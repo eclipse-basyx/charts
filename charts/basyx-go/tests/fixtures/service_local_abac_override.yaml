@@ -1,0 +1,18 @@
+abac:
+  enabled: true
+  accessRules: |
+    {"source":"global"}
+  trustList: |
+    [{"issuer":"https://global.example/realms/basyx","audience":"global-audience","scopes":["profile"]}]
+
+aasRepository:
+  enabled: true
+  abac:
+    enabled: true
+    accessRules: |
+      {"source":"repository"}
+    trustList: |
+      [{"issuer":"https://repo.example/realms/basyx","audience":"repo-audience","scopes":["email"]}]
+
+aasRegistry:
+  enabled: true

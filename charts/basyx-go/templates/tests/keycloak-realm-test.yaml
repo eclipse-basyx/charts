@@ -1,0 +1,26 @@
+{{- if .Values.keycloak.enabled }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "basyx-keycloak.fullname" . }}-realm-test
+  labels:
+    {{- include "basyx-keycloak.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  containers:
+    - name: keycloak-realm-check
+      image: {{ include "basyx.image" (dict "image" .Values.keycloak.tests.realmCheck.image "root" .) | quote }}
+      imagePullPolicy: {{ .Values.keycloak.tests.realmCheck.image.pullPolicy }}
+      command:
+        - /bin/sh
+        - -ec
+      args:
+        - >
+          realm_url="http://{{ include "basyx-keycloak.fullname" . }}:{{ .Values.keycloak.service.port }}{{ .Values.paths.keycloak }}/realms/{{ .Values.keycloak.realm }}";
+          echo "Checking ${realm_url}";
+          body="$(curl -fsS "${realm_url}")";
+          echo "${body}" | grep -q '"realm":"{{ .Values.keycloak.realm }}"'
+{{- end }}

@@ -1,0 +1,17 @@
+{{- if .Values.cdRepository.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "basyx-cdRepository.fullname" . }}
+  labels:
+    {{- include "basyx-cdRepository.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.cdRepository.service.type }}
+  ports:
+    - port: {{ .Values.cdRepository.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "basyx-cdRepository.selectorLabels" . | nindent 4 }}
+{{- end }}

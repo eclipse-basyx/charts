@@ -1,0 +1,17 @@
+{{- if .Values.aasRepository.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "basyx-aasRepository.fullname" . }}
+  labels:
+    {{- include "basyx-aasRepository.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.aasRepository.service.type }}
+  ports:
+    - port: {{ .Values.aasRepository.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "basyx-aasRepository.selectorLabels" . | nindent 4 }}
+{{- end }}

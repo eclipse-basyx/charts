@@ -1,0 +1,74 @@
+suite: abac enablement
+release:
+  name: basyx
+templates:
+  - templates/abac-configmap.yaml
+  - templates/aas-repository/deployment.yaml
+tests:
+  - it: renders no ABAC configmaps when ABAC is globally disabled
+    template: templates/abac-configmap.yaml
+    set:
+      abac.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: allows enabling ABAC per service even when the global switch is off
+    values:
+      - fixtures/service_local_enable_abac.yaml
+    template: templates/abac-configmap.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - matchRegex:
+          path: data["repo-rules.json"]
+          pattern: '"source":"service-local"'
+        documentSelector:
+          path: metadata.name
+          value: basyx-aas-repository-abac-config
+      - matchRegex:
+          path: data["repo-trust.json"]
+          pattern: 'service-local\.example/realms/basyx'
+        documentSelector:
+          path: metadata.name
+          value: basyx-aas-repository-abac-config
+
+  - it: wires service-local ABAC filenames and mount path into the deployment
+    values:
+      - fixtures/service_local_enable_abac.yaml
+    template: templates/aas-repository/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: ABAC_MODELPATH
+            value: /custom-abac/repo-rules.json
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_TRUSTLISTPATH
+            value: /custom-abac/repo-trust.json
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: abac-config
+            mountPath: /custom-abac
+            readOnly: true
+          count: 1
+
+  - it: still supports the legacy abac.services override path
+    values:
+      - fixtures/legacy_abac_override.yaml
+    template: templates/abac-configmap.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - matchRegex:
+          path: data["legacy-rules.json"]
+          pattern: '"source":"legacy"'
+        documentSelector:
+          path: metadata.name
+          value: basyx-aas-repository-abac-config
+

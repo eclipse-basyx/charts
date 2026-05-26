@@ -1,0 +1,33 @@
+{{- if .Values.aasWebGui.enabled }}
+{{- if .Values.aasWebGui.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "basyx-aasWebGui.fullname" . }}
+  labels:
+    {{- include "basyx-aasWebGui.labels" . | nindent 4 }}
+  annotations: &commonIngressAnnotations
+  {{- include "common.ingressTLS.annotations" . | nindent 2}}
+  {{- with .Values.aasWebGui.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  ingressClassName: {{ .Values.aasWebGui.ingress.className | quote }}
+  {{ include "common.ingressTLS" . | nindent 2}}
+  rules:
+    {{- range .Values.aasWebGui.ingress.hosts }}
+    - host: {{ tpl .host $ | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ tpl .path $ | quote }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                name: {{ include "basyx-aasWebGui.fullname" $ }}
+                port:
+                  number: {{ $.Values.aasWebGui.service.port }}
+          {{- end }}
+    {{- end }}
+{{- end }}
+{{- end }}

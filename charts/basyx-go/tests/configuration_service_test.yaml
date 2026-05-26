@@ -1,0 +1,80 @@
+suite: configuration service
+release:
+  name: basyx
+templates:
+  - templates/configuration-service-job.yaml
+tests:
+  - it: renders the configuration service as a database initialization hook
+    template: templates/configuration-service-job.yaml
+    asserts:
+      - isKind:
+          of: Job
+      - equal:
+          path: metadata.name
+          value: basyx-configuration
+      - equal:
+          path: metadata.annotations["helm.sh/hook"]
+          value: post-install,pre-upgrade
+      - equal:
+          path: metadata.annotations["helm.sh/hook-weight"]
+          value: "-10"
+      - equal:
+          path: metadata.annotations["helm.sh/hook-delete-policy"]
+          value: before-hook-creation
+      - equal:
+          path: spec.backoffLimit
+          value: 12
+      - equal:
+          path: spec.template.spec.restartPolicy
+          value: OnFailure
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: wait-for-database
+      - equal:
+          path: spec.template.spec.initContainers[0].image
+          value: ghcr.io/cloudnative-pg/postgresql:18.3-system-trixie
+      - matchRegex:
+          path: spec.template.spec.initContainers[0].command[2]
+          pattern: "pg_isready"
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: eclipsebasyx/basyxconfigurationservice-go:SNAPSHOT
+
+  - it: wires postgres credentials from the shared CNPG application secret
+    template: templates/configuration-service-job.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_HOST
+            valueFrom:
+              secretKeyRef:
+                name: basyx-database-app
+                key: host
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: basyx-database-app
+                key: password
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_DBNAME
+            valueFrom:
+              secretKeyRef:
+                name: basyx-database-app
+                key: dbname
+          count: 1
+
+  - it: can be disabled
+    template: templates/configuration-service-job.yaml
+    set:
+      configurationService.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0

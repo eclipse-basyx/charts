@@ -1,0 +1,13 @@
+{{- if .Values.companyLookup.enabled -}}
+{{- include "basyx.service.deployment" (dict
+  "root" .
+  "component" "companyLookup"
+  "nameSuffix" "company-lookup"
+  "fullnameHelper" "basyx-companyLookup.fullname"
+  "labelsHelper" "basyx-companyLookup.labels"
+  "selectorLabelsHelper" "basyx-companyLookup.selectorLabels"
+  "serviceAccountHelper" "basyx-companyLookup.serviceAccountName"
+  "containerName" "company-lookup"
+  "extraEnv" (include "basyx.service.extraEnvMap" (.Values.companyLookup.environment | default dict))
+) -}}
+{{- end }}

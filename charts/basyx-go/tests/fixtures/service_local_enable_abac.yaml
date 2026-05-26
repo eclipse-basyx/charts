@@ -1,0 +1,14 @@
+abac:
+  enabled: false
+
+aasRepository:
+  enabled: true
+  abac:
+    enabled: true
+    mountPath: /custom-abac
+    accessRulesFileName: repo-rules.json
+    trustListFileName: repo-trust.json
+    accessRules: |
+      {"source":"service-local"}
+    trustList: |
+      [{"issuer":"https://service-local.example/realms/basyx","audience":"repo-audience","scopes":["email"]}]

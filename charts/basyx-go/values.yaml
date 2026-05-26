@@ -1,0 +1,1324 @@
+# This is to override the chart name.
+nameOverride: ""
+fullnameOverride: ""
+# This section builds out the service account more information can be found here: https://kubernetes.io/docs/concepts/security/service-accounts/
+serviceAccount:
+  # Specifies whether a service account should be created.
+  create: true
+  # Automatically mount a ServiceAccount's API credentials?
+  automount: false
+  # Annotations to add to the service account.
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template.
+  name: ""
+
+# This block is for setting up the ingress for more information can be found here: https://kubernetes.io/docs/concepts/services-networking/ingress/
+
+# -- Expose the service via gateway-api HTTPRoute
+# Requires Gateway API resources and suitable controller installed within the cluster
+# (see: https://gateway-api.sigs.k8s.io/guides/)
+
+instanceName: "example"
+host: "basyx.example.com"
+
+tls: 
+  enabled: true
+  hosts: 
+   - "{{ .Values.host }}"
+
+internal:
+  CACertificates:
+    trustStore:
+      # Keep the default system trust directory in SSL_CERT_DIR.
+      useDefaultCAs: true
+      # Mount point for additional CA sources.
+      mountPath: /etc/ssl/certs/custom
+      # Optional chart-local directory whose files are projected into the trust store.
+      # Supports templating, e.g. /config-files/certs/{{ .Values.instanceName }}
+      chartFileDirectory: ""
+      # Optional inline PEM bundle rendered into a generated ConfigMap.
+      additionalCACertificates: |-
+      # Optional existing Secret names projected into the trust store.
+      extraSecrets: []
+      # Optional existing ConfigMap names projected into the trust store.
+      extraConfigMaps: []
+  certificateIssuer:
+    name: internal-issuer
+    autocreateCa: false
+    autocreateCaSecretName: internal-issuer-ca
+    spec:
+      ca:
+        # references existing ca secret
+        secretName: internal-issuer-ca
+
+
+ingress:
+  clusterIssuer: ""
+  issuer: ""
+  certificateIssuer:
+    enabled: false
+    name: ingress-issuer
+    spec: {}
+
+paths:
+  dashboard: /aas-dataspace-dashboard
+  aasDiscovery: /aas-discovery
+  aasRegistry: /aas-registry
+  aasRepository: /aas-repository
+  submodelRegistry: /submodel-registry
+  submodelRepository: /submodel-repo
+  cdRepository: /cd-repository
+  companyLookup: /company-lookup
+  confSubmodelRepository: /conf-submodel-repo
+  aasWebUi: /aas-gui/
+  aasWebUiBasePath: /aas-gui
+  keycloak: /identity-management
+  digitalTwinRegistry: /digital-twin-registry
+
+environment:
+  common:
+    # Restrict to specific origins in production, e.g.: "https://my-app.example.com"
+    # Never combine wildcard '*' with CORS_ALLOWEDCREDENTIALS: true (CSRF risk, browsers block it).
+    CORS_ALLOWEDORIGINS: ""
+    CORS_ALLOWEDHEADERS: "*"
+    CORS_ALLOWEDCREDENTIALS: false
+    CORS_ALLOWEDMETHODS: GET,POST,PUT,PATCH,DELETE,OPTIONS
+    POSTGRES_MAXOPENCONNECTIONS: 500
+    POSTGRES_MAXIDLECONNECTIONS: 500
+    POSTGRES_CONNMAXLIFETIMEMINUTES: 5
+    SERVER_STRICTVERIFICATION: permissive
+    OIDC_AUDIENCE: discovery-service
+    ABAC_ENABLED: false
+
+
+# HTTP proxy settings for outbound connections from all services.
+# Set to empty string "" to disable. noProxy should include cluster-internal
+# domains to avoid proxying internal traffic, e.g.: ".svc.cluster.local,keycloak"
+proxy:
+  http: ""
+  https: ""
+  noProxy: "localhost,127.0.0.1,.svc.cluster.local"
+
+configurationService:
+  # The BaSyx Go Configuration Service initializes and migrates the shared
+  # PostgreSQL schema before DB-backed runtime services use it.
+  enabled: true
+  image:
+    repository: eclipsebasyx/basyxconfigurationservice-go
+    pullPolicy: Always
+    # Keep this tag independent from the BaSyx runtime image tags. Schema
+    # migrations may be released on a different cadence than the services.
+    tag: "SNAPSHOT"
+    digest: ""
+  imagePullSecrets: []
+  command: []
+  args: []
+  waitForDatabase:
+    enabled: true
+    image:
+      repository: ghcr.io/cloudnative-pg/postgresql
+      pullPolicy: IfNotPresent
+      tag: "18.3-system-trixie"
+      digest: ""
+    intervalSeconds: 5
+    timeoutSeconds: 600
+    resources: {}
+  hook:
+    enabled: true
+    # post-install is needed because the CNPG database is created by this chart.
+    # pre-upgrade runs migrations before new runtime pods start.
+    events:
+      - post-install
+      - pre-upgrade
+    weight: "-10"
+    deletePolicy:
+      - before-hook-creation
+    annotations: {}
+  backoffLimit: 12
+  activeDeadlineSeconds: 900
+  ttlSecondsAfterFinished: 600
+  restartPolicy: OnFailure
+  podAnnotations: {}
+  podLabels: {}
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  resources: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+keycloak:
+  enabled: false
+  realm: basyx
+  webUiClientId: basyx-ui  
+  initJob:
+    image:
+      repository: peterevans/curl-jq
+      pullPolicy: Always
+      tag: "1.0"
+      digest: ""
+  tests:
+    realmCheck:
+      image:
+        repository: curlimages/curl
+        pullPolicy: Always
+        tag: 8.19.0
+        digest: ""
+  initialization:
+    userProfile:
+      unmanagedAttributePolicy: ADMIN_EDIT
+
+    roles:
+      - admin
+      - viewer
+
+    clients:
+
+      - clientId: basyx-ui
+        publicClient: true
+        standardFlowEnabled: true
+        implicitFlowEnabled: true
+
+        redirectUris:
+          - "https://{{ .Values.host }}{{ .Values.paths.aasWebUiBasePath }}/*"
+
+        webOrigins:
+          - "+"
+
+        attributes:
+          post.logout.redirect.uris: "https://{{ .Values.host }}{{ .Values.paths.aasWebUiBasePath }}/*"
+          oauth2.device.authorization.grant.enabled: "true"
+        protocolMappers:
+          - name: Role Mapper
+            protocol: openid-connect
+            protocolMapper: oidc-usermodel-attribute-mapper
+            consentRequired: false
+            config:
+              aggregate.attrs: "false"
+              introspection.token.claim: "true"
+              multivalued: "false"
+              userinfo.token.claim: "true"
+              user.attribute: role
+              id.token.claim: "true"
+              lightweight.claim: "false"
+              access.token.claim: "true"
+              claim.name: role
+              jsonType.label: String
+          - name: discovery-service-aud-mapper
+            protocol: openid-connect
+            protocolMapper: oidc-audience-mapper
+            consentRequired: false
+            config:
+              included.client.audience: discovery-service
+              id.token.claim: "false"
+              lightweight.claim: "false"
+              introspection.token.claim: "true"
+              access.token.claim: "true"
+              userinfo.token.claim: "false"
+          - name: Clearance Mapper
+            protocol: openid-connect
+            protocolMapper: oidc-usermodel-attribute-mapper
+            consentRequired: false
+            config:
+              aggregate.attrs: "false"
+              introspection.token.claim: "true"
+              multivalued: "false"
+              userinfo.token.claim: "true"
+              user.attribute: clear
+              id.token.claim: "true"
+              lightweight.claim: "false"
+              access.token.claim: "true"
+              claim.name: clear
+              jsonType.label: String
+
+      - clientId: discovery-service
+        serviceAccountsEnabled: true
+
+    users:
+      - username: d4e.admin
+        enabled: true
+        email: d4e_admin@example.com
+        firstName: D4E
+        lastName: Admin
+        emailVerified: true
+        attributes:
+          role:
+            - admin
+          clear:
+            - admin
+        roles:
+          - admin
+        credentials:
+          - type: password
+            value: changeit
+            temporary: false
+  environment:
+    KC_PROXY: edge
+    jgroups_dns_query: keycloak
+    PROXY_ADDRESS_FORWARDING: true
+    KC_HEALTH_ENABLED: true
+    KC_HTTP_ENABLED: true
+    KC_DB: postgres
+    KC_HTTP_MANAGEMENT_ENABLED: "true"
+    KC_PROXY_HEADERS: xforwarded
+    KC_HOSTNAME_STRICT: "false"
+    KC_HOSTNAME_STRICT_BACKCHANNEL: "false"
+  monitoring:
+    enabled: true
+  secrets:
+    # name for the creditals secret
+    name: "keycloak-credentials"
+    # configures admin user for keycloak
+    admin: 
+      username: changme
+      password: changme
+    # configures client credentials for keycloak
+    client:
+      name: basyx-ui
+      clientPassword: changme
+  replicaCount: 1
+  image:
+    repository: keycloak/keycloak
+    pullPolicy: Always
+    tag: 26.5
+  imagePullSecrets: []
+  nameOverride: "keycloak"
+  fullnameOverride: "keycloak"
+  serviceAccount:
+    # Specifies whether a service account should be created
+    create: true
+    # Automatically mount a ServiceAccount's API credentials?
+    automount: false
+    # Annotations to add to the service account
+    annotations: {}
+    # The name of the service account to use.
+    # If not set and create is true, a name is generated using the fullname template
+    name: "keycloak"
+  podAnnotations: {}
+  podLabels: {}
+  # Keycloak runs as root by default. Consult the official image documentation
+  # before restricting the security context for production deployments.
+  podSecurityContext: {}
+  securityContext: {}
+  service:
+    type: ClusterIP
+    port: 9096
+  managementPort: 9000
+    
+  ingress:
+    enabled: true
+    className: nginx
+    annotations: {}
+    hosts:
+      - host: "{{ .Values.host }}"
+        paths:
+          - path: "{{ .Values.paths.keycloak }}"
+            pathType: ImplementationSpecific
+
+  resources:
+    {}
+    # limits:
+    #   cpu: 100m
+    #   memory: 128Mi
+    # requests:
+    #   cpu: 100m
+    #   memory: 128Mi
+  startupProbe:
+    httpGet:
+      path: "{{ .Values.paths.keycloak }}/health/started"
+      port: management
+    failureThreshold: 30
+    periodSeconds: 10
+  livenessProbe:
+    httpGet:
+      path: "{{ .Values.paths.keycloak }}/health/live"
+      port: management
+    initialDelaySeconds: 0
+    periodSeconds: 10
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: "{{ .Values.paths.keycloak }}/health/ready"
+      port: management
+    initialDelaySeconds: 0
+    periodSeconds: 5
+    failureThreshold: 3
+  command:
+    - "/opt/keycloak/bin/kc.sh"
+    - "start"
+    - "--http-enabled=true"
+    - "--http-port=9096"
+    - "--hostname-strict=false"
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+submodelRepository:
+  enabled: false
+  replicaCount: 1
+  image:
+    repository: eclipsebasyx/submodelrepository-go
+    pullPolicy: Always
+    tag: ""
+    # Image tag is same as Chart App version
+  imagePullSecrets: []
+  nameOverride: "submodel-repository"
+  fullnameOverride: "submodel-repository"
+  path: /submodel-repository
+  serviceAccount:
+    # Specifies whether a service account should be created
+    create: true
+    # Automatically mount a ServiceAccount's API credentials?
+    automount: false
+    # Annotations to add to the service account
+    annotations: {}
+    # The name of the service account to use.
+    # If not set and create is true, a name is generated using the fullname template
+    name: "submodel-repository"
+  podAnnotations: {}
+  podLabels: {}
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  service:
+    type: ClusterIP
+    port: "8080"
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    hosts:
+      - host: "{{ .Values.host }}"
+        paths:
+          - path: "{{ .Values.paths.submodelRepository }}"
+            pathType: ImplementationSpecific
+  environment:
+    # Keep the Submodel Registry in sync when submodels are created, updated or deleted.
+    GENERAL_SUBMODELREGISTRYINTEGRATION: true
+    GENERAL_EXTERNALURL: "https://{{ .Values.host }}{{ .Values.paths.submodelRepository }}"
+  resources: {}
+    # limits:
+    #   cpu: 500m
+    #   memory: 512Mi
+    # requests:
+    #   cpu: 100m
+    #   memory: 256Mi
+  livenessProbe:
+    httpGet:
+      path: "{{ .Values.paths.submodelRepository }}/health"
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: "{{ .Values.paths.submodelRepository }}/health"
+      port: http
+    initialDelaySeconds: 15
+    periodSeconds: 5
+    failureThreshold: 3
+  nodeSelector: {}
+  tolerations: []
+  # affinity:
+  #   podAntiAffinity:
+  #     preferredDuringSchedulingIgnoredDuringExecution:
+  #       - weight: 100
+  #         podAffinityTerm:
+  #           topologyKey: kubernetes.io/hostname
+  #           labelSelector:
+  #             matchLabels:
+  #               app.kubernetes.io/name: submodel-repository
+  affinity: {}
+
+submodelRegistry:
+  enabled: false
+  replicaCount: 1
+  image:
+    repository: eclipsebasyx/submodelregistry-go
+    pullPolicy: Always
+    tag: ""
+    # Image tag is same as Chart App version
+  imagePullSecrets: []
+  nameOverride: "submodel-registry"
+  fullnameOverride: "submodel-registry"
+  path: /submodel-registry
+  serviceAccount:
+    # Specifies whether a service account should be created
+    create: true
+    # Automatically mount a ServiceAccount's API credentials?
+    automount: false
+    # Annotations to add to the service account
+    annotations: {}
+    # The name of the service account to use.
+    # If not set and create is true, a name is generated using the fullname template
+    name: "submodel-registry"
+  podAnnotations: {}
+  podLabels: {}
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  service:
+    type: ClusterIP
+    port: "8080"
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    hosts:
+      - host: "{{ .Values.host }}"
+        paths:
+          - path: "{{ .Values.paths.submodelRegistry }}"
+            pathType: ImplementationSpecific
+  resources: {}
+    # limits:
+    #   cpu: 500m
+    #   memory: 512Mi
+    # requests:
+    #   cpu: 100m
+    #   memory: 256Mi
+  livenessProbe:
+    httpGet:
+      path: "{{ .Values.paths.submodelRegistry }}/health"
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: "{{ .Values.paths.submodelRegistry }}/health"
+      port: http
+    initialDelaySeconds: 15
+    periodSeconds: 5
+    failureThreshold: 3
+  nodeSelector: {}
+  tolerations: []
+  # affinity:
+  #   podAntiAffinity:
+  #     preferredDuringSchedulingIgnoredDuringExecution:
+  #       - weight: 100
+  #         podAffinityTerm:
+  #           topologyKey: kubernetes.io/hostname
+  #           labelSelector:
+  #             matchLabels:
+  #               app.kubernetes.io/name: submodel-registry
+  affinity: {}
+
+aasRegistry:
+  enabled: false
+  replicaCount: 1
+  image:
+    repository: eclipsebasyx/aasregistry-go
+    pullPolicy: Always
+    tag: ""
+    # Image tag is same as Chart App version
+  imagePullSecrets: []
+  nameOverride: "aas-registry"
+  fullnameOverride: "aas-registry"
+  path: /aas-registry
+  serviceAccount:
+    # Specifies whether a service account should be created
+    create: true
+    # Automatically mount a ServiceAccount's API credentials?
+    automount: false
+    # Annotations to add to the service account
+    annotations: {}
+    # The name of the service account to use.
+    # If not set and create is true, a name is generated using the fullname template
+    name: "aas-registry"
+  podAnnotations: {}
+  podLabels: {}
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  service:
+    type: ClusterIP
+    port: "8080"
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    hosts:
+      - host: "{{ .Values.host }}"
+        paths:
+          - path: "{{ .Values.paths.aasRegistry }}"
+            pathType: ImplementationSpecific
+
+  # Content of application.yaml
+  # central environment variables (will be set in configmap.yaml via tpl interpolation)
+  environment: {}
+
+  resources: {}
+    # We usually recommend not to specify default resources and to leave this as a conscious
+    # choice for the user. This also increases chances charts run on environments with little
+    # resources, such as Minikube. If you do want to specify resources, uncomment the following
+    # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+    # limits:
+    #   cpu: 500m
+    #   memory: 512Mi
+    # requests:
+    #   cpu: 100m
+    #   memory: 256Mi
+  livenessProbe:
+    httpGet:
+      path: "{{ .Values.paths.aasRegistry }}/health"
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: "{{ .Values.paths.aasRegistry }}/health"
+      port: http
+    initialDelaySeconds: 15
+    periodSeconds: 5
+    failureThreshold: 3
+  nodeSelector: {}
+  tolerations: []
+  # For HA deployments (replicaCount > 1), configure pod anti-affinity to spread
+  # replicas across nodes. Adjust matchLabels to this service's app.kubernetes.io/name.
+  # affinity:
+  #   podAntiAffinity:
+  #     preferredDuringSchedulingIgnoredDuringExecution:
+  #       - weight: 100
+  #         podAffinityTerm:
+  #           topologyKey: kubernetes.io/hostname
+  #           labelSelector:
+  #             matchLabels:
+  #               app.kubernetes.io/name: aas-registry
+  affinity: {}
+
+
+digitalTwinRegistry:
+  enabled: false
+  replicaCount: 1
+  image:
+    repository: eclipsebasyx/digitaltwinregistry-go
+    pullPolicy: Always
+    tag: ""
+    # Image tag is same as Chart App version
+  imagePullSecrets: []
+  nameOverride: "digital-twin-registry"
+  fullnameOverride: "digital-twin-registry"
+  path: /digital-twin-registry
+  serviceAccount:
+    # Specifies whether a service account should be created
+    create: true
+    # Automatically mount a ServiceAccount's API credentials?
+    automount: false
+    # Annotations to add to the service account
+    annotations: {}
+    # The name of the service account to use.
+    # If not set and create is true, a name is generated using the fullname template
+    name: "digital-twin-registry"
+  podAnnotations: {}
+  podLabels: {}
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  service:
+    type: ClusterIP
+    port: "8080"
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    hosts:
+      - host: "{{ .Values.host }}"
+        paths:
+          - path: "{{ .Values.paths.digitalTwinRegistry }}"
+            pathType: ImplementationSpecific
+
+  # Content of application.yaml
+  # central environment variables (will be set in configmap.yaml via tpl interpolation)
+  environment: {}
+
+  resources: {}
+    # We usually recommend not to specify default resources and to leave this as a conscious
+    # choice for the user. This also increases chances charts run on environments with little
+    # resources, such as Minikube. If you do want to specify resources, uncomment the following
+    # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+    # limits:
+    #   cpu: 500m
+    #   memory: 512Mi
+    # requests:
+    #   cpu: 100m
+    #   memory: 256Mi
+  livenessProbe:
+    httpGet:
+      path: "{{ .Values.paths.digitalTwinRegistry }}/health"
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: "{{ .Values.paths.digitalTwinRegistry }}/health"
+      port: http
+    initialDelaySeconds: 15
+    periodSeconds: 5
+    failureThreshold: 3
+  nodeSelector: {}
+  tolerations: []
+  # For HA deployments (replicaCount > 1), configure pod anti-affinity to spread
+  # replicas across nodes. Adjust matchLabels to this service's app.kubernetes.io/name.
+  # affinity:
+  #   podAntiAffinity:
+  #     preferredDuringSchedulingIgnoredDuringExecution:
+  #       - weight: 100
+  #         podAffinityTerm:
+  #           topologyKey: kubernetes.io/hostname
+  #           labelSelector:
+  #             matchLabels:
+  #               app.kubernetes.io/name: digital-twin-registry
+  affinity: {}
+
+aasRepository:
+  enabled: false
+  replicaCount: 1
+  image:
+    repository: eclipsebasyx/aasrepository-go
+    pullPolicy: Always
+    tag: SNAPSHOT
+    digest: ""
+    # Image tag is same as Chart App version
+  imagePullSecrets: []
+  nameOverride: "aas-repository"
+  fullnameOverride: "aas-repository"
+  path: /aas-repository
+  serviceAccount:
+    # Specifies whether a service account should be created
+    create: true
+    # Automatically mount a ServiceAccount's API credentials?
+    automount: false
+    # Annotations to add to the service account
+    annotations: {}
+    # The name of the service account to use.
+    # If not set and create is true, a name is generated using the fullname template
+    name: "aas-repository"
+  podAnnotations: {}
+  podLabels: {}
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  service:
+    type: ClusterIP
+    port: "8080"
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    hosts:
+      - host: "{{ .Values.host }}"
+        paths:
+          - path: "{{ .Values.paths.aasRepository }}"
+            pathType: ImplementationSpecific
+
+  # Content of application.yaml
+  # central environment variables (will be set in configmap.yaml via tpl interpolation)
+  environment:
+    # Keep the AAS Registry in sync when AAS shells are created, updated or deleted.
+    GENERAL_AASREGISTRYINTEGRATION: true
+    GENERAL_EXTERNALURL: "https://{{ .Values.host }}{{ .Values.paths.aasRepository }}"
+
+  resources: {}
+    # limits:
+    #   cpu: 500m
+    #   memory: 512Mi
+    # requests:
+    #   cpu: 100m
+    #   memory: 256Mi
+  livenessProbe:
+    httpGet:
+      path: "{{ .Values.paths.aasRepository }}/health"
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: "{{ .Values.paths.aasRepository }}/health"
+      port: http
+    initialDelaySeconds: 15
+    periodSeconds: 5
+    failureThreshold: 3
+  nodeSelector: {}
+  tolerations: []
+  # affinity:
+  #   podAntiAffinity:
+  #     preferredDuringSchedulingIgnoredDuringExecution:
+  #       - weight: 100
+  #         podAffinityTerm:
+  #           topologyKey: kubernetes.io/hostname
+  #           labelSelector:
+  #             matchLabels:
+  #               app.kubernetes.io/name: aas-repository
+  affinity: {}
+
+cdRepository:
+  enabled: false
+  replicaCount: 1
+  image:
+    repository: eclipsebasyx/conceptdescriptionrepository-go
+    pullPolicy: Always
+    tag: ""
+    # Image tag is same as Chart App version
+  imagePullSecrets: []
+  nameOverride: "cd-repository"
+  fullnameOverride: "cd-repository"
+  path: /cd-repository
+  serviceAccount:
+    # Specifies whether a service account should be created
+    create: true
+    # Automatically mount a ServiceAccount's API credentials?
+    automount: false
+    # Annotations to add to the service account
+    annotations: {}
+    # The name of the service account to use.
+    # If not set and create is true, a name is generated using the fullname template
+    name: "cd-repository"
+  podAnnotations: {}
+  podLabels: {}
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  service:
+    type: ClusterIP
+    port: "8080"
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    hosts:
+      - host: "{{ .Values.host }}"
+        paths:
+          - path: "{{ .Values.paths.cdRepository }}"
+            pathType: ImplementationSpecific
+
+  # Content of application.yaml
+  # central environment variables (will be set in configmap.yaml via tpl interpolation)
+  environment: {}
+
+  resources: {}
+    # limits:
+    #   cpu: 500m
+    #   memory: 512Mi
+    # requests:
+    #   cpu: 100m
+    #   memory: 256Mi
+  livenessProbe:
+    httpGet:
+      path: "{{ .Values.paths.cdRepository }}/health"
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: "{{ .Values.paths.cdRepository }}/health"
+      port: http
+    initialDelaySeconds: 15
+    periodSeconds: 5
+    failureThreshold: 3
+  nodeSelector: {}
+  tolerations: []
+  # affinity:
+  #   podAntiAffinity:
+  #     preferredDuringSchedulingIgnoredDuringExecution:
+  #       - weight: 100
+  #         podAffinityTerm:
+  #           topologyKey: kubernetes.io/hostname
+  #           labelSelector:
+  #             matchLabels:
+  #               app.kubernetes.io/name: cd-repository
+  affinity: {}
+
+companyLookup:
+  enabled: false
+  replicaCount: 1
+  image:
+    repository: eclipsebasyx/companylookup-go
+    pullPolicy: Always
+    tag: ""
+    digest: ""
+  imagePullSecrets: []
+  nameOverride: "company-lookup"
+  fullnameOverride: "company-lookup"
+  path: /company-lookup
+  serviceAccount:
+    create: true
+    automount: false
+    annotations: {}
+    name: "company-lookup"
+  podAnnotations: {}
+  podLabels: {}
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  service:
+    type: ClusterIP
+    port: "5080"
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    hosts:
+      - host: "{{ .Values.host }}"
+        paths:
+          - path: "{{ .Values.paths.companyLookup }}"
+            pathType: ImplementationSpecific
+  environment: {}
+  resources: {}
+    # limits:
+    #   cpu: 500m
+    #   memory: 512Mi
+    # requests:
+    #   cpu: 100m
+    #   memory: 256Mi
+  livenessProbe:
+    httpGet:
+      path: "{{ .Values.paths.companyLookup }}/health"
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: "{{ .Values.paths.companyLookup }}/health"
+      port: http
+    initialDelaySeconds: 15
+    periodSeconds: 5
+    failureThreshold: 3
+  nodeSelector: {}
+  tolerations: []
+  # affinity:
+  #   podAntiAffinity:
+  #     preferredDuringSchedulingIgnoredDuringExecution:
+  #       - weight: 100
+  #         podAffinityTerm:
+  #           topologyKey: kubernetes.io/hostname
+  #           labelSelector:
+  #             matchLabels:
+  #               app.kubernetes.io/name: company-lookup
+  affinity: {}
+
+
+aasDiscovery:
+  enabled: false
+  replicaCount: 1
+  image:
+    repository: eclipsebasyx/aasdiscovery-go
+    pullPolicy: Always
+    tag: ""
+  imagePullSecrets: []
+  nameOverride: "aas-discovery"
+  fullnameOverride: "aas-discovery"
+  serviceAccount:
+    # Specifies whether a service account should be created
+    create: true
+    # Automatically mount a ServiceAccount's API credentials?
+    automount: false
+    # Annotations to add to the service account
+    annotations: {}
+    # The name of the service account to use.
+    # If not set and create is true, a name is generated using the fullname template
+    name: "aas-discovery"
+  podAnnotations: {}
+  podLabels: {}
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  service:
+    type: ClusterIP
+    port: "8081"
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    hosts:
+      - host: "{{ .Values.host }}"
+        paths:
+          - path: "{{ .Values.paths.aasDiscovery }}"
+            pathType: ImplementationSpecific      
+
+  # central environment variables (will be set in configmap.yaml via tpl interpolation)
+  environment: {}
+  resources: {}
+    # limits:
+    #   cpu: 500m
+    #   memory: 512Mi
+    # requests:
+    #   cpu: 100m
+    #   memory: 256Mi
+  livenessProbe:
+    httpGet:
+      path: "{{ .Values.paths.aasDiscovery }}/health"
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: "{{ .Values.paths.aasDiscovery }}/health"
+      port: http
+    initialDelaySeconds: 15
+    periodSeconds: 5
+    failureThreshold: 3
+  nodeSelector: {}
+  tolerations: []
+  # affinity:
+  #   podAntiAffinity:
+  #     preferredDuringSchedulingIgnoredDuringExecution:
+  #       - weight: 100
+  #         podAffinityTerm:
+  #           topologyKey: kubernetes.io/hostname
+  #           labelSelector:
+  #             matchLabels:
+  #               app.kubernetes.io/name: aas-discovery
+  affinity: {}
+
+  # Default values for aas-web-gui.
+  # This is a YAML-formatted file.
+  # Declare variables to be passed into your templates.
+aasWebGui:
+  enabled: false
+  replicaCount: 1
+  image:
+    repository: eclipsebasyx/aas-gui
+    pullPolicy: Always
+    tag: SNAPSHOT
+  imagePullSecrets: []
+  nameOverride: "aas-gui"
+  fullnameOverride: "aas-gui"
+  serviceAccount:
+    # Specifies whether a service account should be created
+    create: true
+    # Automatically mount a ServiceAccount's API credentials?
+    automount: false
+    # Annotations to add to the service account
+    annotations: {}
+    # The name of the service account to use.
+    # If not set and create is true, a name is generated using the fullname template
+    name: "aas-gui"
+  podAnnotations: {}
+  podLabels: {}
+  podSecurityContext:
+    {}
+    # fsGroup: 2000
+  securityContext:
+    {}
+    # runAsUser: 0
+    # runAsGroup: 0
+    # capabilities:
+    #   drop:
+    #   - ALL
+    # readOnlyRootFilesystem: true
+    # runAsNonRoot: true
+    # runAsUser: 1000
+  service:
+    type: NodePort
+    port: 3000
+  infrastructureConfig:
+    infrastructures:
+      default: main
+
+      main:
+        name: "BaSyx Go {{ .Values.instanceName }}"
+        components:
+          aasDiscovery:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.aasDiscovery }}"
+          aasRegistry:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.aasRegistry }}"
+          submodelRegistry:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.submodelRegistry }}"
+          aasRepository:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.aasRepository }}"
+          submodelRepository:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.submodelRepository }}"
+          conceptDescriptionRepository:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.cdRepository }}"
+        security:
+          type: oauth2
+          config:
+            flow: auth_code
+            issuer: "https://{{ .Values.host }}{{ .Values.paths.keycloak }}/realms/{{ .Values.keycloak.realm }}"
+            clientId: "{{ .Values.keycloak.secrets.client.name }}"
+  logos:
+    light: BaSyx_Logo.svg
+    dark: BaSyx_Logo.svg
+  environment:
+    LOGO_LIGHT_PATH: BaSyx_Logo.svg
+    LOGO_DARK_PATH: BaSyx_Logo.svg
+
+
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    hosts:
+      - host: "{{ .Values.host }}"
+        paths:
+          - path: "{{ .Values.paths.aasWebUi }}"
+            pathType: ImplementationSpecific
+
+  resources: {}
+    # limits:
+    #   cpu: 500m
+    #   memory: 512Mi
+    # requests:
+    #   cpu: 100m
+    #   memory: 256Mi
+  livenessProbe:
+    httpGet:
+      path: "{{ .Values.paths.aasWebUi }}"
+      port: http
+    initialDelaySeconds: 15
+    periodSeconds: 10
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: "{{ .Values.paths.aasWebUi }}"
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    failureThreshold: 3
+  # Additional volumes on the output Deployment definition.
+  # volumes:
+  #   - name: logos
+  #     configMap:
+  #       name: logos
+  #       defaultMode: 365
+  #       items:
+  #         - key: logo.png
+  #           path: logo.png
+  #         - key: favicon.ico
+  #           path: favicon.ico
+  # volumeMounts:
+  #   - name: logos
+  #     mountPath: /usr/src/app/dist/Logo
+  #     readOnly: true
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+  # volumes:
+  #   - name: logo
+  #     configMap:
+  #       name: logo
+  #       defaultMode: 0644
+  # volumeMounts:
+  #   - name: logo
+  #     mountPath: /usr/src/app/dist/Logo
+  #     readOnly: true
+
+
+database:
+  clusterName: basyx-database
+  type: postgres
+  # name for the cnpg cluster ressource
+  # clusterName: "basyx-database"
+  # name of database
+  # database: "basyx"
+  # owner of database
+  # owner: "basyx"
+  # Number of instances per cluster
+  instances: 3
+  # Storage configuration
+  storage:
+    # Volume size per instance
+    size: 10Gi
+
+# PodDisruptionBudget: not managed by this chart. For HA deployments, create
+# PDBs separately to guarantee availability during node drains. Example:
+#
+#   apiVersion: policy/v1
+#   kind: PodDisruptionBudget
+#   metadata:
+#     name: basyx-aas-registry-pdb
+#     namespace: <your-namespace>
+#   spec:
+#     minAvailable: 1
+#     selector:
+#       matchLabels:
+#         app.kubernetes.io/name: aas-registry
+#         app.kubernetes.io/instance: basyx
+
+# Attribute-Based Access Control (ABAC) configuration.
+# When enabled, all services enforce access rules based on JWT token claims.
+# accessRules: JSON defining which roles can access which HTTP methods and paths.
+# trustList: list of trusted OIDC issuers with audience and scope configuration.
+# Individual services can override global ABAC settings via <service>.abac.*
+abac:
+  enabled: false
+  mountPath: /security_env
+  accessRulesFileName: access-rules.json
+  trustListFileName: trustlist.json
+
+  accessRules: |
+    {
+      "AllAccessPermissionRules": {
+        "DEFATTRIBUTES": [
+          { "name": "role_attr", "attributes": [{ "CLAIM": "role" }] }
+        ],
+        "DEFOBJECTS": [
+          {
+            "name": "all_api",
+            "objects": [
+              { "ROUTE": "/description" },
+              { "ROUTE": "/shell-descriptors" },
+              { "ROUTE": "/shell-descriptors/*" },
+              { "ROUTE": "/submodel-descriptors" },
+              { "ROUTE": "/submodel-descriptors/*" },
+              { "ROUTE": "/lookup/shells" },
+              { "ROUTE": "/lookup/shells/*" },
+              { "ROUTE": "/lookup/shellsByAssetLink" },
+              { "ROUTE": "/shells" },
+              { "ROUTE": "/shells/*" },
+              { "ROUTE": "/submodels" },
+              { "ROUTE": "/submodels/*" },
+              { "ROUTE": "/concept-descriptions" },
+              { "ROUTE": "/concept-descriptions/*" },
+              { "ROUTE": "/companies" },
+              { "ROUTE": "/companies/*" },
+              { "ROUTE": "{{ .Values.paths.aasRegistry }}/description" },
+              { "ROUTE": "{{ .Values.paths.aasRegistry }}/shell-descriptors" },
+              { "ROUTE": "{{ .Values.paths.aasRegistry }}/shell-descriptors/*" },
+              { "ROUTE": "{{ .Values.paths.submodelRegistry }}/description" },
+              { "ROUTE": "{{ .Values.paths.submodelRegistry }}/submodel-descriptors" },
+              { "ROUTE": "{{ .Values.paths.submodelRegistry }}/submodel-descriptors/*" },
+              { "ROUTE": "{{ .Values.paths.aasDiscovery }}/description" },
+              { "ROUTE": "{{ .Values.paths.aasDiscovery }}/lookup/shells" },
+              { "ROUTE": "{{ .Values.paths.aasDiscovery }}/lookup/shells/*" },
+              { "ROUTE": "{{ .Values.paths.aasDiscovery }}/lookup/shellsByAssetLink" },
+              { "ROUTE": "{{ .Values.paths.aasRepository }}/description" },
+              { "ROUTE": "{{ .Values.paths.aasRepository }}/shells" },
+              { "ROUTE": "{{ .Values.paths.aasRepository }}/shells/*" },
+              { "ROUTE": "{{ .Values.paths.submodelRepository }}/description" },
+              { "ROUTE": "{{ .Values.paths.submodelRepository }}/submodels" },
+              { "ROUTE": "{{ .Values.paths.submodelRepository }}/submodels/*" },
+              { "ROUTE": "{{ .Values.paths.cdRepository }}/description" },
+              { "ROUTE": "{{ .Values.paths.cdRepository }}/concept-descriptions" },
+              { "ROUTE": "{{ .Values.paths.cdRepository }}/concept-descriptions/*" },
+              { "ROUTE": "{{ .Values.paths.companyLookup }}/description" },
+              { "ROUTE": "{{ .Values.paths.companyLookup }}/companies" },
+              { "ROUTE": "{{ .Values.paths.companyLookup }}/companies/*" }
+            ]
+          }
+        ],
+        "DEFACLS": [
+          { "name": "admin_full", "acl": { "USEATTRIBUTES": "role_attr", "RIGHTS": ["ALL"], "ACCESS": "ALLOW" } }
+        ],
+        "DEFFORMULAS": [
+          { "name": "is_admin", "formula": { "$eq": [{ "$attribute": { "CLAIM": "role" } }, { "$strVal": "admin" }] } }
+        ],
+        "rules": [
+          { "USEACL": "admin_full", "USEOBJECTS": ["all_api"], "USEFORMULA": "is_admin" }
+        ]
+      }
+    }
+
+  trustList: |
+    [
+      {
+        "issuer": "https://{{ .Values.host }}{{ .Values.paths.keycloak }}/realms/{{ .Values.keycloak.realm }}",
+        "audience": "{{ .Values.environment.common.OIDC_AUDIENCE | default .Values.keycloak.secrets.client.name }}",
+        "scopes": ["email", "profile"]
+      }
+    ]
+
+  services: {}
+    # Legacy per-service override location. Prefer `<service>.abac` instead.
+    # Supported service keys:
+    # aasDiscovery, aasRegistry, aasRepository, submodelRegistry,
+    # submodelRepository, cdRepository, digitalTwinRegistry

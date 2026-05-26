@@ -1,0 +1,12 @@
+{{- if .Values.companyLookup.enabled -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "basyx-companyLookup.fullname" . }}-config
+  labels:
+    {{- include "basyx-companyLookup.labels" . | nindent 4 }}
+data:
+  {{- range $key, $value := .Values.environment }}
+  {{ $key }}: {{ tpl (print $value) $ | quote }}
+  {{- end }}
+{{- end }}

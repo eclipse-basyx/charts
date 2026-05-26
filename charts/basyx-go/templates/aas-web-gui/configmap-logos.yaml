@@ -1,0 +1,11 @@
+{{- $logos := .Values.aasWebGui.logos | default dict }}
+{{- if and .Values.aasWebGui.enabled (gt (len $logos) 0) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-logos
+binaryData:
+{{- range $k, $file := $logos }}
+  {{ $file }}: {{ $.Files.Get (printf "config-files/logos/%s" $file) | b64enc }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,94 @@
+suite: abac config
+templates:
+  - templates/abac-configmap.yaml
+release:
+  name: basyx
+tests:
+  - it: derives the default trust list from chart values
+    set:
+      aasRepository.enabled: true
+      abac.enabled: true
+    documentSelector:
+      path: metadata.name
+      value: basyx-aas-repository-abac-config
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - matchRegex:
+          path: data["trustlist.json"]
+          pattern: '"issuer": "https://basyx\.example\.com/identity-management/realms/basyx"'
+      - matchRegex:
+          path: data["trustlist.json"]
+          pattern: '"audience": "discovery-service"'
+      - matchRegex:
+          path: data["access-rules.json"]
+          pattern: '"name": "admin_full"'
+      - matchRegex:
+          path: data["access-rules.json"]
+          pattern: '"name": "all_api"'
+      - matchRegex:
+          path: data["access-rules.json"]
+          pattern: '"ROUTE": "/concept-descriptions/\*"'
+      - matchRegex:
+          path: data["access-rules.json"]
+          pattern: '"ROUTE": "/aas-registry/shell-descriptors"'
+      - matchRegex:
+          path: data["access-rules.json"]
+          pattern: '"ROUTE": "/cd-repository/concept-descriptions/\*"'
+      - notMatchRegex:
+          path: data["access-rules.json"]
+          pattern: '"ROUTE": "/\\*"'
+      - matchRegex:
+          path: data["access-rules.json"]
+          pattern: '"USEFORMULA": "is_admin"'
+
+  - it: prefers service-local ABAC overrides over global defaults
+    values:
+      - fixtures/service_local_abac_override.yaml
+    documentSelector:
+      path: metadata.name
+      value: basyx-aas-repository-abac-config
+    asserts:
+      - matchRegex:
+          path: data["access-rules.json"]
+          pattern: '"source":"repository"'
+      - matchRegex:
+          path: data["trustlist.json"]
+          pattern: 'repo\.example/realms/basyx'
+      - notMatchRegex:
+          path: data["trustlist.json"]
+          pattern: 'global\.example/realms/basyx'
+
+  - it: keeps the global ABAC defaults for other services
+    values:
+      - fixtures/service_local_abac_override.yaml
+    documentSelector:
+      path: metadata.name
+      value: basyx-aas-registry-abac-config
+    asserts:
+      - matchRegex:
+          path: data["access-rules.json"]
+          pattern: '"source":"global"'
+      - matchRegex:
+          path: data["trustlist.json"]
+          pattern: 'global\.example/realms/basyx'
+      - notMatchRegex:
+          path: data["trustlist.json"]
+          pattern: 'repo\.example/realms/basyx'
+
+  - it: renders ABAC configuration for company lookup when enabled
+    set:
+      companyLookup.enabled: true
+      abac.enabled: true
+    documentSelector:
+      path: metadata.name
+      value: basyx-company-lookup-abac-config
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - matchRegex:
+          path: data["access-rules.json"]
+          pattern: '"name": "admin_full"'
+      - matchRegex:
+          path: data["trustlist.json"]
+          pattern: '"audience": "discovery-service"'

@@ -1,0 +1,13 @@
+{{- if .Values.aasRegistry.enabled -}}
+{{- include "basyx.service.deployment" (dict
+  "root" .
+  "component" "aasRegistry"
+  "nameSuffix" "aas-registry"
+  "fullnameHelper" "basyx-aasRegistry.fullname"
+  "labelsHelper" "basyx-aasRegistry.labels"
+  "selectorLabelsHelper" "basyx-aasRegistry.selectorLabels"
+  "serviceAccountHelper" "basyx-aasRegistry.serviceAccountName"
+  "containerName" "aas-registry"
+  "extraEnv" (include "basyx.service.extraEnvMap" (.Values.aasRegistry.environment | default dict))
+) -}}
+{{- end }}

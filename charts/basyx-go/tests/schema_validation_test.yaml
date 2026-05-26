@@ -1,0 +1,25 @@
+suite: schema validation
+templates:
+  - templates/secret.yaml
+tests:
+  - it: fails when host is empty
+    values:
+      - fixtures/invalid_empty_host.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "host"
+
+  - it: fails when keycloak client password is not a string
+    values:
+      - fixtures/invalid_keycloak_client_password.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "clientPassword"
+
+  - it: fails when the keycloak path does not start with a slash
+    values:
+      - fixtures/invalid_keycloak_path.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "paths.keycloak"
+

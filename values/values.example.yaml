@@ -1,0 +1,106 @@
+# Example values for an unsecured BaSyx Go deployment.
+#
+# Copy this file and adapt it for your own cluster:
+#
+#   cp values/values.example.yaml values/values.my-environment.yaml
+#
+# Do not commit real passwords, client secrets or private certificate material.
+
+instanceName: example
+host: basyx.example.com
+
+fullnameOverride: basyx
+
+tls:
+  enabled: true
+  hosts:
+    - basyx.example.com
+
+internal:
+  CACertificates:
+    trustStore:
+      useDefaultCAs: true
+      chartFileDirectory: ""
+      additionalCACertificates: |-
+  certificateIssuer:
+    name: internal-issuer
+    autocreateCa: true
+    autocreateCaSecretName: internal-issuer-ca
+    spec:
+      ca:
+        secretName: internal-issuer-ca
+
+ingress:
+  # Use this issuer when the chart should create and use its own internal CA.
+  issuer: internal-issuer
+
+  # For a production setup with an existing cert-manager ClusterIssuer, use this instead:
+  # clusterIssuer: letsencrypt-prod
+  # issuer: ""
+
+database:
+  clusterName: basyx-database
+  instances: 1
+  storage:
+    size: 10Gi
+
+keycloak:
+  enabled: false
+
+abac:
+  enabled: false
+
+aasDiscovery:
+  enabled: true
+
+
+aasRegistry:
+  enabled: true
+
+
+aasRepository:
+  enabled: true
+
+
+submodelRegistry:
+  enabled: true
+
+
+submodelRepository:
+  enabled: true
+
+
+cdRepository:
+  enabled: true
+
+
+aasWebGui:
+  enabled: true
+  infrastructureConfig:
+    infrastructures:
+      default: main
+      main:
+        name: "BaSyx Go {{ .Values.instanceName }}"
+        components:
+          aasDiscovery:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.aasDiscovery }}"
+          aasRegistry:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.aasRegistry }}"
+          submodelRegistry:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.submodelRegistry }}"
+          aasRepository:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.aasRepository }}"
+          submodelRepository:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.submodelRepository }}"
+          conceptDescriptionRepository:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.cdRepository }}"
+        security:
+          type: None
+          config: null
+
+companyLookup:
+  enabled: false
+
+
+digitalTwinRegistry:
+  enabled: false

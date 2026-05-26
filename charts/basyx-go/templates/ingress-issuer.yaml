@@ -1,0 +1,9 @@
+{{- if .Values.ingress.certificateIssuer.enabled }}
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ .Values.ingress.certificateIssuer.name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+{{- .Values.ingress.certificateIssuer.spec | toYaml | nindent 2 }}
+{{- end }}

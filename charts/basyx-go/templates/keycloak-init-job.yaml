@@ -1,0 +1,48 @@
+{{- if .Values.keycloak.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: keycloak-init
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation,hook-failed
+spec:
+  template:
+    metadata:
+      annotations:
+        checksum/keycloak-init-config: {{ include (print $.Template.BasePath "/keycloak-init-config.yaml") . | sha256sum }}
+        checksum/keycloak-init-script: {{ include (print $.Template.BasePath "/keycloak-init-script.yaml") . | sha256sum }}
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: keycloak-init
+          image: {{ include "basyx.image" (dict "image" .Values.keycloak.initJob.image "root" .) | quote }}
+          imagePullPolicy: {{ .Values.keycloak.initJob.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - /scripts/init.sh
+          env:
+            - name: KEYCLOAK_URL
+              value: "http://{{ .Release.Name }}-{{ .Values.keycloak.fullnameOverride }}:{{ .Values.keycloak.service.port }}"
+            - name: KEYCLOAK_PATH
+              value: "{{ .Values.paths.keycloak }}"
+            - name: REALM
+              value: "{{ .Values.keycloak.realm }}"
+            - name: ADMIN_USER
+              value: "{{ .Values.keycloak.secrets.admin.username }}"
+            - name: ADMIN_PASSWORD
+              value: "{{ .Values.keycloak.secrets.admin.password }}"
+          volumeMounts:
+            - name: config
+              mountPath: /config
+            - name: scripts
+              mountPath: /scripts
+      volumes:
+        - name: config
+          configMap:
+            name: keycloak-init-config
+        - name: scripts
+          configMap:
+            name: keycloak-init-script
+            defaultMode: 0755
+{{- end }}

@@ -1,0 +1,12 @@
+{{- if .Values.cdRepository.enabled -}}
+{{- include "basyx.service.deployment" (dict
+  "root" .
+  "component" "cdRepository"
+  "nameSuffix" "cd-repository"
+  "fullnameHelper" "basyx-cdRepository.fullname"
+  "labelsHelper" "basyx-cdRepository.labels"
+  "selectorLabelsHelper" "basyx-cdRepository.selectorLabels"
+  "serviceAccountHelper" "basyx-cdRepository.serviceAccountName"
+  "containerName" "cd-repository"
+) -}}
+{{- end }}

@@ -1,0 +1,104 @@
+{{- if .Values.configurationService.enabled -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "basyx.fullname" . }}-configuration
+  labels:
+    {{- include "basyx.labels" . | nindent 4 }}
+    app.kubernetes.io/component: configuration-service
+  {{- if .Values.configurationService.hook.enabled }}
+  annotations:
+    helm.sh/hook: {{ join "," .Values.configurationService.hook.events | quote }}
+    helm.sh/hook-weight: {{ .Values.configurationService.hook.weight | quote }}
+    helm.sh/hook-delete-policy: {{ join "," .Values.configurationService.hook.deletePolicy | quote }}
+    {{- with .Values.configurationService.hook.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- end }}
+spec:
+  backoffLimit: {{ .Values.configurationService.backoffLimit }}
+  {{- with .Values.configurationService.activeDeadlineSeconds }}
+  activeDeadlineSeconds: {{ . }}
+  {{- end }}
+  {{- with .Values.configurationService.ttlSecondsAfterFinished }}
+  ttlSecondsAfterFinished: {{ . }}
+  {{- end }}
+  template:
+    metadata:
+      labels:
+        {{- include "basyx.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: configuration-service
+        {{- with .Values.configurationService.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.configurationService.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.configurationService.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "basyx.serviceAccountName" . }}
+      restartPolicy: {{ .Values.configurationService.restartPolicy }}
+      securityContext:
+        {{- toYaml .Values.configurationService.podSecurityContext | nindent 8 }}
+      {{- if .Values.configurationService.waitForDatabase.enabled }}
+      initContainers:
+        - name: wait-for-database
+          image: {{ include "basyx.image" (dict "root" . "image" .Values.configurationService.waitForDatabase.image) | quote }}
+          imagePullPolicy: {{ .Values.configurationService.waitForDatabase.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              end=$((SECONDS + {{ .Values.configurationService.waitForDatabase.timeoutSeconds }}))
+              until pg_isready -h "${POSTGRES_HOST}" -p "${POSTGRES_PORT}" -U "${POSTGRES_USER}" -d "${POSTGRES_DBNAME}"; do
+                if [ "${SECONDS}" -ge "${end}" ]; then
+                  echo "Timed out waiting for PostgreSQL at ${POSTGRES_HOST}:${POSTGRES_PORT}" >&2
+                  exit 1
+                fi
+                echo "Waiting for PostgreSQL at ${POSTGRES_HOST}:${POSTGRES_PORT}..."
+                sleep {{ .Values.configurationService.waitForDatabase.intervalSeconds }}
+              done
+          env:
+            {{- include "common-database-config" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.configurationService.waitForDatabase.resources | nindent 12 }}
+      {{- end }}
+      containers:
+        - name: configuration-service
+          securityContext:
+            {{- toYaml .Values.configurationService.securityContext | nindent 12 }}
+          image: {{ include "basyx.image" (dict "root" . "image" .Values.configurationService.image) | quote }}
+          imagePullPolicy: {{ .Values.configurationService.image.pullPolicy }}
+          {{- with .Values.configurationService.command }}
+          command:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.configurationService.args }}
+          args:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          env:
+            {{- include "common-database-config" . | nindent 12 }}
+            {{- range $key, $value := .Values.environment.common }}
+            - name: {{ $key }}
+              value: {{ tpl (print $value) $ | quote }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.configurationService.resources | nindent 12 }}
+      {{- with .Values.configurationService.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.configurationService.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.configurationService.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
