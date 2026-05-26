@@ -7,15 +7,15 @@ The chart installs the BaSyx Go backend services, a PostgreSQL database, optiona
 The repository follows the common Helm multi-chart layout:
 
 ```text
-charts/basyx-go/        Helm chart for BaSyx Go
+charts/basyx/           Helm chart for BaSyx Go
 values/                 Custom values examples and deployment overlays
 ```
 
-The main chart is located at `charts/basyx-go`. All commands below are written from the repository root.
+The main chart is located at `charts/basyx`. All commands below are written from the repository root.
 
 ## What Gets Deployed
 
-The `basyx-go` chart can deploy these components:
+The `basyx` chart can deploy these components:
 
 | Component | Purpose |
 | --- | --- |
@@ -39,7 +39,7 @@ A deployment is one Helm release, usually named `basyx`, installed into one Kube
 The default chart values live in:
 
 ```text
-charts/basyx-go/values.yaml
+charts/basyx/values.yaml
 ```
 
 Custom values files live outside the chart, for example:
@@ -181,22 +181,22 @@ Do not publish production passwords or client secrets. For public examples, use 
 Always render the chart before the first install. This catches schema errors and missing CRDs early:
 
 ```bash
-helm lint charts/basyx-go -f values/values.example.yaml
-helm lint charts/basyx-go -f values/values.secured.example.yaml
+helm lint charts/basyx -f values/values.example.yaml
+helm lint charts/basyx -f values/values.secured.example.yaml
 
-helm template basyx charts/basyx-go \
+helm template basyx charts/basyx \
   -n basyx-custom \
   -f values/values.example.yaml
 ```
 
-If you use chart-local custom certificates, render from the repository root so the chart can read files under `charts/basyx-go/config-files/`.
+If you use chart-local custom certificates, render from the repository root so the chart can read files under `charts/basyx/config-files/`.
 
 ## Install BaSyx Go
 
 Install the release:
 
 ```bash
-helm upgrade --install basyx charts/basyx-go \
+helm upgrade --install basyx charts/basyx \
   --kube-context custom-rke \
   -n basyx-custom \
   --create-namespace \
@@ -206,7 +206,7 @@ helm upgrade --install basyx charts/basyx-go \
 If you are already on the correct Kubernetes context, `--kube-context` is optional:
 
 ```bash
-helm upgrade --install basyx charts/basyx-go \
+helm upgrade --install basyx charts/basyx \
   -n basyx-custom \
   --create-namespace \
   -f values/values.example.yaml
@@ -276,7 +276,7 @@ Company Lookup intentionally has no resource at the bare `/company-lookup` path.
 Change the custom values and run:
 
 ```bash
-helm upgrade basyx charts/basyx-go \
+helm upgrade basyx charts/basyx \
   --kube-context custom-rke \
   -n basyx-custom \
   -f values/values.example.yaml
@@ -285,7 +285,7 @@ helm upgrade basyx charts/basyx-go \
 For safer upgrades, render first and optionally use the Helm diff plugin:
 
 ```bash
-helm diff upgrade basyx charts/basyx-go \
+helm diff upgrade basyx charts/basyx \
   --kube-context custom-rke \
   -n basyx-custom \
   -f values/values.example.yaml
@@ -359,7 +359,7 @@ internal:
 Expected directory inside the chart:
 
 ```text
-charts/basyx-go/config-files/certs/custom/
+charts/basyx/config-files/certs/custom/
   partner-root-ca.crt
   external-service-ca.crt
 ```
@@ -579,15 +579,15 @@ helm plugin install https://github.com/helm-unittest/helm-unittest --verify=fals
 Run local chart checks:
 
 ```bash
-helm lint charts/basyx-go
-helm unittest charts/basyx-go
+helm lint charts/basyx
+helm unittest charts/basyx
 ```
 
 Run lint with custom values:
 
 ```bash
-helm lint charts/basyx-go -f values/values.example.yaml
-helm lint charts/basyx-go -f values/values.secured.example.yaml
+helm lint charts/basyx -f values/values.example.yaml
+helm lint charts/basyx -f values/values.secured.example.yaml
 ```
 
 Runtime smoke tests after deployment:
@@ -622,12 +622,12 @@ kubectl -n <namespace> debug -it pod/<pod-name> \
 ## Repository Layout
 
 ```text
-charts/basyx-go/                    Helm chart
-charts/basyx-go/Chart.yaml          Chart metadata
-charts/basyx-go/values.yaml         Default chart values
-charts/basyx-go/templates/          Kubernetes templates
-charts/basyx-go/tests/              helm-unittest suites
-charts/basyx-go/config-files/       Chart-local files such as logos and optional certs
+charts/basyx/                       Helm chart
+charts/basyx/Chart.yaml             Chart metadata
+charts/basyx/values.yaml            Default chart values
+charts/basyx/templates/             Kubernetes templates
+charts/basyx/tests/                 helm-unittest suites
+charts/basyx/config-files/          Chart-local files such as logos and optional certs
 values/                             Custom values overlays
 ```
 
