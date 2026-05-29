@@ -36,9 +36,12 @@ tests:
       - matchRegex:
           path: spec.template.spec.initContainers[0].command[2]
           pattern: "pg_isready"
-      - equal:
+      - matchRegex:
           path: spec.template.spec.containers[0].image
-          value: eclipsebasyx/basyxconfigurationservice-go:SNAPSHOT
+          pattern: "^eclipsebasyx/basyxconfigurationservice-go:[^:]+$"
+      - notMatchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ":SNAPSHOT$"
 
   - it: wires postgres credentials from the shared CNPG application secret
     template: templates/configuration-service-job.yaml

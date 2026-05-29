@@ -107,9 +107,7 @@ configurationService:
   image:
     repository: eclipsebasyx/basyxconfigurationservice-go
     pullPolicy: Always
-    # Keep this tag independent from the BaSyx runtime image tags. Schema
-    # migrations may be released on a different cadence than the services.
-    tag: "SNAPSHOT"
+    tag: ""
     digest: ""
   imagePullSecrets: []
   command: []
