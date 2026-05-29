@@ -38,7 +38,7 @@ internal:
       # Supports templating, e.g. /config-files/certs/{{ .Values.instanceName }}
       chartFileDirectory: ""
       # Optional inline PEM bundle rendered into a generated ConfigMap.
-      additionalCACertificates: |-
+      additionalCACertificates: ""
       # Optional existing Secret names projected into the trust store.
       extraSecrets: []
       # Optional existing ConfigMap names projected into the trust store.

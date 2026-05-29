@@ -7,7 +7,7 @@
   "labelsHelper" "basyx-digitalTwinRegistry.labels"
   "selectorLabelsHelper" "basyx-digitalTwinRegistry.selectorLabels"
   "serviceAccountHelper" "basyx-digitalTwinRegistry.serviceAccountName"
-  "containerName" "aas-registry"
+  "containerName" "digital-twin-registry"
   "extraEnv" (include "basyx.service.extraEnvMap" (.Values.digitalTwinRegistry.environment | default dict))
 ) -}}
 {{- end }}

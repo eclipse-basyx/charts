@@ -5,8 +5,13 @@ metadata:
   name: {{ include "basyx-aasRepository.fullname" . }}-config
   labels:
     {{- include "basyx-aasRepository.labels" . | nindent 4 }}
+{{- $env := .Values.aasRepository.environment | default dict }}
+{{- if $env }}
 data:
-  {{- range $key, $value := .Values.environment }}
+  {{- range $key, $value := $env }}
   {{ $key }}: {{ tpl (print $value) $ | quote }}
   {{- end }}
+{{- else }}
+data: {}
+{{- end }}
 {{- end }}

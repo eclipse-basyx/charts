@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: keycloak-init-script
+  name: {{ include "basyx-keycloakInit.scriptName" . }}
 
 data:
   init.sh: |

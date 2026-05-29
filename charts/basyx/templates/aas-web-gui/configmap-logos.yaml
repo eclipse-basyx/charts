@@ -5,7 +5,11 @@ kind: ConfigMap
 metadata:
   name: {{ .Release.Name }}-logos
 binaryData:
+{{- $seen := dict }}
 {{- range $k, $file := $logos }}
+{{- if not (hasKey $seen $file) }}
   {{ $file }}: {{ $.Files.Get (printf "config-files/logos/%s" $file) | b64enc }}
+{{- $_ := set $seen $file true }}
+{{- end }}
 {{- end }}
 {{- end }}

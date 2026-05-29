@@ -2,7 +2,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: keycloak-init
+  name: {{ include "basyx-keycloakInit.fullname" . }}
   annotations:
     helm.sh/hook: post-install,post-upgrade
     helm.sh/hook-delete-policy: before-hook-creation,hook-failed
@@ -23,15 +23,21 @@ spec:
             - /scripts/init.sh
           env:
             - name: KEYCLOAK_URL
-              value: "http://{{ .Release.Name }}-{{ .Values.keycloak.fullnameOverride }}:{{ .Values.keycloak.service.port }}"
+              value: "http://{{ include "basyx-keycloak.fullname" . }}:{{ .Values.keycloak.service.port }}"
             - name: KEYCLOAK_PATH
               value: "{{ .Values.paths.keycloak }}"
             - name: REALM
               value: "{{ .Values.keycloak.realm }}"
             - name: ADMIN_USER
-              value: "{{ .Values.keycloak.secrets.admin.username }}"
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required ".Values.keycloak.secrets.name must be set" .Values.keycloak.secrets.name }}
+                  key: admin
             - name: ADMIN_PASSWORD
-              value: "{{ .Values.keycloak.secrets.admin.password }}"
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required ".Values.keycloak.secrets.name must be set" .Values.keycloak.secrets.name }}
+                  key: adminPassword
           volumeMounts:
             - name: config
               mountPath: /config
@@ -40,9 +46,9 @@ spec:
       volumes:
         - name: config
           configMap:
-            name: keycloak-init-config
+            name: {{ include "basyx-keycloakInit.configName" . }}
         - name: scripts
           configMap:
-            name: keycloak-init-script
+            name: {{ include "basyx-keycloakInit.scriptName" . }}
             defaultMode: 0755
 {{- end }}

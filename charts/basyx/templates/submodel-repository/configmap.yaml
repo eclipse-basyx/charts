@@ -5,8 +5,13 @@ metadata:
   name: {{ include "basyx-submodelRepository.fullname" . }}-config
   labels:
     {{- include "basyx-submodelRepository.labels" . | nindent 4 }}
+{{- $env := .Values.submodelRepository.environment | default dict }}
+{{- if $env }}
 data:
-  {{- range $key, $value := .Values.environment }}
+  {{- range $key, $value := $env }}
   {{ $key }}: {{ tpl (print $value) $ | quote }}
   {{- end }}
+{{- else }}
+data: {}
+{{- end }}
 {{- end }}

@@ -21,7 +21,7 @@ internal:
     trustStore:
       useDefaultCAs: true
       chartFileDirectory: ""
-      additionalCACertificates: |-
+      additionalCACertificates: ""
   certificateIssuer:
     name: internal-issuer
     autocreateCa: true

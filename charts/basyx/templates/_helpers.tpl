@@ -27,6 +27,18 @@ If release name contains chart name it will be used as a full name.
 {{- printf "%s-keycloak" (include "basyx.fullname" .) | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
+{{- define "basyx-keycloakInit.fullname" -}}
+{{- printf "%s-keycloak-init" (include "basyx.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{- define "basyx-keycloakInit.configName" -}}
+{{- printf "%s-config" (include "basyx-keycloakInit.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{- define "basyx-keycloakInit.scriptName" -}}
+{{- printf "%s-script" (include "basyx-keycloakInit.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
 {{- define "basyx-aasRegistry.fullname" -}}
 {{- printf "%s-aas-registry" (include "basyx.fullname" .) | trunc 63 | trimSuffix "-" }}
 {{- end }}

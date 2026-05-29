@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: keycloak-init-config
+  name: {{ include "basyx-keycloakInit.configName" . }}
 
 data:
   user-profile.json: |

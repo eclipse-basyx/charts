@@ -39,7 +39,7 @@ spec:
     group: cert-manager.io
 
 ---
-# We still need an acutual issuer that can be used to issue server certificates based on the created CA Cert.
+# We still need an actual issuer that can be used to issue server certificates based on the created CA cert.
 # We cannot use the former (selfSigned) Issuer if we want to validate the ca chain.
 apiVersion: cert-manager.io/v1
 kind: Issuer
