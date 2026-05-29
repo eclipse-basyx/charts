@@ -490,14 +490,14 @@ tls:
 {{- end }}
 
 {{- define "common.ingressTLS.annotations" -}}
-  {{- if and .Values.tls.enabled (not .Values.ingress.certificateIssuer.enabled) }}
-  {{- if .Values.ingress.issuer }}
+  {{- if .Values.tls.enabled }}
+  {{- if .Values.ingress.certificateIssuer.enabled }}
+  cert-manager.io/issuer: {{ .Values.ingress.certificateIssuer.name | quote }}
+  {{- else if .Values.ingress.issuer }}
   cert-manager.io/issuer: {{ .Values.ingress.issuer | quote}}
   {{- else if .Values.ingress.clusterIssuer }}
   cert-manager.io/cluster-issuer: {{ .Values.ingress.clusterIssuer | quote}}
   {{- end }}
-  {{- else }}
-  cert-manager.io/issuer: {{ .Values.ingress.certificateIssuer.name }}
   {{- end }}
 {{- end }}
 

@@ -83,7 +83,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ include "database-secret" . }}
-                  key: username
+                  key: user
             - name: KC_DB_PASSWORD
               valueFrom:
                 secretKeyRef:

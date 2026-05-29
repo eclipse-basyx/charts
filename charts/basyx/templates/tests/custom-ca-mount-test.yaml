@@ -1,4 +1,16 @@
 {{- if eq (include "common.certs.customEnabled" .) "true" }}
+{{- $defaultImage := dict "repository" "curlimages/curl" "tag" "8.19.0" "pullPolicy" "Always" "digest" "" }}
+{{- $configuredImage := dict }}
+{{- with .Values.keycloak }}
+{{- with .tests }}
+{{- with .realmCheck }}
+{{- with .image }}
+{{- $configuredImage = . }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- $testImage := mergeOverwrite $defaultImage $configuredImage }}
 apiVersion: v1
 kind: Pod
 metadata:
@@ -12,8 +24,8 @@ spec:
   restartPolicy: Never
   containers:
     - name: custom-ca-mount-check
-      image: {{ include "basyx.image" (dict "image" .Values.keycloak.tests.realmCheck.image "root" .) | quote }}
-      imagePullPolicy: {{ .Values.keycloak.tests.realmCheck.image.pullPolicy }}
+      image: {{ include "basyx.image" (dict "image" $testImage "root" .) | quote }}
+      imagePullPolicy: {{ $testImage.pullPolicy }}
       env:
         - name: SSL_CERT_DIR
           value: {{ include "common.certs.sslCertDir" . | quote }}
