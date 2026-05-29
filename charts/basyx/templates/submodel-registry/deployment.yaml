@@ -1,0 +1,12 @@
+{{- if .Values.submodelRegistry.enabled -}}
+{{- include "basyx.service.deployment" (dict
+  "root" .
+  "component" "submodelRegistry"
+  "nameSuffix" "submodel-registry"
+  "fullnameHelper" "basyx-submodelRegistry.fullname"
+  "labelsHelper" "basyx-submodelRegistry.labels"
+  "selectorLabelsHelper" "basyx-submodelRegistry.selectorLabels"
+  "serviceAccountHelper" "basyx-submodelRegistry.serviceAccountName"
+  "containerName" "submodel-registry"
+) -}}
+{{- end }}

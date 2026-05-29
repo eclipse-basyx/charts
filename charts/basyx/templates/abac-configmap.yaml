@@ -1,0 +1,26 @@
+{{- $services := list
+  (dict "component" "aasDiscovery" "nameSuffix" "aas-discovery")
+  (dict "component" "aasRegistry" "nameSuffix" "aas-registry")
+  (dict "component" "aasRepository" "nameSuffix" "aas-repository")
+  (dict "component" "submodelRegistry" "nameSuffix" "submodel-registry")
+  (dict "component" "submodelRepository" "nameSuffix" "submodel-repository")
+  (dict "component" "cdRepository" "nameSuffix" "cd-repository")
+  (dict "component" "companyLookup" "nameSuffix" "company-lookup")
+  (dict "component" "digitalTwinRegistry" "nameSuffix" "digital-twin-registry")
+-}}
+{{- range $service := $services }}
+{{- $ctx := dict "root" $ "component" (index $service "component") "nameSuffix" (index $service "nameSuffix") -}}
+{{- $componentValues := get $.Values (index $service "component") | default dict -}}
+{{- if and $componentValues.enabled (eq (include "basyx.abac.enabled" $ctx) "true") }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "basyx.abac.configMapName" $ctx }}
+data:
+  {{ include "basyx.abac.accessRulesFileName" $ctx }}: |
+{{ include "basyx.abac.accessRules" $ctx | nindent 4 }}
+  {{ include "basyx.abac.trustListFileName" $ctx }}: |
+{{ include "basyx.abac.trustList" $ctx | nindent 4 }}
+{{- end }}
+{{- end }}

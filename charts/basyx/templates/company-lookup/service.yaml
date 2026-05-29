@@ -1,0 +1,17 @@
+{{- if .Values.companyLookup.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "basyx-companyLookup.fullname" . }}
+  labels:
+    {{- include "basyx-companyLookup.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.companyLookup.service.type }}
+  ports:
+    - port: {{ .Values.companyLookup.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "basyx-companyLookup.selectorLabels" . | nindent 4 }}
+{{- end }}

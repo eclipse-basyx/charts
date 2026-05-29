@@ -1,0 +1,17 @@
+{{- if .Values.submodelRegistry.enabled -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "basyx-submodelRegistry.fullname" . }}-config
+  labels:
+    {{- include "basyx-submodelRegistry.labels" . | nindent 4 }}
+{{- $env := .Values.submodelRegistry.environment | default dict }}
+{{- if $env }}
+data:
+  {{- range $key, $value := $env }}
+  {{ $key }}: {{ tpl (print $value) $ | quote }}
+  {{- end }}
+{{- else }}
+data: {}
+{{- end }}
+{{- end }}

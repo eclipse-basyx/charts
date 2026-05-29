@@ -1,0 +1,17 @@
+{{- if .Values.digitalTwinRegistry.enabled -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "basyx-digitalTwinRegistry.fullname" . }}-config
+  labels:
+    {{- include "basyx-digitalTwinRegistry.labels" . | nindent 4 }}
+{{- $env := .Values.digitalTwinRegistry.environment | default dict }}
+{{- if $env }}
+data:
+  {{- range $key, $value := $env }}
+  {{ $key }}: {{ tpl (print $value) $ | quote }}
+  {{- end }}
+{{- else }}
+data: {}
+{{- end }}
+{{- end }}

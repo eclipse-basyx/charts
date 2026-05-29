@@ -1,0 +1,48 @@
+{{- if eq (include "common.certs.customEnabled" .) "true" }}
+{{- $defaultImage := dict "repository" "curlimages/curl" "tag" "8.19.0" "pullPolicy" "Always" "digest" "" }}
+{{- $configuredImage := dict }}
+{{- with .Values.keycloak }}
+{{- with .tests }}
+{{- with .realmCheck }}
+{{- with .image }}
+{{- $configuredImage = . }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- $testImage := mergeOverwrite $defaultImage $configuredImage }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "basyx.fullname" . }}-custom-ca-mount-test
+  labels:
+    {{- include "basyx.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  containers:
+    - name: custom-ca-mount-check
+      image: {{ include "basyx.image" (dict "image" $testImage "root" .) | quote }}
+      imagePullPolicy: {{ $testImage.pullPolicy }}
+      env:
+        - name: SSL_CERT_DIR
+          value: {{ include "common.certs.sslCertDir" . | quote }}
+        - name: CUSTOM_CA_MOUNT_PATH
+          value: {{ include "common.certs.customMountPath" . | quote }}
+      command:
+        - /bin/sh
+        - -ec
+      args:
+        - |
+          echo "Checking custom CA mount at ${CUSTOM_CA_MOUNT_PATH}"
+          test -d "${CUSTOM_CA_MOUNT_PATH}"
+          find -L "${CUSTOM_CA_MOUNT_PATH}" -maxdepth 1 -type f | grep -q .
+          echo "${SSL_CERT_DIR}" | grep -q "${CUSTOM_CA_MOUNT_PATH}"
+          find -L "${CUSTOM_CA_MOUNT_PATH}" -maxdepth 1 -type f -print
+      volumeMounts:
+        {{- include "common.certs.volumeMounts" . | nindent 8 }}
+  volumes:
+    {{- include "common.certs.volume" . | nindent 4 }}
+{{- end }}

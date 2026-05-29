@@ -1,0 +1,12 @@
+{{- if .Values.aasRepository.enabled -}}
+{{- include "basyx.service.deployment" (dict
+  "root" .
+  "component" "aasRepository"
+  "nameSuffix" "aas-repository"
+  "fullnameHelper" "basyx-aasRepository.fullname"
+  "labelsHelper" "basyx-aasRepository.labels"
+  "selectorLabelsHelper" "basyx-aasRepository.selectorLabels"
+  "serviceAccountHelper" "basyx-aasRepository.serviceAccountName"
+  "containerName" "aas-repository"
+) -}}
+{{- end }}

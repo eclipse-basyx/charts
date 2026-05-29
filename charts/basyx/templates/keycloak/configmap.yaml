@@ -1,0 +1,12 @@
+{{- if .Values.keycloak.enabled -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "basyx-keycloak.fullname" . }}-config
+  labels:
+    {{- include "basyx-keycloak.labels" . | nindent 4 }}
+data:
+  {{- range $key, $value := .Values.keycloak.environment }}
+  {{ $key }}: {{ tpl (print $value) $ | quote }}
+  {{- end }}
+{{- end }}

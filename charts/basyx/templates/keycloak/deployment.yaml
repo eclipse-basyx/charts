@@ -1,0 +1,132 @@
+{{- if .Values.keycloak.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "basyx-keycloak.fullname" . }}
+  labels:
+    {{- include "basyx-keycloak.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.keycloak.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "basyx-keycloak.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.keycloak.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "basyx-keycloak.labels" . | nindent 8 }}
+        {{- with .Values.keycloak.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.keycloak.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "basyx-keycloak.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.keycloak.podSecurityContext | nindent 8 }}
+      containers:
+        - name: keycloak
+          {{- if .Values.keycloak.command }}
+          command:
+            {{- toYaml .Values.keycloak.command | nindent 12 }}
+          {{- end }}
+          securityContext:
+            {{- toYaml .Values.keycloak.securityContext | nindent 12 }}
+          image: {{ include "basyx.image" (dict "image" .Values.keycloak.image "root" .) | quote }}
+          imagePullPolicy: {{ .Values.keycloak.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.keycloak.service.port }}
+              protocol: TCP
+            - name: management
+              containerPort: {{ .Values.keycloak.managementPort }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "basyx-keycloak.fullname" . }}-config
+          env:
+            {{- if .Values.keycloak.monitoring }}
+            - name: KC_METRICS_ENABLED
+              value: "true"
+            {{- end }}
+            - name: KC_HOSTNAME_URL
+              value: "https://{{ .Values.host }}{{ .Values.paths.keycloak }}"
+            - name: KC_HOSTNAME_ADMIN_URL
+              value: "https://{{ .Values.host }}{{ .Values.paths.keycloak }}"
+            - name: KC_HTTP_RELATIVE_PATH
+              value: {{ .Values.paths.keycloak | quote }}
+            - name: KC_HOSTNAME
+              value: {{ .Values.host  | quote }}
+            - name: KC_DB
+              value: {{ .Values.database.type  | quote }}
+            - name: KC_DB_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "database-secret" . }}
+                  key: jdbc-uri
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required ".Values.keycloak.secrets.name must be set" .Values.keycloak.secrets.name }}
+                  key: admin
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required ".Values.keycloak.secrets.name must be set" .Values.keycloak.secrets.name }}
+                  key: adminPassword
+            - name: KC_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "database-secret" . }}
+                  key: user
+            - name: KC_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "database-secret" . }}
+                  key: password
+            - name: KC_DB_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "database-secret" . }}
+                  key: dbname
+          # {{- with .Values.keycloak.volumeMounts }}
+          # volumeMounts:
+          #   {{- toYaml . | nindent 12 }}
+          # {{- end }}
+          resources:
+            {{- toYaml .Values.keycloak.resources | nindent 12 }}
+          {{- with .Values.keycloak.startupProbe }}
+          startupProbe:
+            {{- tpl (toYaml .) $ | nindent 12 }}
+          {{- end }}
+          {{- with .Values.keycloak.livenessProbe }}
+          livenessProbe:
+            {{- tpl (toYaml .) $ | nindent 12 }}
+          {{- end }}
+          {{- with .Values.keycloak.readinessProbe }}
+          readinessProbe:
+            {{- tpl (toYaml .) $ | nindent 12 }}
+          {{- end }}
+      # {{- with .Values.keycloak.volumes }}
+      # volumes:
+      #   {{- toYaml . | nindent 8 }}
+      # {{- end }}
+      {{- with .Values.keycloak.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.keycloak.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.keycloak.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+{{- end}}

@@ -1,0 +1,137 @@
+# Example values for a secured BaSyx Go deployment.
+#
+# Copy this file and adapt it for your own cluster:
+#
+#   cp values/values.secured.example.yaml values/values.my-secured-environment.yaml
+#
+# Do not commit real passwords, client secrets or private certificate material.
+
+instanceName: example
+host: basyx.example.com
+
+fullnameOverride: basyx
+
+tls:
+  enabled: true
+  hosts:
+    - basyx.example.com
+
+internal:
+  CACertificates:
+    trustStore:
+      useDefaultCAs: true
+      chartFileDirectory: ""
+      additionalCACertificates: ""
+  certificateIssuer:
+    name: internal-issuer
+    autocreateCa: true
+    autocreateCaSecretName: internal-issuer-ca
+    spec:
+      ca:
+        secretName: internal-issuer-ca
+
+ingress:
+  # Use this issuer when the chart should create and use its own internal CA.
+  issuer: internal-issuer
+
+  # For a production setup with an existing cert-manager ClusterIssuer, use this instead:
+  # clusterIssuer: letsencrypt-prod
+  # issuer: ""
+
+database:
+  clusterName: basyx-database
+  instances: 1
+  storage:
+    size: 10Gi
+
+environment:
+  common:
+    ABAC_ENABLED: true
+
+keycloak:
+  enabled: true
+
+  secrets:
+    admin:
+      username: admin
+      password: change-me
+    client:
+      name: basyx-ui
+      clientPassword: change-me
+  initialization:
+    roles:
+      - admin
+      - viewer
+    users:
+      - username: admin
+        enabled: true
+        email: admin@example.com
+        firstName: Example
+        lastName: Admin
+        emailVerified: true
+        attributes:
+          role:
+            - admin
+          clear:
+            - admin
+        roles:
+          - admin
+        credentials:
+          - type: password
+            value: change-me
+            temporary: true
+      - username: viewer
+        enabled: true
+        email: viewer@example.com
+        firstName: Example
+        lastName: Viewer
+        emailVerified: true
+        attributes:
+          role:
+            - viewer
+        roles:
+          - viewer
+        credentials:
+          - type: password
+            value: change-me
+            temporary: true
+
+abac:
+  enabled: true
+  # The chart defaults allow users with role=admin to access all routes.
+  # Add service-specific rules under `<service>.abac` when you need stricter policies.
+
+aasDiscovery:
+  enabled: true
+
+
+aasRegistry:
+  enabled: true
+
+
+aasRepository:
+  enabled: true
+
+
+submodelRegistry:
+  enabled: true
+
+
+submodelRepository:
+  enabled: true
+
+
+cdRepository:
+  enabled: true
+
+
+aasWebGui:
+  enabled: true
+
+
+companyLookup:
+  enabled: false
+
+
+digitalTwinRegistry:
+  enabled: false

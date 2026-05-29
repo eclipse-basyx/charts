@@ -1,72 +1,21 @@
-#################################################################################
- # Copyright (C) 2025 the Eclipse BaSyx Authors
- #
- # Permission is hereby granted, free of charge, to any person obtaining
- # a copy of this software and associated documentation files (the
- # "Software"), to deal in the Software without restriction, including
- # without limitation the rights to use, copy, modify, merge, publish,
- # distribute, sublicense, and/or sell copies of the Software, and to
- # permit persons to whom the Software is furnished to do so, subject to
- # the following conditions:
- #
- # The above copyright notice and this permission notice shall be
- # included in all copies or substantial portions of the Software.
- #
- # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- # EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- # MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- # NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
- # LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
- # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
- # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- #
- # SPDX-License-Identifier: MIT
-#################################################################################
-
----
 apiVersion: v2
-name: aas-basyx-v2-full
-description: Umbrella chart for the AAS Basyx v2 Environment
+name: basyx
+description: >
+  Helm chart for deploying Eclipse BaSyx Go Components on Kubernetes,
+  including AAS registries, repositories, discovery service, and optional
+  Keycloak authentication with ABAC authorization.
 type: application
-version: 2.2.0
-appVersion: 2.0.0-milestone-06
-
-dependencies:
-# Contains frontend, backend and dashboard
-- name: aas-registry
-  version: "0.0.1"
-  repository: file://dependency_charts/aas-registry
-  condition: aas-registry.enabled
-- name: sm-registry
-  version: "0.0.1"
-  repository: file://dependency_charts/sm-registry
-  condition: sm-registry.enabled
-- name: aas-discovery
-  version: "0.0.1"
-  repository: file://dependency_charts/aas-discovery
-  condition: aas-discovery.enabled
-- name: aas-environment
-  version: "0.0.1"
-  repository: file://dependency_charts/aas-environment
-  condition: aas-environment.enabled
-- name: aas-web-ui
-  version: "0.0.1"
-  repository: file://dependency_charts/aas-web-ui
-  condition: aas-web-ui.enabled
-- name: aas-digitaltwinregistry
-  version: "0.0.1"
-  repository: file://dependency_charts/aas-digitaltwinregistry
-  condition: aas-digitaltwinregistry.enabled
-- name: mqtt
-  version: "0.0.1"
-  repository: file://dependency_charts/mqtt
-  condition: mqtt.enabled
-- name: mongodb
-  version: "14.5.0"
-  repository: https://charts.bitnami.com/bitnami
-  alias: mongodb
-  condition: mongodb.enabled
-- name: keycloak
-  version: "0.20.0"
-  repository: oci://registry-1.docker.io/cloudpirates
-  condition: keycloak.enabled
+version: 3.0.0-rc.1
+appVersion: "46fbb7f"
+home: https://github.com/eclipse-basyx/charts
+sources:
+  - https://github.com/eclipse-basyx/charts
+maintainers:
+  - name: Eclipse BaSyx Authors
+    url: https://github.com/eclipse-basyx
+keywords:
+  - digital-twin
+  - aas
+  - asset-administration-shell
+  - industry40
+  - basyx

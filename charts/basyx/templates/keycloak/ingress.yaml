@@ -1,0 +1,33 @@
+{{- if .Values.keycloak.enabled }}
+{{- if .Values.keycloak.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "basyx-keycloak.fullname" . }}
+  labels:
+    {{- include "basyx-keycloak.labels" . | nindent 4 }}
+  annotations: &commonIngressAnnotations
+  {{- include "common.ingressTLS.annotations" . | nindent 2}}
+  {{- with .Values.keycloak.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  ingressClassName: {{ .Values.keycloak.ingress.className | quote }}
+  {{- include "common.ingressTLS" .  | indent 2}}
+  rules:
+    {{- range .Values.keycloak.ingress.hosts }}
+    - host: {{ tpl .host $ | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ tpl .path $ | quote }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                name: {{ include "basyx-keycloak.fullname" $ }}
+                port:
+                  number: {{ $.Values.keycloak.service.port }}
+          {{- end }}
+    {{- end }}
+{{- end }}
+{{- end }}

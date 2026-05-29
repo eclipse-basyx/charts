@@ -1,0 +1,156 @@
+suite: custom cert mounts
+release:
+  name: basyx
+templates:
+  - templates/custom-ca-configmap.yaml
+  - templates/secret.yaml
+  - templates/aas-repository/deployment.yaml
+  - templates/tests/custom-ca-mount-test.yaml
+tests:
+  - it: renders a generated custom ca configmap from inline pem and chart files
+    set:
+      internal.CACertificates.trustStore.additionalCACertificates: |
+        -----BEGIN CERTIFICATE-----
+        INLINE-CERT
+        -----END CERTIFICATE-----
+      internal.CACertificates.trustStore.chartFileDirectory: config-files/test-certs
+    template: templates/custom-ca-configmap.yaml
+    documentSelector:
+      path: metadata.name
+      value: basyx-custom-ca-certs
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - matchRegex:
+          path: data["additional-ca.crt"]
+          pattern: INLINE-CERT
+      - exists:
+          path: data["example-ca.crt"]
+
+  - it: supports instance-aware chart directories with a leading slash
+    set:
+      instanceName: test-certs
+      internal.CACertificates.trustStore.chartFileDirectory: /config-files/{{ .Values.instanceName }}
+    template: templates/custom-ca-configmap.yaml
+    documentSelector:
+      path: metadata.name
+      value: basyx-custom-ca-certs
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - exists:
+          path: data["example-ca.crt"]
+
+  - it: extends ssl cert dir with the custom trust store mount
+    set:
+      aasRepository.enabled: true
+      internal.CACertificates.trustStore.additionalCACertificates: |
+        -----BEGIN CERTIFICATE-----
+        INLINE-CERT
+        -----END CERTIFICATE-----
+    template: templates/secret.yaml
+    documentSelector:
+      path: metadata.name
+      value: basyx-common-config
+    asserts:
+      - equal:
+          path: stringData.SSL_CERT_DIR
+          value: /etc/ssl/certs:/etc/ssl/certs/custom
+
+  - it: mounts projected custom cert sources into backend pods
+    set:
+      aasRepository.enabled: true
+      internal.CACertificates.trustStore.additionalCACertificates: |
+        -----BEGIN CERTIFICATE-----
+        INLINE-CERT
+        -----END CERTIFICATE-----
+      internal.CACertificates.trustStore.extraSecrets[0]: partner-ca-secret
+      internal.CACertificates.trustStore.extraConfigMaps[0]: partner-ca-config
+    template: templates/aas-repository/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: custom-certs
+            mountPath: /etc/ssl/certs/custom
+            readOnly: true
+          count: 1
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: custom-certs
+            projected:
+              sources:
+                - configMap:
+                    name: basyx-custom-ca-certs
+                - secret:
+                    name: partner-ca-secret
+                - configMap:
+                    name: partner-ca-config
+          count: 1
+      - exists:
+          path: spec.template.metadata.annotations["checksum/common-config"]
+
+  - it: allows disabling the default system ca dir in ssl cert dir
+    set:
+      aasRepository.enabled: true
+      internal.CACertificates.trustStore.useDefaultCAs: false
+      internal.CACertificates.trustStore.additionalCACertificates: |
+        -----BEGIN CERTIFICATE-----
+        INLINE-CERT
+        -----END CERTIFICATE-----
+      internal.CACertificates.trustStore.mountPath: /custom-trust
+    template: templates/secret.yaml
+    documentSelector:
+      path: metadata.name
+      value: basyx-common-config
+    asserts:
+      - equal:
+          path: stringData.SSL_CERT_DIR
+          value: /etc/ssl/certs:/custom-trust
+
+  - it: renders a helm test hook for runtime custom ca mount checks
+    set:
+      internal.CACertificates.trustStore.chartFileDirectory: config-files/test-certs
+    template: templates/tests/custom-ca-mount-test.yaml
+    asserts:
+      - isKind:
+          of: Pod
+      - equal:
+          path: metadata.annotations["helm.sh/hook"]
+          value: test
+      - equal:
+          path: spec.restartPolicy
+          value: Never
+      - equal:
+          path: spec.containers[0].env[0]
+          value:
+            name: SSL_CERT_DIR
+            value: /etc/ssl/certs:/etc/ssl/certs/custom
+      - equal:
+          path: spec.containers[0].env[1]
+          value:
+            name: CUSTOM_CA_MOUNT_PATH
+            value: /etc/ssl/certs/custom
+      - contains:
+          path: spec.containers[0].volumeMounts
+          content:
+            name: custom-certs
+            mountPath: /etc/ssl/certs/custom
+            readOnly: true
+          count: 1
+      - contains:
+          path: spec.volumes
+          content:
+            name: custom-certs
+            projected:
+              sources:
+                - configMap:
+                    name: basyx-custom-ca-certs
+          count: 1
+
+  - it: does not render the custom ca helm test hook when no custom certs are configured
+    template: templates/tests/custom-ca-mount-test.yaml
+    asserts:
+      - hasDocuments:
+          count: 0

@@ -1,0 +1,51 @@
+BaSyx {{ .Values.instanceName }} has been deployed successfully.
+
+Access URL: https://{{ .Values.host }}
+
+Enabled components:
+{{- if .Values.aasDiscovery.enabled }}
+  - AAS Discovery:              https://{{ .Values.host }}{{ .Values.paths.aasDiscovery }}
+{{- end }}
+{{- if .Values.aasRegistry.enabled }}
+  - AAS Registry:               https://{{ .Values.host }}{{ .Values.paths.aasRegistry }}
+{{- end }}
+{{- if .Values.aasRepository.enabled }}
+  - AAS Repository:             https://{{ .Values.host }}{{ .Values.paths.aasRepository }}
+{{- end }}
+{{- if .Values.submodelRegistry.enabled }}
+  - Submodel Registry:          https://{{ .Values.host }}{{ .Values.paths.submodelRegistry }}
+{{- end }}
+{{- if .Values.submodelRepository.enabled }}
+  - Submodel Repository:        https://{{ .Values.host }}{{ .Values.paths.submodelRepository }}
+{{- end }}
+{{- if .Values.cdRepository.enabled }}
+  - Concept Description Repo:   https://{{ .Values.host }}{{ .Values.paths.cdRepository }}
+{{- end }}
+{{- if .Values.digitalTwinRegistry.enabled }}
+  - Digital Twin Registry:      https://{{ .Values.host }}{{ .Values.paths.digitalTwinRegistry }}
+{{- end }}
+{{- if .Values.companyLookup.enabled }}
+  - Company Lookup:             https://{{ .Values.host }}{{ .Values.paths.companyLookup }}
+{{- end }}
+{{- if .Values.aasWebGui.enabled }}
+  - AAS Web UI:                 https://{{ .Values.host }}{{ .Values.paths.aasWebUi }}
+{{- end }}
+{{- if .Values.keycloak.enabled }}
+  - Keycloak:                   https://{{ .Values.host }}{{ .Values.paths.keycloak }}
+{{- end }}
+{{- if .Values.abac.enabled }}
+  - ABAC authorization:         enabled
+{{- end }}
+{{- if .Values.keycloak.enabled }}
+
+!! WARNING: Keycloak is enabled. If you are using default or example credentials,
+!! change them immediately after the first login to prevent unauthorized access.
+!! Keycloak Admin Console: https://{{ .Values.host }}{{ .Values.paths.keycloak }}/admin
+{{- end }}
+
+Next steps:
+  Run smoke tests:
+    helm test {{ .Release.Name }} -n {{ .Release.Namespace }} --logs
+
+  View pod logs:
+    kubectl logs -l app.kubernetes.io/instance={{ .Release.Name }} -n {{ .Release.Namespace }}

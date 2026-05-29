@@ -1,0 +1,14 @@
+abac:
+  enabled: false
+  services:
+    aasRepository:
+      enabled: true
+      accessRulesFileName: legacy-rules.json
+      trustListFileName: legacy-trust.json
+      accessRules: |
+        {"source":"legacy"}
+      trustList: |
+        [{"issuer":"https://legacy.example/realms/basyx","audience":"legacy-audience","scopes":["profile"]}]
+
+aasRepository:
+  enabled: true

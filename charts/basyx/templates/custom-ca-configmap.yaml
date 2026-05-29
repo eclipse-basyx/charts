@@ -1,0 +1,21 @@
+{{- if eq (include "common.certs.generatedConfigMapEnabled" .) "true" }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "common.certs.generatedConfigMapName" . }}
+  labels:
+    {{- include "basyx.labels" . | nindent 4 }}
+data:
+  {{- $inline := .Values.internal.CACertificates.trustStore.additionalCACertificates | default "" }}
+  {{- if $inline }}
+  additional-ca.crt: |
+{{ $inline | nindent 4 }}
+  {{- end }}
+  {{- $pattern := include "common.certs.chartFilesPattern" . }}
+  {{- if $pattern }}
+  {{- range $path, $file := .Files.Glob $pattern }}
+  {{ base $path }}: |
+{{ $file | toString | nindent 4 }}
+  {{- end }}
+  {{- end }}
+{{- end }}

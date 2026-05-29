@@ -1,0 +1,53 @@
+{{- if not .Values.internal.certificateIssuer.autocreateCa }}
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ .Values.internal.certificateIssuer.name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+{{- .Values.internal.certificateIssuer.spec | toYaml | nindent 2 }}
+{{- end }}
+
+{{ if .Values.internal.certificateIssuer.autocreateCa }}
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: "{{ .Release.Name }}-ca"
+  namespace: {{ .Release.Namespace }}
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: "{{ .Release.Name }}-ca"
+  # Create CA root secret in `cert-manager` namespace instead of `sandbox` namespace.
+  namespace: {{ .Release.Namespace }}
+spec:
+  isCA: true
+  commonName: {{ .Release.Name }}
+  secretName: {{ .Values.internal.certificateIssuer.autocreateCaSecretName }}
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  issuerRef:
+    name: "{{ .Release.Name }}-ca"
+    kind: Issuer
+    group: cert-manager.io
+
+---
+# We still need an actual issuer that can be used to issue server certificates based on the created CA cert.
+# We cannot use the former (selfSigned) Issuer if we want to validate the ca chain.
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: "{{ .Values.internal.certificateIssuer.name }}"
+  namespace: {{ .Release.Namespace }}
+spec:
+  ca:
+    secretName: "{{ .Values.internal.certificateIssuer.autocreateCaSecretName }}"
+
+{{ end }}

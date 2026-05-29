@@ -1,0 +1,54 @@
+{{- if .Values.keycloak.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "basyx-keycloakInit.fullname" . }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation,hook-failed
+spec:
+  template:
+    metadata:
+      annotations:
+        checksum/keycloak-init-config: {{ include (print $.Template.BasePath "/keycloak-init-config.yaml") . | sha256sum }}
+        checksum/keycloak-init-script: {{ include (print $.Template.BasePath "/keycloak-init-script.yaml") . | sha256sum }}
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: keycloak-init
+          image: {{ include "basyx.image" (dict "image" .Values.keycloak.initJob.image "root" .) | quote }}
+          imagePullPolicy: {{ .Values.keycloak.initJob.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - /scripts/init.sh
+          env:
+            - name: KEYCLOAK_URL
+              value: "http://{{ include "basyx-keycloak.fullname" . }}:{{ .Values.keycloak.service.port }}"
+            - name: KEYCLOAK_PATH
+              value: "{{ .Values.paths.keycloak }}"
+            - name: REALM
+              value: "{{ .Values.keycloak.realm }}"
+            - name: ADMIN_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required ".Values.keycloak.secrets.name must be set" .Values.keycloak.secrets.name }}
+                  key: admin
+            - name: ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required ".Values.keycloak.secrets.name must be set" .Values.keycloak.secrets.name }}
+                  key: adminPassword
+          volumeMounts:
+            - name: config
+              mountPath: /config
+            - name: scripts
+              mountPath: /scripts
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "basyx-keycloakInit.configName" . }}
+        - name: scripts
+          configMap:
+            name: {{ include "basyx-keycloakInit.scriptName" . }}
+            defaultMode: 0755
+{{- end }}

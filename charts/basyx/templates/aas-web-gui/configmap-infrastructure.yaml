@@ -1,0 +1,9 @@
+{{- if and .Values.aasWebGui.enabled .Values.aasWebGui.infrastructureConfig }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "basyx-aasWebGui.fullname" . }}-infrastructure
+data:
+  basyx-infra.yml: |
+{{ tpl (toYaml .Values.aasWebGui.infrastructureConfig) . | nindent 4 }}
+{{- end }}

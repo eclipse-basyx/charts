@@ -1,0 +1,12 @@
+{{- if .Values.aasWebGui.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "basyx-aasWebGui.fullname" . }}-config
+  labels:
+    {{- include "basyx-aasWebGui.labels" . | nindent 4 }}
+data:
+  {{- range $key, $value := .Values.aasWebGui.environment }}
+  {{ $key }}: {{ tpl (print $value) $ | quote }}
+  {{- end }}
+{{- end }}

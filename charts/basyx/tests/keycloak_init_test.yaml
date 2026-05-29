@@ -1,0 +1,92 @@
+suite: keycloak init
+release:
+  name: basyx
+templates:
+  - templates/keycloak-init-config.yaml
+  - templates/keycloak-init-job.yaml
+  - templates/keycloak-init-script.yaml
+  - templates/tests/keycloak-realm-test.yaml
+tests:
+  - it: renders keycloak init config as json payloads
+    template: templates/keycloak-init-config.yaml
+    set:
+      keycloak.enabled: true
+    documentSelector:
+      path: metadata.name
+      value: basyx-keycloak-init-config
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - matchRegex:
+          path: data["roles.json"]
+          pattern: '\["admin","viewer"\]'
+      - matchRegex:
+          path: data["clients.json"]
+          pattern: '"clientId":"basyx-ui"'
+      - matchRegex:
+          path: data["users.json"]
+          pattern: '"username":"d4e\.admin"'
+      - matchRegex:
+          path: data["user-profile.json"]
+          pattern: '"unmanagedAttributePolicy":"ADMIN_EDIT"'
+
+  - it: renders keycloak init job with release-scoped resources and secret refs
+    template: templates/keycloak-init-job.yaml
+    set:
+      keycloak.enabled: true
+    asserts:
+      - isKind:
+          of: Job
+      - equal:
+          path: metadata.name
+          value: basyx-keycloak-init
+      - equal:
+          path: spec.template.spec.containers[0].env[0].value
+          value: http://basyx-keycloak:9096
+      - equal:
+          path: spec.template.spec.containers[0].env[3].valueFrom.secretKeyRef.name
+          value: keycloak-credentials
+      - equal:
+          path: spec.template.spec.containers[0].env[3].valueFrom.secretKeyRef.key
+          value: admin
+      - equal:
+          path: spec.template.spec.containers[0].env[4].valueFrom.secretKeyRef.name
+          value: keycloak-credentials
+      - equal:
+          path: spec.template.spec.containers[0].env[4].valueFrom.secretKeyRef.key
+          value: adminPassword
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: config
+            configMap:
+              name: basyx-keycloak-init-config
+          count: 1
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: scripts
+            configMap:
+              name: basyx-keycloak-init-script
+              defaultMode: 493
+          count: 1
+
+  - it: renders a helm test hook that checks the keycloak realm endpoint
+    template: templates/tests/keycloak-realm-test.yaml
+    set:
+      keycloak.enabled: true
+    asserts:
+      - isKind:
+          of: Pod
+      - equal:
+          path: metadata.annotations["helm.sh/hook"]
+          value: test
+      - equal:
+          path: spec.restartPolicy
+          value: Never
+      - equal:
+          path: spec.containers[0].image
+          value: curlimages/curl:8.19.0
+      - matchRegex:
+          path: spec.containers[0].args[0]
+          pattern: 'http://basyx-keycloak:9096/identity-management/realms/basyx'

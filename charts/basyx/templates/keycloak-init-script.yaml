@@ -1,0 +1,272 @@
+{{- if .Values.keycloak.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "basyx-keycloakInit.scriptName" . }}
+
+data:
+  init.sh: |
+    #!/bin/sh
+
+    set -e
+
+    echo "KEYCLOAK_URL=$KEYCLOAK_URL"
+    echo "KEYCLOAK_PATH=$KEYCLOAK_PATH"
+    echo "REALM=$REALM"
+
+    BASE_URL="${KEYCLOAK_URL}${KEYCLOAK_PATH}"
+
+    echo "Waiting for Keycloak..."
+
+    until curl -s "$BASE_URL/realms/master" >/dev/null; do
+      echo "Keycloak not ready yet..."
+      sleep 5
+    done
+
+    echo "Keycloak reachable"
+
+    echo "Requesting admin token..."
+
+    TOKEN=$(curl -s \
+      -d "username=$ADMIN_USER" \
+      -d "password=$ADMIN_PASSWORD" \
+      -d "grant_type=password" \
+      -d "client_id=admin-cli" \
+      "$BASE_URL/realms/master/protocol/openid-connect/token" \
+      | jq -r '.access_token')
+
+    if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+      echo "Failed to obtain admin token"
+      exit 1
+    fi
+
+    echo "Admin token acquired"
+
+    ############################################
+    # REALM
+    ############################################
+
+    REALM_EXISTS=$(curl -s \
+      -H "Authorization: Bearer $TOKEN" \
+      "$BASE_URL/admin/realms/$REALM" \
+      | jq -r '.realm // empty' 2>/dev/null || true)
+
+    if [ "$REALM_EXISTS" = "$REALM" ]; then
+      echo "Realm already exists"
+    else
+      echo "Creating realm $REALM"
+
+      curl -s -X POST "$BASE_URL/admin/realms" \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        -d "{\"realm\":\"$REALM\",\"enabled\":true}"
+    fi
+
+    ############################################
+    # USER PROFILE
+    ############################################
+
+    USER_PROFILE_PAYLOAD=$(cat /config/user-profile.json)
+
+    if [ "$USER_PROFILE_PAYLOAD" != "{}" ]; then
+      echo "Configuring user profile"
+
+      EXISTING_USER_PROFILE=$(curl -s \
+        -H "Authorization: Bearer $TOKEN" \
+        "$BASE_URL/admin/realms/$REALM/users/profile")
+
+      MERGED_USER_PROFILE=$(printf '%s\n%s' "$EXISTING_USER_PROFILE" "$USER_PROFILE_PAYLOAD" | jq -s '.[0] * .[1]')
+
+      curl -s -X PUT \
+        "$BASE_URL/admin/realms/$REALM/users/profile" \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        -d "$MERGED_USER_PROFILE"
+    fi
+
+    ############################################
+    # ROLES
+    ############################################
+
+    echo "Creating roles"
+
+    jq -r '.[]?' /config/roles.json | while read ROLE
+    do
+      [ -z "$ROLE" ] && continue
+
+      ROLE_EXISTS=$(curl -s \
+        "$BASE_URL/admin/realms/$REALM/roles/$ROLE" \
+        -H "Authorization: Bearer $TOKEN" \
+        | jq -r '.name // empty' 2>/dev/null || true)
+
+      if [ "$ROLE_EXISTS" = "$ROLE" ]; then
+        echo "Role already exists: $ROLE"
+      else
+        echo "Creating role: $ROLE"
+
+        curl -s -X POST \
+          "$BASE_URL/admin/realms/$REALM/roles" \
+          -H "Authorization: Bearer $TOKEN" \
+          -H "Content-Type: application/json" \
+          -d "{\"name\":\"$ROLE\"}"
+      fi
+    done
+
+    ############################################
+    # CLIENTS
+    ############################################
+
+    echo "Creating or updating clients"
+
+    jq -c '.[]?' /config/clients.json | while read CLIENT
+    do
+      [ -z "$CLIENT" ] && continue
+
+      CLIENT_ID=$(echo "$CLIENT" | jq -r '.clientId')
+      CLIENT_PAYLOAD=$(echo "$CLIENT" | jq 'del(.protocolMappers)')
+      CLIENT_MAPPERS=$(echo "$CLIENT" | jq -c '.protocolMappers // []')
+
+      CLIENT_UUID=$(curl -s \
+        "$BASE_URL/admin/realms/$REALM/clients?clientId=$CLIENT_ID" \
+        -H "Authorization: Bearer $TOKEN" \
+        | jq -r '.[0].id // empty')
+
+      if [ -z "$CLIENT_UUID" ]; then
+        echo "Creating client: $CLIENT_ID"
+
+        curl -s -X POST \
+          "$BASE_URL/admin/realms/$REALM/clients" \
+          -H "Authorization: Bearer $TOKEN" \
+          -H "Content-Type: application/json" \
+          -d "$CLIENT_PAYLOAD"
+
+        CLIENT_UUID=$(curl -s \
+          "$BASE_URL/admin/realms/$REALM/clients?clientId=$CLIENT_ID" \
+          -H "Authorization: Bearer $TOKEN" \
+          | jq -r '.[0].id // empty')
+
+      else
+        echo "Updating client: $CLIENT_ID"
+
+        curl -s -X PUT \
+          "$BASE_URL/admin/realms/$REALM/clients/$CLIENT_UUID" \
+          -H "Authorization: Bearer $TOKEN" \
+          -H "Content-Type: application/json" \
+          -d "$CLIENT_PAYLOAD"
+      fi
+
+      echo "$CLIENT_MAPPERS" | jq -c '.[]?' | while read MAPPER
+      do
+        MAPPER_NAME=$(echo "$MAPPER" | jq -r '.name')
+        EXISTING_MAPPER=$(curl -s \
+          "$BASE_URL/admin/realms/$REALM/clients/$CLIENT_UUID/protocol-mappers/models" \
+          -H "Authorization: Bearer $TOKEN" \
+          | jq -c --arg NAME "$MAPPER_NAME" '.[] | select(.name == $NAME)' \
+          | head -n 1)
+        EXISTING_MAPPER_ID=$(echo "$EXISTING_MAPPER" | jq -r '.id // empty')
+        EXISTING_MAPPER_TYPE=$(echo "$EXISTING_MAPPER" | jq -r '.protocolMapper // empty')
+        DESIRED_MAPPER_TYPE=$(echo "$MAPPER" | jq -r '.protocolMapper')
+
+        if [ -z "$EXISTING_MAPPER_ID" ]; then
+          echo "Creating protocol mapper '$MAPPER_NAME' for client '$CLIENT_ID'"
+
+          curl -s -X POST \
+            "$BASE_URL/admin/realms/$REALM/clients/$CLIENT_UUID/protocol-mappers/add-models" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "[$MAPPER]"
+        elif [ "$EXISTING_MAPPER_TYPE" != "$DESIRED_MAPPER_TYPE" ]; then
+          echo "Replacing protocol mapper '$MAPPER_NAME' for client '$CLIENT_ID' ($EXISTING_MAPPER_TYPE -> $DESIRED_MAPPER_TYPE)"
+
+          curl -s -X DELETE \
+            "$BASE_URL/admin/realms/$REALM/clients/$CLIENT_UUID/protocol-mappers/models/$EXISTING_MAPPER_ID" \
+            -H "Authorization: Bearer $TOKEN"
+
+          curl -s -X POST \
+            "$BASE_URL/admin/realms/$REALM/clients/$CLIENT_UUID/protocol-mappers/add-models" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "[$MAPPER]"
+        else
+          echo "Updating protocol mapper '$MAPPER_NAME' for client '$CLIENT_ID'"
+
+          MAPPER_WITH_ID=$(echo "$MAPPER" | jq --arg ID "$EXISTING_MAPPER_ID" '. + {id: $ID}')
+
+          curl -s -X PUT \
+            "$BASE_URL/admin/realms/$REALM/clients/$CLIENT_UUID/protocol-mappers/models/$EXISTING_MAPPER_ID" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "$MAPPER_WITH_ID"
+        fi
+      done
+    done
+
+    ############################################
+    # USERS
+    ############################################
+
+    echo "Creating or updating users"
+
+    jq -c '.[]?' /config/users.json | while read USER
+    do
+      [ -z "$USER" ] && continue
+
+      USERNAME=$(echo "$USER" | jq -r '.username')
+      USER_ROLES=$(echo "$USER" | jq -c '.roles // []')
+
+      USER_PAYLOAD=$(echo "$USER" | jq 'del(.roles)')
+
+      echo "Processing user: $USERNAME"
+
+      USER_ID=$(curl -s \
+        "$BASE_URL/admin/realms/$REALM/users?username=$USERNAME" \
+        -H "Authorization: Bearer $TOKEN" \
+        | jq -r '.[0].id // empty')
+
+      if [ -z "$USER_ID" ]; then
+
+        echo "Creating user: $USERNAME"
+
+        curl -s -X POST \
+          "$BASE_URL/admin/realms/$REALM/users" \
+          -H "Authorization: Bearer $TOKEN" \
+          -H "Content-Type: application/json" \
+          -d "$USER_PAYLOAD"
+
+        USER_ID=$(curl -s \
+          "$BASE_URL/admin/realms/$REALM/users?username=$USERNAME" \
+          -H "Authorization: Bearer $TOKEN" \
+          | jq -r '.[0].id')
+
+      else
+
+        echo "Updating user: $USERNAME"
+
+        curl -s -X PUT \
+          "$BASE_URL/admin/realms/$REALM/users/$USER_ID" \
+          -H "Authorization: Bearer $TOKEN" \
+          -H "Content-Type: application/json" \
+          -d "$USER_PAYLOAD"
+
+      fi
+
+      ##########################################
+      # ROLE ASSIGNMENT
+      ##########################################
+
+      echo "$USER_ROLES" | jq -r '.[]?' | while read ROLE
+      do
+        ROLE_JSON=$(curl -s \
+          "$BASE_URL/admin/realms/$REALM/roles/$ROLE" \
+          -H "Authorization: Bearer $TOKEN")
+
+        curl -s -X POST \
+          "$BASE_URL/admin/realms/$REALM/users/$USER_ID/role-mappings/realm" \
+          -H "Authorization: Bearer $TOKEN" \
+          -H "Content-Type: application/json" \
+          -d "[$ROLE_JSON]" || true
+      done
+
+    done
+    echo "Keycloak initialization finished"
+{{- end }}

@@ -1,0 +1,17 @@
+{{- if .Values.aasDiscovery.enabled -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "basyx-aasDiscovery.fullname" . }}-config
+  labels:
+    {{- include "basyx-aasDiscovery.labels" . | nindent 4 }}
+{{- $env := .Values.aasDiscovery.environment | default dict }}
+{{- if $env }}
+data:
+  {{- range $key, $value := $env }}
+  {{ $key }}: {{ tpl (print $value) $ | quote }}
+  {{- end }}
+{{- else }}
+data: {}
+{{- end }}
+{{- end }}

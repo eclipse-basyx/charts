@@ -1,0 +1,148 @@
+suite: config and ingress
+release:
+  name: basyx
+templates:
+  - templates/secret.yaml
+  - templates/aas-web-gui/configmap-infrastructure.yaml
+  - templates/aas-web-gui/deployment.yaml
+  - templates/aas-discovery/deployment.yaml
+  - templates/aas-discovery/ingress.yaml
+  - templates/company-lookup/ingress.yaml
+tests:
+  - it: renders the common secret with derived oidc issuer and ssl cert dir
+    template: templates/secret.yaml
+    set:
+      aasDiscovery.enabled: true
+    documentSelector:
+      path: metadata.name
+      value: basyx-common-config
+    asserts:
+      - equal:
+          path: stringData.OIDC_ISSUER
+          value: https://basyx.example.com/identity-management/realms/basyx
+      - equal:
+          path: stringData.SSL_CERT_DIR
+          value: /etc/ssl/certs
+      - equal:
+          path: stringData.OIDC_AUDIENCE
+          value: discovery-service
+
+  - it: renders the web ui infrastructure with keycloak issuer and client id
+    template: templates/aas-web-gui/configmap-infrastructure.yaml
+    set:
+      aasWebGui.enabled: true
+    documentSelector:
+      path: metadata.name
+      value: basyx-aas-web-ui-infrastructure
+    asserts:
+      - matchRegex:
+          path: data["basyx-infra.yml"]
+          pattern: "clientId: 'basyx-ui'"
+      - matchRegex:
+          path: data["basyx-infra.yml"]
+          pattern: 'issuer: https://basyx\.example\.com/identity-management/realms/basyx'
+      - matchRegex:
+          path: data["basyx-infra.yml"]
+          pattern: 'baseUrl: https://basyx\.example\.com/aas-repository'
+
+  - it: mounts common config and custom ca into aas discovery
+    template: templates/aas-discovery/deployment.yaml
+    set:
+      aasDiscovery.enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            secretRef:
+              name: basyx-common-config
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: certs
+            mountPath: /etc/ssl/certs/ca.crt
+            subPath: ca.crt
+            readOnly: true
+          count: 1
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: certs
+            secret:
+              secretName: internal-issuer-ca
+          count: 1
+
+  - it: renders discovery health probes below the configured service context path
+    template: templates/aas-discovery/deployment.yaml
+    set:
+      aasDiscovery.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.path
+          value: /aas-discovery/health
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /aas-discovery/health
+
+  - it: probes the web ui at its configured base path
+    template: templates/aas-web-gui/deployment.yaml
+    set:
+      aasWebGui.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.path
+          value: /aas-gui/
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /aas-gui/
+
+  - it: renders the discovery ingress with the configured host and path
+    template: templates/aas-discovery/ingress.yaml
+    set:
+      aasDiscovery.enabled: true
+    asserts:
+      - equal:
+          path: spec.rules[0].host
+          value: basyx.example.com
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: /aas-discovery
+      - equal:
+          path: spec.tls[0].secretName
+          value: basyx-tls-secret
+
+  - it: renders the company lookup ingress with its own path and port
+    template: templates/company-lookup/ingress.yaml
+    set:
+      companyLookup.enabled: true
+    asserts:
+      - equal:
+          path: spec.rules[0].host
+          value: basyx.example.com
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: /company-lookup
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.port.number
+          value: 5080
+
+  - it: renders the common secret for a company lookup only deployment
+    template: templates/secret.yaml
+    documentSelector:
+      path: metadata.name
+      value: basyx-common-config
+    set:
+      aasDiscovery.enabled: false
+      aasRegistry.enabled: false
+      aasRepository.enabled: false
+      submodelRegistry.enabled: false
+      submodelRepository.enabled: false
+      cdRepository.enabled: false
+      digitalTwinRegistry.enabled: false
+      companyLookup.enabled: true
+    asserts:
+      - isKind:
+          of: Secret
+      - equal:
+          path: stringData.ABAC_ENABLED
+          value: "false"

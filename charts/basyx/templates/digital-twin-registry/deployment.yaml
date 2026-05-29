@@ -1,0 +1,13 @@
+{{- if .Values.digitalTwinRegistry.enabled -}}
+{{- include "basyx.service.deployment" (dict
+  "root" .
+  "component" "digitalTwinRegistry"
+  "nameSuffix" "digital-twin-registry"
+  "fullnameHelper" "basyx-digitalTwinRegistry.fullname"
+  "labelsHelper" "basyx-digitalTwinRegistry.labels"
+  "selectorLabelsHelper" "basyx-digitalTwinRegistry.selectorLabels"
+  "serviceAccountHelper" "basyx-digitalTwinRegistry.serviceAccountName"
+  "containerName" "digital-twin-registry"
+  "extraEnv" (include "basyx.service.extraEnvMap" (.Values.digitalTwinRegistry.environment | default dict))
+) -}}
+{{- end }}
