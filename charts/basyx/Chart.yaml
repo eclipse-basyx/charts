@@ -6,7 +6,7 @@ description: >
   Keycloak authentication with ABAC authorization.
 type: application
 version: 3.0.0-rc.1
-appVersion: "46fbb7f"
+appVersion: "1.0.0-rc.5"
 home: https://github.com/eclipse-basyx/charts
 sources:
   - https://github.com/eclipse-basyx/charts
