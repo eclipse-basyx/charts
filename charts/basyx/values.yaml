@@ -727,7 +727,7 @@ aasRepository:
   image:
     repository: eclipsebasyx/aasrepository-go
     pullPolicy: IfNotPresent
-    tag: SNAPSHOT
+    tag: ""
     digest: ""
     # Image tag is same as Chart App version
   imagePullSecrets: []
