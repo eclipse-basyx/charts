@@ -106,7 +106,7 @@ configurationService:
   enabled: true
   image:
     repository: eclipsebasyx/basyxconfigurationservice-go
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
     tag: ""
     digest: ""
   imagePullSecrets: []
@@ -163,14 +163,14 @@ keycloak:
   initJob:
     image:
       repository: peterevans/curl-jq
-      pullPolicy: Always
+      pullPolicy: IfNotPresent
       tag: "1.0"
       digest: ""
   tests:
     realmCheck:
       image:
         repository: curlimages/curl
-        pullPolicy: Always
+        pullPolicy: IfNotPresent
         tag: 8.19.0
         digest: ""
   initialization:
@@ -288,7 +288,7 @@ keycloak:
   replicaCount: 1
   image:
     repository: keycloak/keycloak
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
     tag: 26.5
   imagePullSecrets: []
   nameOverride: "keycloak"
@@ -367,7 +367,7 @@ submodelRepository:
   replicaCount: 1
   image:
     repository: eclipsebasyx/submodelrepository-go
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
     tag: ""
     # Image tag is same as Chart App version
   imagePullSecrets: []
@@ -454,7 +454,7 @@ submodelRegistry:
   replicaCount: 1
   image:
     repository: eclipsebasyx/submodelregistry-go
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
     tag: ""
     # Image tag is same as Chart App version
   imagePullSecrets: []
@@ -537,7 +537,7 @@ aasRegistry:
   replicaCount: 1
   image:
     repository: eclipsebasyx/aasregistry-go
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
     tag: ""
     # Image tag is same as Chart App version
   imagePullSecrets: []
@@ -632,7 +632,7 @@ digitalTwinRegistry:
   replicaCount: 1
   image:
     repository: eclipsebasyx/digitaltwinregistry-go
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
     tag: ""
     # Image tag is same as Chart App version
   imagePullSecrets: []
@@ -726,7 +726,7 @@ aasRepository:
   replicaCount: 1
   image:
     repository: eclipsebasyx/aasrepository-go
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
     tag: SNAPSHOT
     digest: ""
     # Image tag is same as Chart App version
@@ -818,7 +818,7 @@ cdRepository:
   replicaCount: 1
   image:
     repository: eclipsebasyx/conceptdescriptionrepository-go
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
     tag: ""
     # Image tag is same as Chart App version
   imagePullSecrets: []
@@ -906,7 +906,7 @@ companyLookup:
   replicaCount: 1
   image:
     repository: eclipsebasyx/companylookup-go
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
     tag: ""
     digest: ""
   imagePullSecrets: []
@@ -986,7 +986,7 @@ aasDiscovery:
   replicaCount: 1
   image:
     repository: eclipsebasyx/aasdiscovery-go
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
     tag: ""
   imagePullSecrets: []
   nameOverride: "aas-discovery"
