@@ -94,6 +94,159 @@ Render an image reference, preferring digest over tag when provided.
 {{- end }}
 
 {{/*
+Render a common config entry unless the raw environment map explicitly overrides it.
+*/}}
+{{- define "basyx.commonConfig.entry" -}}
+{{- if not (hasKey .common .name) }}
+{{ .name }}: {{ tpl (print .value) .root | quote }}
+{{- end }}
+{{- end }}
+
+{{/*
+Render a comma-separated common config entry from a list.
+*/}}
+{{- define "basyx.commonConfig.listEntry" -}}
+{{- if not (hasKey .common .name) }}
+{{ .name }}: {{ join "," (default (list) .value) | quote }}
+{{- end }}
+{{- end }}
+
+{{/*
+Render a service-local runtime env entry when the structured service config
+explicitly sets it. The raw service environment map remains the escape hatch
+and takes precedence.
+*/}}
+{{- define "basyx.serviceRuntimeEnv.entry" -}}
+{{- if and (hasKey .config .key) (not (hasKey .environment .name)) }}
+- name: {{ .name }}
+  value: {{ tpl (print (get .config .key)) .root | quote }}
+{{- end }}
+{{- end }}
+
+{{/*
+Render a service-local runtime env entry from a list.
+*/}}
+{{- define "basyx.serviceRuntimeEnv.listEntry" -}}
+{{- if and (hasKey .config .key) (not (hasKey .environment .name)) }}
+- name: {{ .name }}
+  value: {{ join "," (default (list) (get .config .key)) | quote }}
+{{- end }}
+{{- end }}
+
+{{/*
+Render structured BaSyx runtime configuration as environment variables.
+The environment.common map remains the escape hatch and takes precedence.
+*/}}
+{{- define "basyx.commonConfig.runtimeEnv" -}}
+{{- $root := . -}}
+{{- $common := .Values.environment.common | default dict -}}
+{{- $general := .Values.general | default dict -}}
+{{- $history := .Values.history | default dict -}}
+{{- $evidence := dig "evidence" (dict) $history -}}
+{{- $signing := dig "signing" (dict) $evidence -}}
+{{- $integrityAnchor := dig "integrityAnchor" (dict) $history -}}
+{{- $eventing := .Values.eventing | default dict -}}
+{{- $abac := .Values.abac | default dict -}}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_ENABLEIMPLICITCASTS" "value" (dig "enableImplicitCasts" true $general)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_ENABLEDESCRIPTORDEBUG" "value" (dig "enableDescriptorDebug" false $general)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_DISCOVERYINTEGRATION" "value" (dig "discoveryIntegration" false $general)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_ENABLECUSTOMMIDDLEWAREHEADERINJECTION" "value" (dig "enableCustomMiddlewareHeaderInjection" false $general)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_SUPPORTSSINGULARSUPPLEMENTALSEMANTICID" "value" (dig "supportsSingularSupplementalSemanticId" false $general)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_AASREGISTRYINTEGRATION" "value" (dig "aasRegistryIntegration" false $general)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_SUBMODELREGISTRYINTEGRATION" "value" (dig "submodelRegistryIntegration" false $general)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_EXTERNALURL" "value" (dig "externalUrl" "" $general)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_TRUSTPROXYHEADERS" "value" (dig "trustProxyHeaders" false $general)) }}
+{{- include "basyx.commonConfig.listEntry" (dict "common" $common "name" "GENERAL_TRUSTEDPROXYCIDRS" "value" (dig "trustedProxyCIDRs" (list) $general)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_UPLOADMAXSIZEBYTES" "value" (dig "uploadMaxSizeBytes" 0 $general)) }}
+{{- include "basyx.commonConfig.listEntry" (dict "common" $common "name" "GENERAL_AAS_PRECONFIG_PATHS" "value" (dig "aasPreconfigPaths" (list) $general)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "ABAC_POLICY_FILE_IMPORT" "value" (dig "policyFileImport" "" $abac)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "ABAC_MANAGEMENT_API_ENABLED" "value" (dig "managementApi" "enabled" false $abac)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "BASYX_HISTORY_MODE" "value" (dig "mode" "off" $history)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "BASYX_HISTORY_RETENTION_DAYS" "value" (dig "retentionDays" 0 $history)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "BASYX_HISTORY_FULL_SNAPSHOT_INTERVAL" "value" (dig "fullSnapshotInterval" 1 $history)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "BASYX_HISTORY_IMMUTABILITY" "value" (dig "immutability" "none" $history)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "BASYX_AUDIT_IDENTITY_MODE" "value" (dig "auditIdentityMode" "none" $history)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "BASYX_HISTORY_EVIDENCE_ENABLED" "value" (dig "enabled" false $evidence)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "BASYX_HISTORY_EVIDENCE_PROVIDER" "value" (dig "provider" "none" $evidence)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "BASYX_HISTORY_EVIDENCE_BUCKET" "value" (dig "bucket" "" $evidence)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "BASYX_HISTORY_EVIDENCE_PREFIX" "value" (dig "prefix" "basyx-history-evidence" $evidence)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "BASYX_HISTORY_EVIDENCE_REGION" "value" (dig "region" "us-east-1" $evidence)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "BASYX_HISTORY_EVIDENCE_ENDPOINT" "value" (dig "endpoint" "" $evidence)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "BASYX_HISTORY_EVIDENCE_ACCESS_KEY_ID" "value" (dig "accessKeyId" "" $evidence)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "BASYX_HISTORY_EVIDENCE_SECRET_ACCESS_KEY" "value" (dig "secretAccessKey" "" $evidence)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "BASYX_HISTORY_EVIDENCE_PATH_STYLE" "value" (dig "pathStyle" false $evidence)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "BASYX_HISTORY_EVIDENCE_RETENTION_MODE" "value" (dig "retentionMode" "" $evidence)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "BASYX_HISTORY_EVIDENCE_RETENTION_DAYS" "value" (dig "retentionDays" 0 $evidence)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "BASYX_HISTORY_EVIDENCE_WRITE_TIMEOUT_SECONDS" "value" (dig "writeTimeoutSeconds" 10 $evidence)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "BASYX_HISTORY_EVIDENCE_SIGNING_PRIVATE_KEY_PATH" "value" (dig "privateKeyPath" "" $signing)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "BASYX_HISTORY_EVIDENCE_SIGNING_PUBLIC_KEY_PATH" "value" (dig "publicKeyPath" "" $signing)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "BASYX_HISTORY_EVIDENCE_SIGNING_REQUIRED" "value" (dig "required" false $signing)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "BASYX_HISTORY_INTEGRITY_ANCHOR_PROVIDER" "value" (dig "provider" "none" $integrityAnchor)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "BASYX_EVENTING_ENABLED" "value" (dig "enabled" false $eventing)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "BASYX_EVENTING_FORMAT" "value" (dig "format" "cloudevents" $eventing)) }}
+{{- include "basyx.commonConfig.listEntry" (dict "common" $common "name" "BASYX_EVENTING_SINKS" "value" (dig "sinks" (list) $eventing)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "BASYX_EVENTING_OUTBOX_ENABLED" "value" (dig "outboxEnabled" false $eventing)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "BASYX_EVENTING_TOPIC_PREFIX" "value" (dig "topicPrefix" "basyx" $eventing)) }}
+{{- end }}
+
+{{/*
+Render service-local BaSyx runtime overrides as explicit container env values.
+*/}}
+{{- define "basyx.serviceRuntimeEnv" -}}
+{{- $root := .root -}}
+{{- $values := .values | default dict -}}
+{{- $environment := $values.environment | default dict -}}
+{{- $general := $values.general | default dict -}}
+{{- $history := $values.history | default dict -}}
+{{- $evidence := $history.evidence | default dict -}}
+{{- $signing := $evidence.signing | default dict -}}
+{{- $integrityAnchor := $history.integrityAnchor | default dict -}}
+{{- $eventing := $values.eventing | default dict -}}
+{{- $abac := $values.abac | default dict -}}
+{{- $abacManagementApi := $abac.managementApi | default dict -}}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "enableImplicitCasts" "name" "GENERAL_ENABLEIMPLICITCASTS") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "enableDescriptorDebug" "name" "GENERAL_ENABLEDESCRIPTORDEBUG") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "discoveryIntegration" "name" "GENERAL_DISCOVERYINTEGRATION") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "enableCustomMiddlewareHeaderInjection" "name" "GENERAL_ENABLECUSTOMMIDDLEWAREHEADERINJECTION") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "supportsSingularSupplementalSemanticId" "name" "GENERAL_SUPPORTSSINGULARSUPPLEMENTALSEMANTICID") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "aasRegistryIntegration" "name" "GENERAL_AASREGISTRYINTEGRATION") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "submodelRegistryIntegration" "name" "GENERAL_SUBMODELREGISTRYINTEGRATION") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "externalUrl" "name" "GENERAL_EXTERNALURL") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "trustProxyHeaders" "name" "GENERAL_TRUSTPROXYHEADERS") }}
+{{- include "basyx.serviceRuntimeEnv.listEntry" (dict "environment" $environment "config" $general "key" "trustedProxyCIDRs" "name" "GENERAL_TRUSTEDPROXYCIDRS") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "uploadMaxSizeBytes" "name" "GENERAL_UPLOADMAXSIZEBYTES") }}
+{{- include "basyx.serviceRuntimeEnv.listEntry" (dict "environment" $environment "config" $general "key" "aasPreconfigPaths" "name" "GENERAL_AAS_PRECONFIG_PATHS") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $abac "key" "policyFileImport" "name" "ABAC_POLICY_FILE_IMPORT") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $abacManagementApi "key" "enabled" "name" "ABAC_MANAGEMENT_API_ENABLED") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $history "key" "mode" "name" "BASYX_HISTORY_MODE") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $history "key" "retentionDays" "name" "BASYX_HISTORY_RETENTION_DAYS") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $history "key" "fullSnapshotInterval" "name" "BASYX_HISTORY_FULL_SNAPSHOT_INTERVAL") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $history "key" "immutability" "name" "BASYX_HISTORY_IMMUTABILITY") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $history "key" "auditIdentityMode" "name" "BASYX_AUDIT_IDENTITY_MODE") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $evidence "key" "enabled" "name" "BASYX_HISTORY_EVIDENCE_ENABLED") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $evidence "key" "provider" "name" "BASYX_HISTORY_EVIDENCE_PROVIDER") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $evidence "key" "bucket" "name" "BASYX_HISTORY_EVIDENCE_BUCKET") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $evidence "key" "prefix" "name" "BASYX_HISTORY_EVIDENCE_PREFIX") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $evidence "key" "region" "name" "BASYX_HISTORY_EVIDENCE_REGION") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $evidence "key" "endpoint" "name" "BASYX_HISTORY_EVIDENCE_ENDPOINT") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $evidence "key" "accessKeyId" "name" "BASYX_HISTORY_EVIDENCE_ACCESS_KEY_ID") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $evidence "key" "secretAccessKey" "name" "BASYX_HISTORY_EVIDENCE_SECRET_ACCESS_KEY") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $evidence "key" "pathStyle" "name" "BASYX_HISTORY_EVIDENCE_PATH_STYLE") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $evidence "key" "retentionMode" "name" "BASYX_HISTORY_EVIDENCE_RETENTION_MODE") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $evidence "key" "retentionDays" "name" "BASYX_HISTORY_EVIDENCE_RETENTION_DAYS") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $evidence "key" "writeTimeoutSeconds" "name" "BASYX_HISTORY_EVIDENCE_WRITE_TIMEOUT_SECONDS") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $signing "key" "privateKeyPath" "name" "BASYX_HISTORY_EVIDENCE_SIGNING_PRIVATE_KEY_PATH") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $signing "key" "publicKeyPath" "name" "BASYX_HISTORY_EVIDENCE_SIGNING_PUBLIC_KEY_PATH") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $signing "key" "required" "name" "BASYX_HISTORY_EVIDENCE_SIGNING_REQUIRED") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $integrityAnchor "key" "provider" "name" "BASYX_HISTORY_INTEGRITY_ANCHOR_PROVIDER") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $eventing "key" "enabled" "name" "BASYX_EVENTING_ENABLED") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $eventing "key" "format" "name" "BASYX_EVENTING_FORMAT") }}
+{{- include "basyx.serviceRuntimeEnv.listEntry" (dict "environment" $environment "config" $eventing "key" "sinks" "name" "BASYX_EVENTING_SINKS") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $eventing "key" "outboxEnabled" "name" "BASYX_EVENTING_OUTBOX_ENABLED") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $eventing "key" "topicPrefix" "name" "BASYX_EVENTING_TOPIC_PREFIX") }}
+{{- end }}
+
+{{/*
 Render extra env entries from a key/value map.
 */}}
 {{- define "basyx.service.extraEnvMap" -}}
@@ -173,6 +326,7 @@ spec:
               value: {{ $values.service.port | quote }}
             - name: SERVER_CONTEXTPATH
               value: {{ index $root.Values.paths .component | quote }}
+            {{- include "basyx.serviceRuntimeEnv" (dict "root" $root "values" $values) | nindent 12 }}
             {{- range $key, $value := $values.environment | default dict }}
             - name: {{ $key }}
               value: {{ tpl (print $value) $root | quote }}
@@ -589,7 +743,7 @@ tls:
 {{- end }}
 
 {{- define "common.config.checksum" -}}
-{{- printf "%s\n%s\n%s\n" (printf "https://%s%s/realms/%s" .Values.host .Values.paths.keycloak .Values.keycloak.realm) (include "common.certs.sslCertDir" .) (toYaml .Values.environment.common) | sha256sum -}}
+{{- printf "%s\n%s\n%s\n%s\n%s\n%s\n%s\n" (printf "https://%s%s/realms/%s" .Values.host .Values.paths.keycloak .Values.keycloak.realm) (include "common.certs.sslCertDir" .) (toYaml .Values.environment.common) (toYaml .Values.general) (toYaml .Values.history) (toYaml .Values.eventing) (toYaml .Values.abac) | sha256sum -}}
 {{- end }}
 
 {{- define "common-database-config" -}}

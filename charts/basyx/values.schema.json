@@ -1,6 +1,29 @@
 {
   "$schema": "https://json-schema.org/draft-07/schema#",
   "type": "object",
+  "definitions": {
+    "serviceRuntimeOverrides": {
+      "type": "object",
+      "properties": {
+        "general": { "$ref": "#/properties/general" },
+        "history": { "$ref": "#/properties/history" },
+        "eventing": { "$ref": "#/properties/eventing" },
+        "abac": {
+          "type": "object",
+          "properties": {
+            "policyFileImport": { "type": "string", "enum": ["", "always", "if_missing", "never"] },
+            "managementApi": {
+              "type": "object",
+              "properties": {
+                "enabled": { "type": "boolean" }
+              }
+            }
+          }
+        },
+        "environment": { "type": "object" }
+      }
+    }
+  },
   "required": [
     "instanceName",
     "host",
@@ -209,6 +232,83 @@
         }
       }
     },
+    "general": {
+      "type": "object",
+      "properties": {
+        "enableImplicitCasts": { "type": "boolean" },
+        "enableDescriptorDebug": { "type": "boolean" },
+        "discoveryIntegration": { "type": "boolean" },
+        "enableCustomMiddlewareHeaderInjection": { "type": "boolean" },
+        "supportsSingularSupplementalSemanticId": { "type": "boolean" },
+        "aasRegistryIntegration": { "type": "boolean" },
+        "submodelRegistryIntegration": { "type": "boolean" },
+        "externalUrl": { "type": "string" },
+        "trustProxyHeaders": { "type": "boolean" },
+        "trustedProxyCIDRs": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "uploadMaxSizeBytes": { "type": "integer", "minimum": 0 },
+        "aasPreconfigPaths": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "history": {
+      "type": "object",
+      "properties": {
+        "mode": { "type": "string", "enum": ["off", "api", "audit"] },
+        "retentionDays": { "type": "integer", "minimum": 0 },
+        "fullSnapshotInterval": { "type": "integer", "minimum": 1 },
+        "immutability": { "type": "string", "enum": ["none", "postgres_guarded", "external_anchor"] },
+        "auditIdentityMode": { "type": "string", "enum": ["none", "minimal", "extended"] },
+        "evidence": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "provider": { "type": "string" },
+            "bucket": { "type": "string" },
+            "prefix": { "type": "string" },
+            "region": { "type": "string" },
+            "endpoint": { "type": "string" },
+            "accessKeyId": { "type": "string" },
+            "secretAccessKey": { "type": "string" },
+            "pathStyle": { "type": "boolean" },
+            "retentionMode": { "type": "string" },
+            "retentionDays": { "type": "integer", "minimum": 0 },
+            "writeTimeoutSeconds": { "type": "integer", "minimum": 1 },
+            "signing": {
+              "type": "object",
+              "properties": {
+                "privateKeyPath": { "type": "string" },
+                "publicKeyPath": { "type": "string" },
+                "required": { "type": "boolean" }
+              }
+            }
+          }
+        },
+        "integrityAnchor": {
+          "type": "object",
+          "properties": {
+            "provider": { "type": "string" }
+          }
+        }
+      }
+    },
+    "eventing": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "format": { "type": "string" },
+        "sinks": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "outboxEnabled": { "type": "boolean" },
+        "topicPrefix": { "type": "string" }
+      }
+    },
     "proxy": {
       "type": "object",
       "properties": {
@@ -295,6 +395,13 @@
       "type": "object",
       "properties": {
         "enabled": { "type": "boolean" },
+        "policyFileImport": { "type": "string", "enum": ["", "always", "if_missing", "never"] },
+        "managementApi": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" }
+          }
+        },
         "mountPath": { "type": "string" },
         "accessRulesFileName": { "type": "string" },
         "trustListFileName": { "type": "string" },
@@ -302,6 +409,14 @@
         "trustList": { "type": "string" }
       }
     },
+    "aasDiscovery": { "$ref": "#/definitions/serviceRuntimeOverrides" },
+    "aasRegistry": { "$ref": "#/definitions/serviceRuntimeOverrides" },
+    "aasRepository": { "$ref": "#/definitions/serviceRuntimeOverrides" },
+    "submodelRegistry": { "$ref": "#/definitions/serviceRuntimeOverrides" },
+    "submodelRepository": { "$ref": "#/definitions/serviceRuntimeOverrides" },
+    "cdRepository": { "$ref": "#/definitions/serviceRuntimeOverrides" },
+    "companyLookup": { "$ref": "#/definitions/serviceRuntimeOverrides" },
+    "digitalTwinRegistry": { "$ref": "#/definitions/serviceRuntimeOverrides" },
     "database": {
       "type": "object",
       "required": ["clusterName", "type", "instances", "storage"],

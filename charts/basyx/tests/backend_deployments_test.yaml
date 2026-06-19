@@ -63,6 +63,69 @@ tests:
           path: spec.template.spec.containers[0].readinessProbe.httpGet.path
           value: /aas-repository/health
 
+  - it: renders service-local runtime overrides for shared backend deployments
+    template: templates/aas-repository/deployment.yaml
+    set:
+      aasRepository.enabled: true
+      history.mode: audit
+      aasRepository.history.mode: api
+      aasRepository.history.evidence.enabled: true
+      aasRepository.eventing.topicPrefix: aas-repository-events
+      aasRepository.general.aasPreconfigPaths[0]: /aas/preconfigured
+      aasRepository.abac.policyFileImport: if_missing
+      aasRepository.abac.managementApi.enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BASYX_HISTORY_MODE
+            value: api
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BASYX_HISTORY_EVIDENCE_ENABLED
+            value: "true"
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BASYX_EVENTING_TOPIC_PREFIX
+            value: aas-repository-events
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GENERAL_AAS_PRECONFIG_PATHS
+            value: /aas/preconfigured
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: ABAC_POLICY_FILE_IMPORT
+            value: if_missing
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: ABAC_MANAGEMENT_API_ENABLED
+            value: "true"
+          count: 1
+
+  - it: lets raw service environment override structured service runtime config
+    template: templates/aas-repository/deployment.yaml
+    set:
+      aasRepository.enabled: true
+      aasRepository.history.mode: api
+      aasRepository.environment.BASYX_HISTORY_MODE: audit
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BASYX_HISTORY_MODE
+            value: audit
+          count: 1
+
   - it: renders numeric keycloak image tags cleanly
     template: templates/keycloak/deployment.yaml
     set:
