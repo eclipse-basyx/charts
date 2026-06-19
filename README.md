@@ -477,7 +477,7 @@ Most service blocks support `enabled`, `replicaCount`, `image.*`, `imagePullSecr
 
 ### BaSyx Runtime Configuration
 
-BaSyx Go runtime options can be configured globally and overridden per backend service. Global values are rendered into the shared `basyx-common-config` Secret and are loaded by all backend services. Service-local values are rendered as explicit container environment variables and therefore override the global defaults.
+BaSyx Go runtime options can be configured globally and overridden per backend service. Global values are rendered into the shared `<fullname>-common-config` Secret, for example `basyx-common-config` when installing the chart as release `basyx`, and are loaded by all backend services. Service-local values are rendered as explicit container environment variables and therefore override the global defaults.
 
 This applies to:
 
