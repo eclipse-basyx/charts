@@ -86,7 +86,7 @@ tests:
           value: Never
       - equal:
           path: spec.containers[0].image
-          value: curlimages/curl:8.19.0
+          value: curlimages/curl:8.20.0
       - matchRegex:
           path: spec.containers[0].args[0]
           pattern: 'http://basyx-keycloak:9096/identity-management/realms/basyx'

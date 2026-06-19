@@ -1,5 +1,5 @@
 {{- if eq (include "common.certs.customEnabled" .) "true" }}
-{{- $defaultImage := dict "repository" "curlimages/curl" "tag" "8.19.0" "pullPolicy" "Always" "digest" "" }}
+{{- $defaultImage := dict "repository" "curlimages/curl" "tag" "8.20.0" "pullPolicy" "Always" "digest" "" }}
 {{- $configuredImage := dict }}
 {{- with .Values.keycloak }}
 {{- with .tests }}
