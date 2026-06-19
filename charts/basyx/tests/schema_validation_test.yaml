@@ -23,3 +23,37 @@ tests:
       - failedTemplate:
           errorPattern: "paths.keycloak"
 
+  - it: fails when history mode is unsupported
+    values:
+      - fixtures/invalid_history_mode.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "history.mode"
+
+  - it: fails when history full snapshot interval is below one
+    values:
+      - fixtures/invalid_history_full_snapshot_interval.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "history.fullSnapshotInterval"
+
+  - it: fails when history immutability mode is unsupported
+    values:
+      - fixtures/invalid_history_immutability.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "history.immutability"
+
+  - it: fails when history audit identity mode is unsupported
+    values:
+      - fixtures/invalid_history_audit_identity_mode.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "history.auditIdentityMode"
+
+  - it: fails when history evidence write timeout is below one
+    values:
+      - fixtures/invalid_history_evidence_write_timeout.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "history.evidence.writeTimeoutSeconds"

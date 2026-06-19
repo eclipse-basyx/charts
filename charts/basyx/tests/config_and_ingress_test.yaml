@@ -27,6 +27,97 @@ tests:
           path: stringData.OIDC_AUDIENCE
           value: discovery-service
 
+  - it: renders structured BaSyx runtime configuration into the common secret
+    template: templates/secret.yaml
+    documentSelector:
+      path: metadata.name
+      value: basyx-common-config
+    set:
+      aasDiscovery.enabled: true
+      general.trustProxyHeaders: true
+      general.aasPreconfigPaths[0]: /app/preconfiguration
+      abac.policyFileImport: if_missing
+      abac.managementApi.enabled: true
+      history.mode: audit
+      history.fullSnapshotInterval: 5
+      history.immutability: postgres_guarded
+      history.auditIdentityMode: extended
+      history.evidence.enabled: true
+      history.evidence.provider: s3
+      history.evidence.bucket: basyx-history-evidence
+      history.evidence.prefix: history-evidence
+      history.evidence.endpoint: http://minio:9000
+      history.evidence.pathStyle: true
+      history.evidence.retentionMode: compliance
+      history.evidence.retentionDays: 7
+      eventing.topicPrefix: custom-basyx
+    asserts:
+      - equal:
+          path: stringData.GENERAL_TRUSTPROXYHEADERS
+          value: "true"
+      - equal:
+          path: stringData.GENERAL_AAS_PRECONFIG_PATHS
+          value: /app/preconfiguration
+      - equal:
+          path: stringData.ABAC_POLICY_FILE_IMPORT
+          value: if_missing
+      - equal:
+          path: stringData.ABAC_MANAGEMENT_API_ENABLED
+          value: "true"
+      - equal:
+          path: stringData.BASYX_HISTORY_MODE
+          value: audit
+      - equal:
+          path: stringData.BASYX_HISTORY_FULL_SNAPSHOT_INTERVAL
+          value: "5"
+      - equal:
+          path: stringData.BASYX_HISTORY_IMMUTABILITY
+          value: postgres_guarded
+      - equal:
+          path: stringData.BASYX_AUDIT_IDENTITY_MODE
+          value: extended
+      - equal:
+          path: stringData.BASYX_HISTORY_EVIDENCE_ENABLED
+          value: "true"
+      - equal:
+          path: stringData.BASYX_HISTORY_EVIDENCE_PROVIDER
+          value: s3
+      - equal:
+          path: stringData.BASYX_HISTORY_EVIDENCE_BUCKET
+          value: basyx-history-evidence
+      - equal:
+          path: stringData.BASYX_HISTORY_EVIDENCE_PREFIX
+          value: history-evidence
+      - equal:
+          path: stringData.BASYX_HISTORY_EVIDENCE_ENDPOINT
+          value: http://minio:9000
+      - equal:
+          path: stringData.BASYX_HISTORY_EVIDENCE_PATH_STYLE
+          value: "true"
+      - equal:
+          path: stringData.BASYX_HISTORY_EVIDENCE_RETENTION_MODE
+          value: compliance
+      - equal:
+          path: stringData.BASYX_HISTORY_EVIDENCE_RETENTION_DAYS
+          value: "7"
+      - equal:
+          path: stringData.BASYX_EVENTING_TOPIC_PREFIX
+          value: custom-basyx
+
+  - it: lets environment.common override structured runtime configuration
+    template: templates/secret.yaml
+    documentSelector:
+      path: metadata.name
+      value: basyx-common-config
+    set:
+      aasDiscovery.enabled: true
+      history.mode: audit
+      environment.common.BASYX_HISTORY_MODE: api
+    asserts:
+      - equal:
+          path: stringData.BASYX_HISTORY_MODE
+          value: api
+
   - it: renders the web ui infrastructure with keycloak issuer and client id
     template: templates/aas-web-gui/configmap-infrastructure.yaml
     set:
@@ -83,6 +174,34 @@ tests:
       - equal:
           path: spec.template.spec.containers[0].readinessProbe.httpGet.path
           value: /aas-discovery/health
+
+  - it: renders service-local runtime overrides for aas discovery
+    template: templates/aas-discovery/deployment.yaml
+    set:
+      aasDiscovery.enabled: true
+      history.mode: audit
+      aasDiscovery.history.mode: api
+      aasDiscovery.eventing.topicPrefix: discovery-events
+      aasDiscovery.general.trustProxyHeaders: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BASYX_HISTORY_MODE
+            value: api
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BASYX_EVENTING_TOPIC_PREFIX
+            value: discovery-events
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GENERAL_TRUSTPROXYHEADERS
+            value: "true"
+          count: 1
 
   - it: probes the web ui at its configured base path
     template: templates/aas-web-gui/deployment.yaml

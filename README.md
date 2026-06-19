@@ -475,6 +475,178 @@ Supported service blocks:
 
 Most service blocks support `enabled`, `replicaCount`, `image.*`, `imagePullSecrets`, `service.*`, `ingress.*`, `resources`, `nodeSelector`, `tolerations`, `affinity`, `podAnnotations`, `podLabels`, `podSecurityContext`, `securityContext`, `volumes`, `volumeMounts` and optional service-local `abac` overrides.
 
+### BaSyx Runtime Configuration
+
+BaSyx Go runtime options can be configured globally and overridden per backend service. Global values are rendered into the shared `<fullname>-common-config` Secret, for example `basyx-common-config` when installing the chart as release `basyx`, and are loaded by all backend services. Service-local values are rendered as explicit container environment variables and therefore override the global defaults.
+
+This applies to:
+
+- `aasDiscovery`
+- `aasRegistry`
+- `aasRepository`
+- `submodelRegistry`
+- `submodelRepository`
+- `cdRepository`
+- `companyLookup`
+- `digitalTwinRegistry`
+
+Global runtime defaults:
+
+```yaml
+general:
+  trustProxyHeaders: false
+  trustedProxyCIDRs: []
+  aasPreconfigPaths: []
+
+history:
+  mode: "off"
+  immutability: "none"
+  auditIdentityMode: "none"
+  evidence:
+    enabled: false
+    provider: "none"
+
+eventing:
+  enabled: false
+  topicPrefix: basyx
+
+abac:
+  policyFileImport: ""
+  managementApi:
+    enabled: false
+```
+
+Service-local override example:
+
+```yaml
+history:
+  mode: "off"
+
+aasRepository:
+  history:
+    mode: audit
+    immutability: postgres_guarded
+    auditIdentityMode: extended
+    evidence:
+      enabled: true
+      provider: s3
+      bucket: basyx-history-evidence
+      endpoint: http://minio:9000
+      pathStyle: true
+  eventing:
+    topicPrefix: aas-repository-events
+  general:
+    aasPreconfigPaths:
+      - /aas/preconfigured
+  abac:
+    policyFileImport: if_missing
+    managementApi:
+      enabled: true
+```
+
+History settings can be overridden independently for each backend service. Use the
+global `history` block as the default for all services, then add a service-local
+`history` block where a component needs different history or audit behavior:
+
+```yaml
+history:
+  mode: "off"
+
+aasRepository:
+  history:
+    mode: api
+    fullSnapshotInterval: 1
+
+submodelRepository:
+  history:
+    mode: audit
+    immutability: postgres_guarded
+    auditIdentityMode: extended
+```
+
+In this example, history stays disabled globally, the AAS Repository records API
+history, and the Submodel Repository uses audit-oriented history settings. The
+same pattern can be used for `aasDiscovery`, `aasRegistry`, `submodelRegistry`,
+`cdRepository`, `companyLookup` and `digitalTwinRegistry`.
+
+If you need a parameter that is not modeled as a structured value yet, use the raw environment maps:
+
+```yaml
+environment:
+  common:
+    BASYX_HISTORY_MODE: api
+
+aasRepository:
+  environment:
+    BASYX_HISTORY_MODE: audit
+```
+
+Raw environment maps are the escape hatch and take precedence over structured values. In the example above, `aasRepository.environment.BASYX_HISTORY_MODE` wins over `aasRepository.history.mode`.
+
+#### General Runtime Values
+
+| Value | Rendered environment variable | Description |
+| --- | --- | --- |
+| `general.enableImplicitCasts` | `GENERAL_ENABLEIMPLICITCASTS` | Enables implicit value casts. |
+| `general.enableDescriptorDebug` | `GENERAL_ENABLEDESCRIPTORDEBUG` | Enables descriptor debug behavior. |
+| `general.discoveryIntegration` | `GENERAL_DISCOVERYINTEGRATION` | Enables AAS Discovery integration where supported. |
+| `general.enableCustomMiddlewareHeaderInjection` | `GENERAL_ENABLECUSTOMMIDDLEWAREHEADERINJECTION` | Enables custom middleware header injection. |
+| `general.supportsSingularSupplementalSemanticId` | `GENERAL_SUPPORTSSINGULARSUPPLEMENTALSEMANTICID` | Enables compatibility for singular supplemental semantic IDs. |
+| `general.aasRegistryIntegration` | `GENERAL_AASREGISTRYINTEGRATION` | Enables AAS Registry synchronization. |
+| `general.submodelRegistryIntegration` | `GENERAL_SUBMODELREGISTRYINTEGRATION` | Enables Submodel Registry synchronization. |
+| `general.externalUrl` | `GENERAL_EXTERNALURL` | Public external URL used by registry synchronization. |
+| `general.trustProxyHeaders` | `GENERAL_TRUSTPROXYHEADERS` | Trusts forwarded proxy headers. Only enable behind trusted reverse proxies. |
+| `general.trustedProxyCIDRs` | `GENERAL_TRUSTEDPROXYCIDRS` | Comma-separated trusted proxy CIDR list. |
+| `general.uploadMaxSizeBytes` | `GENERAL_UPLOADMAXSIZEBYTES` | Maximum upload size in bytes. `0` keeps the service default. |
+| `general.aasPreconfigPaths` | `GENERAL_AAS_PRECONFIG_PATHS` | Comma-separated paths for preconfigured AAS input. Mount matching files or directories with service-specific `volumes` and `volumeMounts`. |
+
+`aasRepository` and `submodelRepository` already set registry integration related values in their service-local `environment` maps by default. Override these service-local values only when you intentionally want different registry synchronization behavior.
+
+#### History, Audit And Evidence Values
+
+| Value | Rendered environment variable | Description |
+| --- | --- | --- |
+| `history.mode` | `BASYX_HISTORY_MODE` | History mode. Typical values are `off`, `api` or `audit`. |
+| `history.retentionDays` | `BASYX_HISTORY_RETENTION_DAYS` | Retention period in days. `0` keeps the service default. |
+| `history.fullSnapshotInterval` | `BASYX_HISTORY_FULL_SNAPSHOT_INTERVAL` | Interval for full history snapshots. |
+| `history.immutability` | `BASYX_HISTORY_IMMUTABILITY` | Immutability mode, e.g. `none`, `postgres_guarded` or `external_anchor`. |
+| `history.auditIdentityMode` | `BASYX_AUDIT_IDENTITY_MODE` | Audit identity mode, e.g. `none`, `minimal` or `extended`. |
+| `history.evidence.enabled` | `BASYX_HISTORY_EVIDENCE_ENABLED` | Enables external evidence writing. |
+| `history.evidence.provider` | `BASYX_HISTORY_EVIDENCE_PROVIDER` | Evidence provider, e.g. `none` or `s3`. |
+| `history.evidence.bucket` | `BASYX_HISTORY_EVIDENCE_BUCKET` | Evidence storage bucket. |
+| `history.evidence.prefix` | `BASYX_HISTORY_EVIDENCE_PREFIX` | Object prefix for evidence storage. |
+| `history.evidence.region` | `BASYX_HISTORY_EVIDENCE_REGION` | S3-compatible region. |
+| `history.evidence.endpoint` | `BASYX_HISTORY_EVIDENCE_ENDPOINT` | S3-compatible endpoint URL. |
+| `history.evidence.accessKeyId` | `BASYX_HISTORY_EVIDENCE_ACCESS_KEY_ID` | Evidence storage access key ID. Prefer external secret handling for real credentials. |
+| `history.evidence.secretAccessKey` | `BASYX_HISTORY_EVIDENCE_SECRET_ACCESS_KEY` | Evidence storage secret access key. Prefer external secret handling for real credentials. |
+| `history.evidence.pathStyle` | `BASYX_HISTORY_EVIDENCE_PATH_STYLE` | Enables path-style S3 access. |
+| `history.evidence.retentionMode` | `BASYX_HISTORY_EVIDENCE_RETENTION_MODE` | Object lock retention mode, if supported by the backend. |
+| `history.evidence.retentionDays` | `BASYX_HISTORY_EVIDENCE_RETENTION_DAYS` | Object lock retention period in days. |
+| `history.evidence.writeTimeoutSeconds` | `BASYX_HISTORY_EVIDENCE_WRITE_TIMEOUT_SECONDS` | Evidence write timeout in seconds. |
+| `history.evidence.signing.privateKeyPath` | `BASYX_HISTORY_EVIDENCE_SIGNING_PRIVATE_KEY_PATH` | Private key path for evidence signing. Mount the key separately. |
+| `history.evidence.signing.publicKeyPath` | `BASYX_HISTORY_EVIDENCE_SIGNING_PUBLIC_KEY_PATH` | Public key path for evidence verification. Mount the key separately. |
+| `history.evidence.signing.required` | `BASYX_HISTORY_EVIDENCE_SIGNING_REQUIRED` | Requires signing for evidence records. |
+| `history.integrityAnchor.provider` | `BASYX_HISTORY_INTEGRITY_ANCHOR_PROVIDER` | Integrity anchor provider. |
+
+#### Eventing Values
+
+| Value | Rendered environment variable | Description |
+| --- | --- | --- |
+| `eventing.enabled` | `BASYX_EVENTING_ENABLED` | Enables event publishing. |
+| `eventing.format` | `BASYX_EVENTING_FORMAT` | Event payload format, default `cloudevents`. |
+| `eventing.sinks` | `BASYX_EVENTING_SINKS` | Comma-separated sink list. |
+| `eventing.outboxEnabled` | `BASYX_EVENTING_OUTBOX_ENABLED` | Enables outbox processing. |
+| `eventing.topicPrefix` | `BASYX_EVENTING_TOPIC_PREFIX` | Event topic prefix. |
+
+The current BaSyx Go implementation may fail fast when event publishing or outbox processing is enabled before a matching implementation is available. Keep `eventing.enabled: false` unless you intentionally deploy a compatible eventing setup.
+
+#### ABAC Runtime Values
+
+| Value | Rendered environment variable | Description |
+| --- | --- | --- |
+| `abac.policyFileImport` | `ABAC_POLICY_FILE_IMPORT` | Controls startup import behavior for ABAC policy files, e.g. `always`, `if_missing` or `never`. Empty value keeps the service default. |
+| `abac.managementApi.enabled` | `ABAC_MANAGEMENT_API_ENABLED` | Enables the ABAC management API where supported. |
+
 ### AAS Web UI
 
 Enable the Web UI with:

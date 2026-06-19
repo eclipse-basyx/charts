@@ -8,6 +8,5 @@
   "selectorLabelsHelper" "basyx-digitalTwinRegistry.selectorLabels"
   "serviceAccountHelper" "basyx-digitalTwinRegistry.serviceAccountName"
   "containerName" "digital-twin-registry"
-  "extraEnv" (include "basyx.service.extraEnvMap" (.Values.digitalTwinRegistry.environment | default dict))
 ) -}}
 {{- end }}

@@ -91,6 +91,62 @@ environment:
     OIDC_AUDIENCE: discovery-service
     ABAC_ENABLED: false
 
+# Shared BaSyx Go runtime configuration rendered into the common environment
+# for backend services. Explicit keys in environment.common override these
+# structured values.
+general:
+  enableImplicitCasts: true
+  enableDescriptorDebug: false
+  discoveryIntegration: false
+  enableCustomMiddlewareHeaderInjection: false
+  supportsSingularSupplementalSemanticId: false
+  aasRegistryIntegration: false
+  submodelRegistryIntegration: false
+  externalUrl: ""
+  trustProxyHeaders: false
+  trustedProxyCIDRs: []
+  uploadMaxSizeBytes: 0
+  # Comma-rendered into GENERAL_AAS_PRECONFIG_PATHS. Mount matching files or
+  # directories with the service-specific volumes/volumeMounts when used.
+  aasPreconfigPaths: []
+
+# AAS v3.2 history/audit runtime configuration. Defaults keep history disabled.
+history:
+  mode: "off"
+  retentionDays: 0
+  fullSnapshotInterval: 1
+  immutability: "none"
+  auditIdentityMode: "none"
+  evidence:
+    enabled: false
+    provider: "none"
+    bucket: ""
+    prefix: basyx-history-evidence
+    region: us-east-1
+    endpoint: ""
+    accessKeyId: ""
+    secretAccessKey: ""
+    pathStyle: false
+    retentionMode: ""
+    retentionDays: 0
+    writeTimeoutSeconds: 10
+    signing:
+      privateKeyPath: ""
+      publicKeyPath: ""
+      required: false
+  integrityAnchor:
+    provider: "none"
+
+# Future-compatible eventing settings. BaSyx Go currently fails fast when
+# event publishing or outbox processing is enabled before an implementation is
+# available.
+eventing:
+  enabled: false
+  format: cloudevents
+  sinks: []
+  outboxEnabled: false
+  topicPrefix: basyx
+
 
 # HTTP proxy settings for outbound connections from all services.
 # Set to empty string "" to disable. noProxy should include cluster-internal
@@ -106,7 +162,7 @@ configurationService:
   enabled: true
   image:
     repository: eclipsebasyx/basyxconfigurationservice-go
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
     tag: ""
     digest: ""
   imagePullSecrets: []
@@ -163,15 +219,15 @@ keycloak:
   initJob:
     image:
       repository: peterevans/curl-jq
-      pullPolicy: Always
+      pullPolicy: IfNotPresent
       tag: "1.0"
       digest: ""
   tests:
     realmCheck:
       image:
         repository: curlimages/curl
-        pullPolicy: Always
-        tag: 8.19.0
+        pullPolicy: IfNotPresent
+        tag: 8.20.0
         digest: ""
   initialization:
     userProfile:
@@ -288,7 +344,7 @@ keycloak:
   replicaCount: 1
   image:
     repository: keycloak/keycloak
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
     tag: 26.5
   imagePullSecrets: []
   nameOverride: "keycloak"
@@ -367,7 +423,7 @@ submodelRepository:
   replicaCount: 1
   image:
     repository: eclipsebasyx/submodelrepository-go
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
     tag: ""
     # Image tag is same as Chart App version
   imagePullSecrets: []
@@ -415,6 +471,9 @@ submodelRepository:
     # Keep the Submodel Registry in sync when submodels are created, updated or deleted.
     GENERAL_SUBMODELREGISTRYINTEGRATION: true
     GENERAL_EXTERNALURL: "https://{{ .Values.host }}{{ .Values.paths.submodelRepository }}"
+  general: {}
+  history: {}
+  eventing: {}
   resources: {}
     # limits:
     #   cpu: 500m
@@ -454,7 +513,7 @@ submodelRegistry:
   replicaCount: 1
   image:
     repository: eclipsebasyx/submodelregistry-go
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
     tag: ""
     # Image tag is same as Chart App version
   imagePullSecrets: []
@@ -498,6 +557,10 @@ submodelRegistry:
         paths:
           - path: "{{ .Values.paths.submodelRegistry }}"
             pathType: ImplementationSpecific
+  environment: {}
+  general: {}
+  history: {}
+  eventing: {}
   resources: {}
     # limits:
     #   cpu: 500m
@@ -537,7 +600,7 @@ aasRegistry:
   replicaCount: 1
   image:
     repository: eclipsebasyx/aasregistry-go
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
     tag: ""
     # Image tag is same as Chart App version
   imagePullSecrets: []
@@ -585,6 +648,9 @@ aasRegistry:
   # Content of application.yaml
   # central environment variables (will be set in configmap.yaml via tpl interpolation)
   environment: {}
+  general: {}
+  history: {}
+  eventing: {}
 
   resources: {}
     # We usually recommend not to specify default resources and to leave this as a conscious
@@ -632,7 +698,7 @@ digitalTwinRegistry:
   replicaCount: 1
   image:
     repository: eclipsebasyx/digitaltwinregistry-go
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
     tag: ""
     # Image tag is same as Chart App version
   imagePullSecrets: []
@@ -680,6 +746,9 @@ digitalTwinRegistry:
   # Content of application.yaml
   # central environment variables (will be set in configmap.yaml via tpl interpolation)
   environment: {}
+  general: {}
+  history: {}
+  eventing: {}
 
   resources: {}
     # We usually recommend not to specify default resources and to leave this as a conscious
@@ -726,8 +795,8 @@ aasRepository:
   replicaCount: 1
   image:
     repository: eclipsebasyx/aasrepository-go
-    pullPolicy: Always
-    tag: SNAPSHOT
+    pullPolicy: IfNotPresent
+    tag: ""
     digest: ""
     # Image tag is same as Chart App version
   imagePullSecrets: []
@@ -778,6 +847,9 @@ aasRepository:
     # Keep the AAS Registry in sync when AAS shells are created, updated or deleted.
     GENERAL_AASREGISTRYINTEGRATION: true
     GENERAL_EXTERNALURL: "https://{{ .Values.host }}{{ .Values.paths.aasRepository }}"
+  general: {}
+  history: {}
+  eventing: {}
 
   resources: {}
     # limits:
@@ -818,7 +890,7 @@ cdRepository:
   replicaCount: 1
   image:
     repository: eclipsebasyx/conceptdescriptionrepository-go
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
     tag: ""
     # Image tag is same as Chart App version
   imagePullSecrets: []
@@ -866,6 +938,9 @@ cdRepository:
   # Content of application.yaml
   # central environment variables (will be set in configmap.yaml via tpl interpolation)
   environment: {}
+  general: {}
+  history: {}
+  eventing: {}
 
   resources: {}
     # limits:
@@ -906,7 +981,7 @@ companyLookup:
   replicaCount: 1
   image:
     repository: eclipsebasyx/companylookup-go
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
     tag: ""
     digest: ""
   imagePullSecrets: []
@@ -946,6 +1021,9 @@ companyLookup:
           - path: "{{ .Values.paths.companyLookup }}"
             pathType: ImplementationSpecific
   environment: {}
+  general: {}
+  history: {}
+  eventing: {}
   resources: {}
     # limits:
     #   cpu: 500m
@@ -986,7 +1064,7 @@ aasDiscovery:
   replicaCount: 1
   image:
     repository: eclipsebasyx/aasdiscovery-go
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
     tag: ""
   imagePullSecrets: []
   nameOverride: "aas-discovery"
@@ -1031,6 +1109,9 @@ aasDiscovery:
 
   # central environment variables (will be set in configmap.yaml via tpl interpolation)
   environment: {}
+  general: {}
+  history: {}
+  eventing: {}
   resources: {}
     # limits:
     #   cpu: 500m
@@ -1239,6 +1320,11 @@ database:
 # Individual services can override global ABAC settings via <service>.abac.*
 abac:
   enabled: false
+  # Startup import behavior for accessRulesFileName:
+  # "" uses the service default, otherwise one of always, if_missing, never.
+  policyFileImport: ""
+  managementApi:
+    enabled: false
   mountPath: /security_env
   accessRulesFileName: access-rules.json
   trustListFileName: trustlist.json

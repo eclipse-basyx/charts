@@ -1,5 +1,5 @@
 {{- if .Values.keycloak.enabled }}
-{{- $defaultImage := dict "repository" "curlimages/curl" "tag" "8.19.0" "pullPolicy" "Always" "digest" "" }}
+{{- $defaultImage := dict "repository" "curlimages/curl" "tag" "8.20.0" "pullPolicy" "IfNotPresent" "digest" "" }}
 {{- $configuredImage := dict }}
 {{- with .Values.keycloak }}
 {{- with .tests }}
