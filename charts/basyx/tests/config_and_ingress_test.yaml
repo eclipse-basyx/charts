@@ -175,6 +175,34 @@ tests:
           path: spec.template.spec.containers[0].readinessProbe.httpGet.path
           value: /aas-discovery/health
 
+  - it: renders service-local runtime overrides for aas discovery
+    template: templates/aas-discovery/deployment.yaml
+    set:
+      aasDiscovery.enabled: true
+      history.mode: audit
+      aasDiscovery.history.mode: api
+      aasDiscovery.eventing.topicPrefix: discovery-events
+      aasDiscovery.general.trustProxyHeaders: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BASYX_HISTORY_MODE
+            value: api
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BASYX_EVENTING_TOPIC_PREFIX
+            value: discovery-events
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GENERAL_TRUSTPROXYHEADERS
+            value: "true"
+          count: 1
+
   - it: probes the web ui at its configured base path
     template: templates/aas-web-gui/deployment.yaml
     set:
