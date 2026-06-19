@@ -247,16 +247,6 @@ Render service-local BaSyx runtime overrides as explicit container env values.
 {{- end }}
 
 {{/*
-Render extra env entries from a key/value map.
-*/}}
-{{- define "basyx.service.extraEnvMap" -}}
-{{- range $key, $val := . }}
-- name: {{ $key }}
-  value: {{ $val | quote }}
-{{- end }}
-{{- end }}
-
-{{/*
 Shared deployment template for the BaSyx Go backend services with common database/ABAC wiring.
 */}}
 {{- define "basyx.service.deployment" -}}

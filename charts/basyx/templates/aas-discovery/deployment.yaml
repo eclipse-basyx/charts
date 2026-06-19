@@ -8,6 +8,5 @@
   "selectorLabelsHelper" "basyx-aasDiscovery.selectorLabels"
   "serviceAccountHelper" "basyx-aasDiscovery.serviceAccountName"
   "containerName" "aas-discovery"
-  "extraEnv" (include "basyx.service.extraEnvMap" (.Values.aasDiscovery.environment | default dict))
 ) -}}
 {{- end }}

@@ -8,6 +8,5 @@
   "selectorLabelsHelper" "basyx-aasRegistry.selectorLabels"
   "serviceAccountHelper" "basyx-aasRegistry.serviceAccountName"
   "containerName" "aas-registry"
-  "extraEnv" (include "basyx.service.extraEnvMap" (.Values.aasRegistry.environment | default dict))
 ) -}}
 {{- end }}

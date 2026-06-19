@@ -8,6 +8,5 @@
   "selectorLabelsHelper" "basyx-companyLookup.selectorLabels"
   "serviceAccountHelper" "basyx-companyLookup.serviceAccountName"
   "containerName" "company-lookup"
-  "extraEnv" (include "basyx.service.extraEnvMap" (.Values.companyLookup.environment | default dict))
 ) -}}
 {{- end }}
