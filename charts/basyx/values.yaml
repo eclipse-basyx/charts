@@ -175,7 +175,7 @@ configurationService:
     image:
       repository: ghcr.io/cloudnative-pg/postgresql
       pullPolicy: IfNotPresent
-      tag: "18.3-system-trixie"
+      tag: "18.4"
       digest: ""
     intervalSeconds: 5
     timeoutSeconds: 600
