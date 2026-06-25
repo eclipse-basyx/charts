@@ -23,6 +23,7 @@ The `basyx` chart can deploy these components:
 | `aasDiscovery` | AAS discovery service |
 | `aasRegistry` | AAS registry service |
 | `aasRepository` | AAS repository service |
+| `aasEnvironment` | Integrated AAS environment service bundling AAS, submodel, concept description, registry and discovery APIs |
 | `submodelRegistry` | Submodel registry service |
 | `submodelRepository` | Submodel repository service |
 | `cdRepository` | Concept description repository |
@@ -46,6 +47,7 @@ Custom values files live outside the chart, for example:
 
 ```text
 values/values.example.yaml
+values/values.minimal.yaml
 values/values.secured.example.yaml
 ```
 
@@ -116,6 +118,9 @@ Start by copying one of the provided example values files:
 # Unsecured deployment without Keycloak and ABAC.
 cp values/values.example.yaml values/values.my-environment.yaml
 
+# Minimal deployment with only AAS Environment and Web UI.
+cp values/values.minimal.yaml values/values.my-minimal-environment.yaml
+
 # Secured deployment with Keycloak and ABAC.
 cp values/values.secured.example.yaml values/values.my-secured-environment.yaml
 ```
@@ -149,6 +154,8 @@ aasRegistry:
   enabled: true
 aasRepository:
   enabled: true
+aasEnvironment:
+  enabled: false
 submodelRegistry:
   enabled: true
 submodelRepository:
@@ -174,6 +181,8 @@ The `aasWebGui.infrastructureConfig...security.type: None` override is intention
 
 Use `values/values.secured.example.yaml` when you want authentication and authorization enabled from the start. It enables Keycloak, initializes an example admin user and enables ABAC with the chart default rule that grants full access to users with token claim `role=admin`.
 
+Use `values/values.minimal.yaml` when you want the BaSyx Go MinimalExample style deployment. It enables only `aasEnvironment` and `aasWebGui`; the individual AAS/Submodel registries and repositories stay disabled because the AAS Environment exposes those APIs through one component.
+
 Do not publish production passwords or client secrets. For public examples, use placeholders and inject real credentials through your deployment pipeline or an external secret management solution.
 
 ## Render Before Installing
@@ -182,6 +191,7 @@ Always render the chart before the first install. This catches schema errors and
 
 ```bash
 helm lint charts/basyx -f values/values.example.yaml
+helm lint charts/basyx -f values/values.minimal.yaml
 helm lint charts/basyx -f values/values.secured.example.yaml
 
 helm template basyx charts/basyx \
@@ -264,6 +274,7 @@ With the default paths, services are exposed below one host:
 | AAS Discovery | `https://<host>/aas-discovery` |
 | AAS Registry | `https://<host>/aas-registry` |
 | AAS Repository | `https://<host>/aas-repository` |
+| AAS Environment | `https://<host>/aas-environment` |
 | Submodel Registry | `https://<host>/submodel-registry` |
 | Submodel Repository | `https://<host>/submodel-repo` or your custom override |
 | Concept Description Repository | `https://<host>/cd-repository` |
@@ -467,6 +478,7 @@ Supported service blocks:
 - `aasDiscovery`
 - `aasRegistry`
 - `aasRepository`
+- `aasEnvironment`
 - `submodelRegistry`
 - `submodelRepository`
 - `cdRepository`
@@ -474,6 +486,35 @@ Supported service blocks:
 - `digitalTwinRegistry`
 
 Most service blocks support `enabled`, `replicaCount`, `image.*`, `imagePullSecrets`, `service.*`, `ingress.*`, `resources`, `nodeSelector`, `tolerations`, `affinity`, `podAnnotations`, `podLabels`, `podSecurityContext`, `securityContext`, `volumes`, `volumeMounts` and optional service-local `abac` overrides.
+
+`aasEnvironment` uses the `eclipsebasyx/aasenvironment-go` image and defaults to service port `8082`. It can be deployed as a single BaSyx Go API endpoint backed by the chart's PostgreSQL database and Configuration Service. It enables AAS Registry, Submodel Registry and Discovery integration by default:
+
+```yaml
+aasEnvironment:
+  enabled: true
+  environment:
+    GENERAL_AASREGISTRYINTEGRATION: true
+    GENERAL_SUBMODELREGISTRYINTEGRATION: true
+    GENERAL_DISCOVERYINTEGRATION: true
+```
+
+To import preconfigured AAS files, mount the files into the pod and point BaSyx Go to the mount path:
+
+```yaml
+aasEnvironment:
+  enabled: true
+  general:
+    aasPreconfigPaths:
+      - /app/preconfiguration
+  volumeMounts:
+    - name: aas-preconfiguration
+      mountPath: /app/preconfiguration
+      readOnly: true
+  volumes:
+    - name: aas-preconfiguration
+      configMap:
+        name: aas-preconfiguration
+```
 
 ### BaSyx Runtime Configuration
 
@@ -484,6 +525,7 @@ This applies to:
 - `aasDiscovery`
 - `aasRegistry`
 - `aasRepository`
+- `aasEnvironment`
 - `submodelRegistry`
 - `submodelRepository`
 - `cdRepository`
@@ -570,8 +612,8 @@ submodelRepository:
 
 In this example, history stays disabled globally, the AAS Repository records API
 history, and the Submodel Repository uses audit-oriented history settings. The
-same pattern can be used for `aasDiscovery`, `aasRegistry`, `submodelRegistry`,
-`cdRepository`, `companyLookup` and `digitalTwinRegistry`.
+same pattern can be used for `aasDiscovery`, `aasRegistry`, `aasEnvironment`,
+`submodelRegistry`, `cdRepository`, `companyLookup` and `digitalTwinRegistry`.
 
 If you need a parameter that is not modeled as a structured value yet, use the raw environment maps:
 
@@ -765,6 +807,7 @@ Run lint with custom values:
 
 ```bash
 helm lint charts/basyx -f values/values.example.yaml
+helm lint charts/basyx -f values/values.minimal.yaml
 helm lint charts/basyx -f values/values.secured.example.yaml
 ```
 

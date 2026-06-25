@@ -1,0 +1,33 @@
+{{- if .Values.aasEnvironment.enabled -}}
+{{- if .Values.aasEnvironment.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "basyx-aasEnvironment.fullname" . }}
+  labels:
+    {{- include "basyx-aasEnvironment.labels" . | nindent 4 }}
+  annotations: &commonIngressAnnotations
+  {{- include "common.ingressTLS.annotations" . | nindent 2}}
+  {{- with .Values.aasEnvironment.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  ingressClassName: {{ .Values.aasEnvironment.ingress.className | quote }}
+  {{- include "common.ingressTLS" .  | indent 2}}
+  rules:
+    {{- range .Values.aasEnvironment.ingress.hosts }}
+    - host: {{ tpl .host $ | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ tpl .path $ | quote }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                name: {{ include "basyx-aasEnvironment.fullname" $ }}
+                port:
+                  number: {{ $.Values.aasEnvironment.service.port }}
+          {{- end }}
+    {{- end }}
+{{- end }}
+{{- end }}

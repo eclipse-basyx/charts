@@ -92,3 +92,20 @@ tests:
       - matchRegex:
           path: data["trustlist.json"]
           pattern: '"audience": "discovery-service"'
+
+  - it: renders ABAC configuration for aas environment when enabled
+    set:
+      aasEnvironment.enabled: true
+      abac.enabled: true
+    documentSelector:
+      path: metadata.name
+      value: basyx-aas-environment-abac-config
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - matchRegex:
+          path: data["access-rules.json"]
+          pattern: '"name": "admin_full"'
+      - matchRegex:
+          path: data["trustlist.json"]
+          pattern: '"audience": "discovery-service"'

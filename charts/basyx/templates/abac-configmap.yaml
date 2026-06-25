@@ -2,6 +2,7 @@
   (dict "component" "aasDiscovery" "nameSuffix" "aas-discovery")
   (dict "component" "aasRegistry" "nameSuffix" "aas-registry")
   (dict "component" "aasRepository" "nameSuffix" "aas-repository")
+  (dict "component" "aasEnvironment" "nameSuffix" "aas-environment")
   (dict "component" "submodelRegistry" "nameSuffix" "submodel-registry")
   (dict "component" "submodelRepository" "nameSuffix" "submodel-repository")
   (dict "component" "cdRepository" "nameSuffix" "cd-repository")

@@ -23,6 +23,13 @@ tests:
       - failedTemplate:
           errorPattern: "paths.keycloak"
 
+  - it: fails when the aas environment path does not start with a slash
+    values:
+      - fixtures/invalid_aas_environment_path.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "paths.aasEnvironment"
+
   - it: fails when history mode is unsupported
     values:
       - fixtures/invalid_history_mode.yaml

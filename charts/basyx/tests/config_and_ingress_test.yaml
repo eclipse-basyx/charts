@@ -7,6 +7,7 @@ templates:
   - templates/aas-web-gui/deployment.yaml
   - templates/aas-discovery/deployment.yaml
   - templates/aas-discovery/ingress.yaml
+  - templates/aas-environment/ingress.yaml
   - templates/company-lookup/ingress.yaml
 tests:
   - it: renders the common secret with derived oidc issuer and ssl cert dir
@@ -263,7 +264,22 @@ tests:
           path: spec.rules[0].http.paths[0].backend.service.port.number
           value: 5080
 
-  - it: renders the common secret for a company lookup only deployment
+  - it: renders the aas environment ingress with its own path and port
+    template: templates/aas-environment/ingress.yaml
+    set:
+      aasEnvironment.enabled: true
+    asserts:
+      - equal:
+          path: spec.rules[0].host
+          value: basyx.example.com
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: /aas-environment
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.port.number
+          value: 8082
+
+  - it: renders the common secret for an aas environment only deployment
     template: templates/secret.yaml
     documentSelector:
       path: metadata.name
@@ -272,11 +288,12 @@ tests:
       aasDiscovery.enabled: false
       aasRegistry.enabled: false
       aasRepository.enabled: false
+      aasEnvironment.enabled: true
       submodelRegistry.enabled: false
       submodelRepository.enabled: false
       cdRepository.enabled: false
       digitalTwinRegistry.enabled: false
-      companyLookup.enabled: true
+      companyLookup.enabled: false
     asserts:
       - isKind:
           of: Secret

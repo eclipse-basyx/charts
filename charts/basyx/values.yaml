@@ -66,6 +66,7 @@ paths:
   aasDiscovery: /aas-discovery
   aasRegistry: /aas-registry
   aasRepository: /aas-repository
+  aasEnvironment: /aas-environment
   submodelRegistry: /submodel-registry
   submodelRepository: /submodel-repo
   cdRepository: /cd-repository
@@ -884,6 +885,105 @@ aasRepository:
   #           labelSelector:
   #             matchLabels:
   #               app.kubernetes.io/name: aas-repository
+  affinity: {}
+
+aasEnvironment:
+  enabled: false
+  replicaCount: 1
+  image:
+    repository: eclipsebasyx/aasenvironment-go
+    pullPolicy: IfNotPresent
+    tag: ""
+    digest: ""
+    # Image tag is same as Chart App version
+  imagePullSecrets: []
+  nameOverride: "aas-environment"
+  fullnameOverride: "aas-environment"
+  path: /aas-environment
+  serviceAccount:
+    # Specifies whether a service account should be created
+    create: true
+    # Automatically mount a ServiceAccount's API credentials?
+    automount: false
+    # Annotations to add to the service account
+    annotations: {}
+    # The name of the service account to use.
+    # If not set and create is true, a name is generated using the fullname template
+    name: "aas-environment"
+  podAnnotations: {}
+  podLabels: {}
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  service:
+    type: ClusterIP
+    port: "8082"
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    hosts:
+      - host: "{{ .Values.host }}"
+        paths:
+          - path: "{{ .Values.paths.aasEnvironment }}"
+            pathType: ImplementationSpecific
+
+  # AAS Environment bundles the AAS, submodel, concept description, registry
+  # and discovery APIs in one service. Preconfigured AAS files can be imported
+  # by setting general.aasPreconfigPaths and mounting matching files/directories below.
+  environment:
+    GENERAL_AASREGISTRYINTEGRATION: true
+    GENERAL_SUBMODELREGISTRYINTEGRATION: true
+    GENERAL_DISCOVERYINTEGRATION: true
+    GENERAL_EXTERNALURL: "https://{{ .Values.host }}{{ .Values.paths.aasEnvironment }}"
+  general: {}
+  history: {}
+  eventing: {}
+
+  resources: {}
+    # limits:
+    #   cpu: 500m
+    #   memory: 512Mi
+    # requests:
+    #   cpu: 100m
+    #   memory: 256Mi
+  livenessProbe:
+    httpGet:
+      path: "{{ .Values.paths.aasEnvironment }}/health"
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: "{{ .Values.paths.aasEnvironment }}/health"
+      port: http
+    initialDelaySeconds: 15
+    periodSeconds: 5
+    failureThreshold: 3
+  nodeSelector: {}
+  tolerations: []
+  # volumes:
+  #   - name: aas-preconfiguration
+  #     configMap:
+  #       name: aas-preconfiguration
+  # volumeMounts:
+  #   - name: aas-preconfiguration
+  #     mountPath: /app/preconfiguration
+  #     readOnly: true
+  # general:
+  #   aasPreconfigPaths:
+  #     - /app/preconfiguration
   affinity: {}
 
 cdRepository:

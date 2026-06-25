@@ -16,6 +16,7 @@ The suites cover stable chart contracts such as:
 - ABAC enablement, disablement and legacy override compatibility
 - precedence of service-local ABAC overrides over global defaults
 - ABAC mounts and rollout checksum annotations in backend deployments
+- optional AAS Environment deployment, ingress and ABAC wiring
 - common OIDC and ingress configuration
 - additional custom CA certificate mounts and trust-store wiring
 - runtime `helm test` hook for custom CA mount checks

@@ -1,0 +1,17 @@
+{{- if .Values.aasEnvironment.enabled -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "basyx-aasEnvironment.fullname" . }}-config
+  labels:
+    {{- include "basyx-aasEnvironment.labels" . | nindent 4 }}
+{{- $env := .Values.aasEnvironment.environment | default dict }}
+{{- if $env }}
+data:
+  {{- range $key, $value := $env }}
+  {{ $key }}: {{ tpl (print $value) $ | quote }}
+  {{- end }}
+{{- else }}
+data: {}
+{{- end }}
+{{- end }}

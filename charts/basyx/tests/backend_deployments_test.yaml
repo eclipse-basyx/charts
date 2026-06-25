@@ -3,6 +3,7 @@ release:
   name: basyx
 templates:
   - templates/aas-repository/deployment.yaml
+  - templates/aas-environment/deployment.yaml
   - templates/company-lookup/deployment.yaml
   - templates/keycloak/deployment.yaml
 tests:
@@ -213,6 +214,61 @@ tests:
           content:
             name: SERVER_CONTEXTPATH
             value: /company-lookup
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: ABAC_ENABLED
+            value: "true"
+          count: 1
+
+  - it: renders aas environment as an optional BaSyx Go backend
+    template: templates/aas-environment/deployment.yaml
+    set:
+      aasEnvironment.enabled: true
+      abac.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: aas-environment
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: "^eclipsebasyx/aasenvironment-go:[^:]+$"
+      - notMatchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ":SNAPSHOT$"
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 8082
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SERVER_CONTEXTPATH
+            value: /aas-environment
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GENERAL_AASREGISTRYINTEGRATION
+            value: "true"
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GENERAL_SUBMODELREGISTRYINTEGRATION
+            value: "true"
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GENERAL_DISCOVERYINTEGRATION
+            value: "true"
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GENERAL_EXTERNALURL
+            value: https://basyx.example.com/aas-environment
           count: 1
       - contains:
           path: spec.template.spec.containers[0].env

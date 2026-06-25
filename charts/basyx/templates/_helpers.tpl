@@ -51,6 +51,10 @@ If release name contains chart name it will be used as a full name.
 {{- printf "%s-aas-repository" (include "basyx.fullname" .) | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
+{{- define "basyx-aasEnvironment.fullname" -}}
+{{- printf "%s-aas-environment" (include "basyx.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
 {{- define "basyx-cdRepository.fullname" -}}
 {{- printf "%s-cd-repository" (include "basyx.fullname" .) | trunc 63 | trimSuffix "-" }}
 {{- end }}
@@ -416,6 +420,15 @@ app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
+{{- define "basyx-aasEnvironment.labels" -}}
+helm.sh/chart: {{ include "basyx.chart" . }}
+{{ include "basyx-aasEnvironment.selectorLabels" . }}
+{{- if .Chart.AppVersion }}
+app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+{{- end }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end }}
+
 {{- define "basyx-cdRepository.labels" -}}
 helm.sh/chart: {{ include "basyx.chart" . }}
 {{ include "basyx-cdRepository.selectorLabels" . }}
@@ -498,6 +511,11 @@ app.kubernetes.io/component: "digital-twin-registry"
 app.kubernetes.io/component: "aas-repository"
 {{- end }}
 
+{{- define "basyx-aasEnvironment.selectorLabels" -}}
+{{ include "basyx.selectorLabels" . }}
+app.kubernetes.io/component: "aas-environment"
+{{- end }}
+
 {{- define "basyx-cdRepository.selectorLabels" -}}
 {{ include "basyx.selectorLabels" . }}
 app.kubernetes.io/component: "cd-repository"
@@ -568,6 +586,14 @@ Create the name of the service account to use
 {{- default (include "basyx-aasRepository.fullname" .) .Values.aasRepository.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.aasRepository.serviceAccount.name }}
+{{- end }}
+{{- end }}
+
+{{- define "basyx-aasEnvironment.serviceAccountName" -}}
+{{- if .Values.aasEnvironment.serviceAccount.create }}
+{{- default (include "basyx-aasEnvironment.fullname" .) .Values.aasEnvironment.serviceAccount.name }}
+{{- else }}
+{{- default "default" .Values.aasEnvironment.serviceAccount.name }}
 {{- end }}
 {{- end }}
 

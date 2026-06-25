@@ -12,6 +12,9 @@ Enabled components:
 {{- if .Values.aasRepository.enabled }}
   - AAS Repository:             https://{{ .Values.host }}{{ .Values.paths.aasRepository }}
 {{- end }}
+{{- if .Values.aasEnvironment.enabled }}
+  - AAS Environment:            https://{{ .Values.host }}{{ .Values.paths.aasEnvironment }}
+{{- end }}
 {{- if .Values.submodelRegistry.enabled }}
   - Submodel Registry:          https://{{ .Values.host }}{{ .Values.paths.submodelRegistry }}
 {{- end }}
