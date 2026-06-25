@@ -496,6 +496,7 @@ Global runtime defaults:
 general:
   trustProxyHeaders: false
   trustedProxyCIDRs: []
+  bulkBatchLimit: 1000
   aasPreconfigPaths: []
 
 history:
@@ -512,6 +513,7 @@ eventing:
 
 abac:
   policyFileImport: ""
+  policyScope: ""
   managementApi:
     enabled: false
 ```
@@ -536,10 +538,12 @@ aasRepository:
   eventing:
     topicPrefix: aas-repository-events
   general:
+    bulkBatchLimit: 500
     aasPreconfigPaths:
       - /aas/preconfigured
   abac:
     policyFileImport: if_missing
+    policyScope: aas-repository
     managementApi:
       enabled: true
 ```
@@ -598,6 +602,7 @@ Raw environment maps are the escape hatch and take precedence over structured va
 | `general.trustProxyHeaders` | `GENERAL_TRUSTPROXYHEADERS` | Trusts forwarded proxy headers. Only enable behind trusted reverse proxies. |
 | `general.trustedProxyCIDRs` | `GENERAL_TRUSTEDPROXYCIDRS` | Comma-separated trusted proxy CIDR list. |
 | `general.uploadMaxSizeBytes` | `GENERAL_UPLOADMAXSIZEBYTES` | Maximum upload size in bytes. `0` keeps the service default. |
+| `general.bulkBatchLimit` | `GENERAL_BULK_BATCH_LIMIT` | Maximum row count per generated bulk SQL statement. Must be greater than `0`. |
 | `general.aasPreconfigPaths` | `GENERAL_AAS_PRECONFIG_PATHS` | Comma-separated paths for preconfigured AAS input. Mount matching files or directories with service-specific `volumes` and `volumeMounts`. |
 
 `aasRepository` and `submodelRepository` already set registry integration related values in their service-local `environment` maps by default. Override these service-local values only when you intentionally want different registry synchronization behavior.
@@ -645,6 +650,7 @@ The current BaSyx Go implementation may fail fast when event publishing or outbo
 | Value | Rendered environment variable | Description |
 | --- | --- | --- |
 | `abac.policyFileImport` | `ABAC_POLICY_FILE_IMPORT` | Controls startup import behavior for ABAC policy files, e.g. `always`, `if_missing` or `never`. Empty value keeps the service default. |
+| `abac.policyScope` | `ABAC_POLICY_SCOPE` | Optional database namespace for stored ABAC policies. Empty value keeps the service default scope. Use different scopes to isolate deployments that share a database. |
 | `abac.managementApi.enabled` | `ABAC_MANAGEMENT_API_ENABLED` | Enables the ABAC management API where supported. |
 
 ### AAS Web UI

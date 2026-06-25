@@ -158,8 +158,10 @@ The environment.common map remains the escape hatch and takes precedence.
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_TRUSTPROXYHEADERS" "value" (dig "trustProxyHeaders" false $general)) }}
 {{- include "basyx.commonConfig.listEntry" (dict "common" $common "name" "GENERAL_TRUSTEDPROXYCIDRS" "value" (dig "trustedProxyCIDRs" (list) $general)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_UPLOADMAXSIZEBYTES" "value" (dig "uploadMaxSizeBytes" 0 $general)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_BULK_BATCH_LIMIT" "value" (dig "bulkBatchLimit" 1000 $general)) }}
 {{- include "basyx.commonConfig.listEntry" (dict "common" $common "name" "GENERAL_AAS_PRECONFIG_PATHS" "value" (dig "aasPreconfigPaths" (list) $general)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "ABAC_POLICY_FILE_IMPORT" "value" (dig "policyFileImport" "" $abac)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "ABAC_POLICY_SCOPE" "value" (dig "policyScope" "" $abac)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "ABAC_MANAGEMENT_API_ENABLED" "value" (dig "managementApi" "enabled" false $abac)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "BASYX_HISTORY_MODE" "value" (dig "mode" "off" $history)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "BASYX_HISTORY_RETENTION_DAYS" "value" (dig "retentionDays" 0 $history)) }}
@@ -215,8 +217,10 @@ Render service-local BaSyx runtime overrides as explicit container env values.
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "trustProxyHeaders" "name" "GENERAL_TRUSTPROXYHEADERS") }}
 {{- include "basyx.serviceRuntimeEnv.listEntry" (dict "environment" $environment "config" $general "key" "trustedProxyCIDRs" "name" "GENERAL_TRUSTEDPROXYCIDRS") }}
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "uploadMaxSizeBytes" "name" "GENERAL_UPLOADMAXSIZEBYTES") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "bulkBatchLimit" "name" "GENERAL_BULK_BATCH_LIMIT") }}
 {{- include "basyx.serviceRuntimeEnv.listEntry" (dict "environment" $environment "config" $general "key" "aasPreconfigPaths" "name" "GENERAL_AAS_PRECONFIG_PATHS") }}
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $abac "key" "policyFileImport" "name" "ABAC_POLICY_FILE_IMPORT") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $abac "key" "policyScope" "name" "ABAC_POLICY_SCOPE") }}
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $abacManagementApi "key" "enabled" "name" "ABAC_MANAGEMENT_API_ENABLED") }}
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $history "key" "mode" "name" "BASYX_HISTORY_MODE") }}
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $history "key" "retentionDays" "name" "BASYX_HISTORY_RETENTION_DAYS") }}

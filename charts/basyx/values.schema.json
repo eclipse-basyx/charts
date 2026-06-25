@@ -12,6 +12,11 @@
           "type": "object",
           "properties": {
             "policyFileImport": { "type": "string", "enum": ["", "always", "if_missing", "never"] },
+            "policyScope": {
+              "type": "string",
+              "maxLength": 255,
+              "pattern": "^$|^[A-Za-z0-9_.:-]+$"
+            },
             "managementApi": {
               "type": "object",
               "properties": {
@@ -249,6 +254,7 @@
           "items": { "type": "string" }
         },
         "uploadMaxSizeBytes": { "type": "integer", "minimum": 0 },
+        "bulkBatchLimit": { "type": "integer", "minimum": 1 },
         "aasPreconfigPaths": {
           "type": "array",
           "items": { "type": "string", "minLength": 1 }
@@ -396,6 +402,11 @@
       "properties": {
         "enabled": { "type": "boolean" },
         "policyFileImport": { "type": "string", "enum": ["", "always", "if_missing", "never"] },
+        "policyScope": {
+          "type": "string",
+          "maxLength": 255,
+          "pattern": "^$|^[A-Za-z0-9_.:-]+$"
+        },
         "managementApi": {
           "type": "object",
           "properties": {

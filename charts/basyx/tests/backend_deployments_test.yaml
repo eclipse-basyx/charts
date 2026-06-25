@@ -72,7 +72,9 @@ tests:
       aasRepository.history.evidence.enabled: true
       aasRepository.eventing.topicPrefix: aas-repository-events
       aasRepository.general.aasPreconfigPaths[0]: /aas/preconfigured
+      aasRepository.general.bulkBatchLimit: 250
       aasRepository.abac.policyFileImport: if_missing
+      aasRepository.abac.policyScope: aas-repository-scope
       aasRepository.abac.managementApi.enabled: true
     asserts:
       - contains:
@@ -102,8 +104,20 @@ tests:
       - contains:
           path: spec.template.spec.containers[0].env
           content:
+            name: GENERAL_BULK_BATCH_LIMIT
+            value: "250"
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
             name: ABAC_POLICY_FILE_IMPORT
             value: if_missing
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: ABAC_POLICY_SCOPE
+            value: aas-repository-scope
           count: 1
       - contains:
           path: spec.template.spec.containers[0].env
@@ -118,12 +132,28 @@ tests:
       aasRepository.enabled: true
       aasRepository.history.mode: api
       aasRepository.environment.BASYX_HISTORY_MODE: audit
+      aasRepository.general.bulkBatchLimit: 250
+      aasRepository.environment.GENERAL_BULK_BATCH_LIMIT: 100
+      aasRepository.abac.policyScope: structured-scope
+      aasRepository.environment.ABAC_POLICY_SCOPE: raw-scope
     asserts:
       - contains:
           path: spec.template.spec.containers[0].env
           content:
             name: BASYX_HISTORY_MODE
             value: audit
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GENERAL_BULK_BATCH_LIMIT
+            value: "100"
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: ABAC_POLICY_SCOPE
+            value: raw-scope
           count: 1
 
   - it: renders numeric keycloak image tags cleanly

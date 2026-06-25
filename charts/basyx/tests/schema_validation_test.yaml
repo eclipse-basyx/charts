@@ -57,3 +57,17 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "history.evidence.writeTimeoutSeconds"
+
+  - it: fails when bulk batch limit is below one
+    values:
+      - fixtures/invalid_general_bulk_batch_limit.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "general.bulkBatchLimit"
+
+  - it: fails when ABAC policy scope contains unsupported characters
+    values:
+      - fixtures/invalid_abac_policy_scope.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "abac.policyScope"
