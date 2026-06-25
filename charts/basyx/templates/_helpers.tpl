@@ -51,6 +51,10 @@ If release name contains chart name it will be used as a full name.
 {{- printf "%s-aas-repository" (include "basyx.fullname" .) | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
+{{- define "basyx-aasEnvironment.fullname" -}}
+{{- printf "%s-aas-environment" (include "basyx.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
 {{- define "basyx-cdRepository.fullname" -}}
 {{- printf "%s-cd-repository" (include "basyx.fullname" .) | trunc 63 | trimSuffix "-" }}
 {{- end }}
@@ -158,8 +162,10 @@ The environment.common map remains the escape hatch and takes precedence.
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_TRUSTPROXYHEADERS" "value" (dig "trustProxyHeaders" false $general)) }}
 {{- include "basyx.commonConfig.listEntry" (dict "common" $common "name" "GENERAL_TRUSTEDPROXYCIDRS" "value" (dig "trustedProxyCIDRs" (list) $general)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_UPLOADMAXSIZEBYTES" "value" (dig "uploadMaxSizeBytes" 0 $general)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_BULK_BATCH_LIMIT" "value" (dig "bulkBatchLimit" 1000 $general)) }}
 {{- include "basyx.commonConfig.listEntry" (dict "common" $common "name" "GENERAL_AAS_PRECONFIG_PATHS" "value" (dig "aasPreconfigPaths" (list) $general)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "ABAC_POLICY_FILE_IMPORT" "value" (dig "policyFileImport" "" $abac)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "ABAC_POLICY_SCOPE" "value" (dig "policyScope" "" $abac)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "ABAC_MANAGEMENT_API_ENABLED" "value" (dig "managementApi" "enabled" false $abac)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "BASYX_HISTORY_MODE" "value" (dig "mode" "off" $history)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "BASYX_HISTORY_RETENTION_DAYS" "value" (dig "retentionDays" 0 $history)) }}
@@ -215,8 +221,10 @@ Render service-local BaSyx runtime overrides as explicit container env values.
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "trustProxyHeaders" "name" "GENERAL_TRUSTPROXYHEADERS") }}
 {{- include "basyx.serviceRuntimeEnv.listEntry" (dict "environment" $environment "config" $general "key" "trustedProxyCIDRs" "name" "GENERAL_TRUSTEDPROXYCIDRS") }}
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "uploadMaxSizeBytes" "name" "GENERAL_UPLOADMAXSIZEBYTES") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "bulkBatchLimit" "name" "GENERAL_BULK_BATCH_LIMIT") }}
 {{- include "basyx.serviceRuntimeEnv.listEntry" (dict "environment" $environment "config" $general "key" "aasPreconfigPaths" "name" "GENERAL_AAS_PRECONFIG_PATHS") }}
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $abac "key" "policyFileImport" "name" "ABAC_POLICY_FILE_IMPORT") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $abac "key" "policyScope" "name" "ABAC_POLICY_SCOPE") }}
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $abacManagementApi "key" "enabled" "name" "ABAC_MANAGEMENT_API_ENABLED") }}
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $history "key" "mode" "name" "BASYX_HISTORY_MODE") }}
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $history "key" "retentionDays" "name" "BASYX_HISTORY_RETENTION_DAYS") }}
@@ -412,6 +420,15 @@ app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
+{{- define "basyx-aasEnvironment.labels" -}}
+helm.sh/chart: {{ include "basyx.chart" . }}
+{{ include "basyx-aasEnvironment.selectorLabels" . }}
+{{- if .Chart.AppVersion }}
+app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+{{- end }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end }}
+
 {{- define "basyx-cdRepository.labels" -}}
 helm.sh/chart: {{ include "basyx.chart" . }}
 {{ include "basyx-cdRepository.selectorLabels" . }}
@@ -494,6 +511,11 @@ app.kubernetes.io/component: "digital-twin-registry"
 app.kubernetes.io/component: "aas-repository"
 {{- end }}
 
+{{- define "basyx-aasEnvironment.selectorLabels" -}}
+{{ include "basyx.selectorLabels" . }}
+app.kubernetes.io/component: "aas-environment"
+{{- end }}
+
 {{- define "basyx-cdRepository.selectorLabels" -}}
 {{ include "basyx.selectorLabels" . }}
 app.kubernetes.io/component: "cd-repository"
@@ -564,6 +586,14 @@ Create the name of the service account to use
 {{- default (include "basyx-aasRepository.fullname" .) .Values.aasRepository.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.aasRepository.serviceAccount.name }}
+{{- end }}
+{{- end }}
+
+{{- define "basyx-aasEnvironment.serviceAccountName" -}}
+{{- if .Values.aasEnvironment.serviceAccount.create }}
+{{- default (include "basyx-aasEnvironment.fullname" .) .Values.aasEnvironment.serviceAccount.name }}
+{{- else }}
+{{- default "default" .Values.aasEnvironment.serviceAccount.name }}
 {{- end }}
 {{- end }}
 

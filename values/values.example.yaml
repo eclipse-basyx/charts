@@ -62,6 +62,10 @@ aasRepository:
   enabled: true
 
 
+aasEnvironment:
+  enabled: false
+
+
 submodelRegistry:
   enabled: true
 

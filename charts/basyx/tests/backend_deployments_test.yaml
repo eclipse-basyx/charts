@@ -3,6 +3,7 @@ release:
   name: basyx
 templates:
   - templates/aas-repository/deployment.yaml
+  - templates/aas-environment/deployment.yaml
   - templates/company-lookup/deployment.yaml
   - templates/keycloak/deployment.yaml
 tests:
@@ -72,7 +73,9 @@ tests:
       aasRepository.history.evidence.enabled: true
       aasRepository.eventing.topicPrefix: aas-repository-events
       aasRepository.general.aasPreconfigPaths[0]: /aas/preconfigured
+      aasRepository.general.bulkBatchLimit: 250
       aasRepository.abac.policyFileImport: if_missing
+      aasRepository.abac.policyScope: aas-repository-scope
       aasRepository.abac.managementApi.enabled: true
     asserts:
       - contains:
@@ -102,8 +105,20 @@ tests:
       - contains:
           path: spec.template.spec.containers[0].env
           content:
+            name: GENERAL_BULK_BATCH_LIMIT
+            value: "250"
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
             name: ABAC_POLICY_FILE_IMPORT
             value: if_missing
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: ABAC_POLICY_SCOPE
+            value: aas-repository-scope
           count: 1
       - contains:
           path: spec.template.spec.containers[0].env
@@ -118,12 +133,28 @@ tests:
       aasRepository.enabled: true
       aasRepository.history.mode: api
       aasRepository.environment.BASYX_HISTORY_MODE: audit
+      aasRepository.general.bulkBatchLimit: 250
+      aasRepository.environment.GENERAL_BULK_BATCH_LIMIT: 100
+      aasRepository.abac.policyScope: structured-scope
+      aasRepository.environment.ABAC_POLICY_SCOPE: raw-scope
     asserts:
       - contains:
           path: spec.template.spec.containers[0].env
           content:
             name: BASYX_HISTORY_MODE
             value: audit
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GENERAL_BULK_BATCH_LIMIT
+            value: "100"
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: ABAC_POLICY_SCOPE
+            value: raw-scope
           count: 1
 
   - it: renders numeric keycloak image tags cleanly
@@ -183,6 +214,61 @@ tests:
           content:
             name: SERVER_CONTEXTPATH
             value: /company-lookup
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: ABAC_ENABLED
+            value: "true"
+          count: 1
+
+  - it: renders aas environment as an optional BaSyx Go backend
+    template: templates/aas-environment/deployment.yaml
+    set:
+      aasEnvironment.enabled: true
+      abac.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: aas-environment
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: "^eclipsebasyx/aasenvironment-go:[^:]+$"
+      - notMatchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ":SNAPSHOT$"
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 8082
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SERVER_CONTEXTPATH
+            value: /aas-environment
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GENERAL_AASREGISTRYINTEGRATION
+            value: "true"
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GENERAL_SUBMODELREGISTRYINTEGRATION
+            value: "true"
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GENERAL_DISCOVERYINTEGRATION
+            value: "true"
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GENERAL_EXTERNALURL
+            value: https://basyx.example.com/aas-environment
           count: 1
       - contains:
           path: spec.template.spec.containers[0].env

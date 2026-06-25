@@ -1,0 +1,126 @@
+# Minimal example values for a BaSyx Go AAS Environment deployment.
+#
+# This setup mirrors the BaSyx Go MinimalExample pattern: one AAS Environment
+# service, the AAS Web UI, PostgreSQL and the Configuration Service. The
+# individual AAS/Submodel registries and repositories are disabled because the
+# AAS Environment bundles those APIs in one component.
+#
+# Copy this file and adapt it for your own cluster:
+#
+#   cp values/values.minimal.yaml values/values.my-minimal-environment.yaml
+
+instanceName: minimal
+host: basyx.example.com
+
+fullnameOverride: basyx
+
+tls:
+  enabled: true
+  hosts:
+    - basyx.example.com
+
+internal:
+  CACertificates:
+    trustStore:
+      useDefaultCAs: true
+      chartFileDirectory: ""
+      additionalCACertificates: ""
+  certificateIssuer:
+    name: internal-issuer
+    autocreateCa: true
+    autocreateCaSecretName: internal-issuer-ca
+    spec:
+      ca:
+        secretName: internal-issuer-ca
+
+ingress:
+  # Use this issuer when the chart should create and use its own internal CA.
+  issuer: internal-issuer
+
+database:
+  clusterName: basyx-database
+  instances: 1
+  storage:
+    size: 10Gi
+
+configurationService:
+  enabled: true
+
+keycloak:
+  enabled: false
+
+abac:
+  enabled: false
+
+aasEnvironment:
+  enabled: true
+  # The image tag defaults to the chart appVersion. Use SNAPSHOT only when you
+  # explicitly want mutable development images:
+  # image:
+  #   tag: SNAPSHOT
+  #
+  # To import preconfigured AAS files, create a ConfigMap or Secret with those
+  # files and mount it here. This is the Kubernetes equivalent of the
+  # MinimalExample docker-compose mount `./aas:/app/preconfiguration:ro`.
+  # general:
+  #   aasPreconfigPaths:
+  #     - /app/preconfiguration
+  # volumeMounts:
+  #   - name: aas-preconfiguration
+  #     mountPath: /app/preconfiguration
+  #     readOnly: true
+  # volumes:
+  #   - name: aas-preconfiguration
+  #     configMap:
+  #       name: aas-preconfiguration
+
+aasWebGui:
+  enabled: true
+  infrastructureConfig:
+    infrastructures:
+      default: main
+      main:
+        name: "BaSyx Go {{ .Values.instanceName }}"
+        components:
+          aasDiscovery:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.aasEnvironment }}/lookup/shells"
+          aasRegistry:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.aasEnvironment }}/shell-descriptors"
+            hasDiscoveryIntegration: true
+          submodelRegistry:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.aasEnvironment }}/submodel-descriptors"
+          aasRepository:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.aasEnvironment }}/shells"
+            hasRegistryIntegration: true
+          submodelRepository:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.aasEnvironment }}/submodels"
+            hasRegistryIntegration: true
+          conceptDescriptionRepository:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.aasEnvironment }}/concept-descriptions"
+        security:
+          type: None
+          config: null
+
+aasDiscovery:
+  enabled: false
+
+aasRegistry:
+  enabled: false
+
+aasRepository:
+  enabled: false
+
+submodelRegistry:
+  enabled: false
+
+submodelRepository:
+  enabled: false
+
+cdRepository:
+  enabled: false
+
+companyLookup:
+  enabled: false
+
+digitalTwinRegistry:
+  enabled: false

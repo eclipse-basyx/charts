@@ -7,6 +7,7 @@ templates:
   - templates/aas-web-gui/deployment.yaml
   - templates/aas-discovery/deployment.yaml
   - templates/aas-discovery/ingress.yaml
+  - templates/aas-environment/ingress.yaml
   - templates/company-lookup/ingress.yaml
 tests:
   - it: renders the common secret with derived oidc issuer and ssl cert dir
@@ -35,8 +36,10 @@ tests:
     set:
       aasDiscovery.enabled: true
       general.trustProxyHeaders: true
+      general.bulkBatchLimit: 500
       general.aasPreconfigPaths[0]: /app/preconfiguration
       abac.policyFileImport: if_missing
+      abac.policyScope: shared-policy-scope
       abac.managementApi.enabled: true
       history.mode: audit
       history.fullSnapshotInterval: 5
@@ -59,8 +62,14 @@ tests:
           path: stringData.GENERAL_AAS_PRECONFIG_PATHS
           value: /app/preconfiguration
       - equal:
+          path: stringData.GENERAL_BULK_BATCH_LIMIT
+          value: "500"
+      - equal:
           path: stringData.ABAC_POLICY_FILE_IMPORT
           value: if_missing
+      - equal:
+          path: stringData.ABAC_POLICY_SCOPE
+          value: shared-policy-scope
       - equal:
           path: stringData.ABAC_MANAGEMENT_API_ENABLED
           value: "true"
@@ -113,10 +122,20 @@ tests:
       aasDiscovery.enabled: true
       history.mode: audit
       environment.common.BASYX_HISTORY_MODE: api
+      general.bulkBatchLimit: 500
+      environment.common.GENERAL_BULK_BATCH_LIMIT: 250
+      abac.policyScope: structured-scope
+      environment.common.ABAC_POLICY_SCOPE: raw-scope
     asserts:
       - equal:
           path: stringData.BASYX_HISTORY_MODE
           value: api
+      - equal:
+          path: stringData.GENERAL_BULK_BATCH_LIMIT
+          value: "250"
+      - equal:
+          path: stringData.ABAC_POLICY_SCOPE
+          value: raw-scope
 
   - it: renders the web ui infrastructure with keycloak issuer and client id
     template: templates/aas-web-gui/configmap-infrastructure.yaml
@@ -245,7 +264,22 @@ tests:
           path: spec.rules[0].http.paths[0].backend.service.port.number
           value: 5080
 
-  - it: renders the common secret for a company lookup only deployment
+  - it: renders the aas environment ingress with its own path and port
+    template: templates/aas-environment/ingress.yaml
+    set:
+      aasEnvironment.enabled: true
+    asserts:
+      - equal:
+          path: spec.rules[0].host
+          value: basyx.example.com
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: /aas-environment
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.port.number
+          value: 8082
+
+  - it: renders the common secret for an aas environment only deployment
     template: templates/secret.yaml
     documentSelector:
       path: metadata.name
@@ -254,11 +288,12 @@ tests:
       aasDiscovery.enabled: false
       aasRegistry.enabled: false
       aasRepository.enabled: false
+      aasEnvironment.enabled: true
       submodelRegistry.enabled: false
       submodelRepository.enabled: false
       cdRepository.enabled: false
       digitalTwinRegistry.enabled: false
-      companyLookup.enabled: true
+      companyLookup.enabled: false
     asserts:
       - isKind:
           of: Secret

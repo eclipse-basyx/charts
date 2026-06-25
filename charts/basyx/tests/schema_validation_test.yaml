@@ -23,6 +23,13 @@ tests:
       - failedTemplate:
           errorPattern: "paths.keycloak"
 
+  - it: fails when the aas environment path does not start with a slash
+    values:
+      - fixtures/invalid_aas_environment_path.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "paths.aasEnvironment"
+
   - it: fails when history mode is unsupported
     values:
       - fixtures/invalid_history_mode.yaml
@@ -57,3 +64,17 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "history.evidence.writeTimeoutSeconds"
+
+  - it: fails when bulk batch limit is below one
+    values:
+      - fixtures/invalid_general_bulk_batch_limit.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "general.bulkBatchLimit"
+
+  - it: fails when ABAC policy scope contains unsupported characters
+    values:
+      - fixtures/invalid_abac_policy_scope.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "abac.policyScope"

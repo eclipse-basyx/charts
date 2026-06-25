@@ -1,0 +1,17 @@
+{{- if .Values.aasEnvironment.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "basyx-aasEnvironment.fullname" . }}
+  labels:
+    {{- include "basyx-aasEnvironment.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.aasEnvironment.service.type }}
+  ports:
+    - port: {{ .Values.aasEnvironment.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "basyx-aasEnvironment.selectorLabels" . | nindent 4 }}
+{{- end }}
