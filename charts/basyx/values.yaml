@@ -302,10 +302,10 @@ keycloak:
         serviceAccountsEnabled: true
 
     users:
-      - username: d4e.admin
+      - username: basyx.admin
         enabled: true
-        email: d4e_admin@example.com
-        firstName: D4E
+        email: basyx_admin@example.com
+        firstName: BaSyx
         lastName: Admin
         emailVerified: true
         attributes:
@@ -337,12 +337,12 @@ keycloak:
     name: "keycloak-credentials"
     # configures admin user for keycloak
     admin:
-      username: changme
-      password: changme
+      username: admin
+      password: changeit
     # configures client credentials for keycloak
     client:
       name: basyx-ui
-      clientPassword: changme
+      clientPassword: changeit
   replicaCount: 1
   image:
     repository: keycloak/keycloak
@@ -1256,7 +1256,7 @@ aasWebGui:
   image:
     repository: eclipsebasyx/aas-gui
     pullPolicy: Always
-    tag: SNAPSHOT
+    tag: 0db02d0
   imagePullSecrets: []
   nameOverride: "aas-gui"
   fullnameOverride: "aas-gui"

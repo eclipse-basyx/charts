@@ -25,7 +25,7 @@ tests:
           pattern: '"clientId":"basyx-ui"'
       - matchRegex:
           path: data["users.json"]
-          pattern: '"username":"d4e\.admin"'
+          pattern: '"username":"basyx\.admin"'
       - matchRegex:
           path: data["user-profile.json"]
           pattern: '"unmanagedAttributePolicy":"ADMIN_EDIT"'
