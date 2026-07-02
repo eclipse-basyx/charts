@@ -453,6 +453,8 @@ keycloak:
 ```
 
 The chart can also create roles, clients, protocol mappers and users through `keycloak.initialization.*`.
+The default chart values initialize a generic admin user named `basyx.admin` with the password `changeit`.
+Override `keycloak.initialization.users` and `keycloak.secrets.*` before using Keycloak in any shared or production environment.
 
 ### BaSyx Services
 
