@@ -402,7 +402,7 @@ database:
 
 ### BaSyx Configuration Service
 
-Current BaSyx Go snapshots require the database schema to be prepared before DB-backed services start. The chart enables `configurationService` by default for this. It renders a Kubernetes `Job` using `eclipsebasyx/basyxconfigurationservice-go` and the same CloudNativePG application secret as the runtime services.
+BaSyx Go requires the database schema to be prepared before DB-backed services start. The chart enables `configurationService` by default for this. It renders a Kubernetes `Job` using `eclipsebasyx/basyxconfigurationservice-go` and the same CloudNativePG application secret as the runtime services.
 
 The Configuration Service image is versioned independently from the BaSyx runtime service images. Set `configurationService.image.tag` or, preferably for reproducible deployments, `configurationService.image.digest` explicitly when a schema migration image changes.
 
@@ -412,7 +412,7 @@ The default job runs as a Helm hook:
 configurationService:
   enabled: true
   image:
-    tag: SNAPSHOT
+    tag: "1.0.0"
   waitForDatabase:
     enabled: true
   hook:
@@ -466,7 +466,7 @@ aasRepository:
   replicaCount: 1
   image:
     repository: eclipsebasyx/aasrepository-go
-    tag: SNAPSHOT
+    tag: "1.0.0"
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
@@ -705,7 +705,7 @@ Enable the Web UI with:
 aasWebGui:
   enabled: true
   image:
-    tag: SNAPSHOT
+    tag: 0db02d0
 ```
 
 The Web UI infrastructure is rendered from `aasWebGui.infrastructureConfig`. The defaults derive service URLs from `host` and `paths.*`.
