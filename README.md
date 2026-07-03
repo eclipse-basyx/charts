@@ -412,7 +412,7 @@ The default job runs as a Helm hook:
 configurationService:
   enabled: true
   image:
-    tag: "1.0.0"
+    tag: "1.0.1"
   waitForDatabase:
     enabled: true
   hook:
@@ -466,7 +466,7 @@ aasRepository:
   replicaCount: 1
   image:
     repository: eclipsebasyx/aasrepository-go
-    tag: "1.0.0"
+    tag: "1.0.1"
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
