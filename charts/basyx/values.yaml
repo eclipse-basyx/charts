@@ -230,7 +230,7 @@ keycloak:
       image:
         repository: curlimages/curl
         pullPolicy: IfNotPresent
-        tag: 8.20.0
+        tag: 8.21.0
         digest: ""
   initialization:
     userProfile:
