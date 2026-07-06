@@ -1,0 +1,17 @@
+{{- if .Values.dppApi.enabled -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "basyx-dppApi.fullname" . }}-config
+  labels:
+    {{- include "basyx-dppApi.labels" . | nindent 4 }}
+{{- $env := .Values.dppApi.environment | default dict }}
+{{- if $env }}
+data:
+  {{- range $key, $value := $env }}
+  {{ $key }}: {{ tpl (print $value) $ | quote }}
+  {{- end }}
+{{- else }}
+data: {}
+{{- end }}
+{{- end }}

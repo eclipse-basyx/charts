@@ -67,6 +67,7 @@ paths:
   aasRegistry: /aas-registry
   aasRepository: /aas-repository
   aasEnvironment: /aas-environment
+  dppApi: /dpp-api
   submodelRegistry: /submodel-registry
   submodelRepository: /submodel-repo
   cdRepository: /cd-repository
@@ -986,6 +987,99 @@ aasEnvironment:
   #     - /app/preconfiguration
   affinity: {}
 
+dppApi:
+  enabled: false
+  replicaCount: 1
+  image:
+    repository: eclipsebasyx/dppapi-go
+    pullPolicy: IfNotPresent
+    tag: ""
+    digest: ""
+    # Image tag is same as Chart App version
+  imagePullSecrets: []
+  nameOverride: "dpp-api"
+  fullnameOverride: "dpp-api"
+  path: /dpp-api
+  serviceAccount:
+    # Specifies whether a service account should be created
+    create: true
+    # Automatically mount a ServiceAccount's API credentials?
+    automount: false
+    # Annotations to add to the service account
+    annotations: {}
+    # The name of the service account to use.
+    # If not set and create is true, a name is generated using the fullname template
+    name: "dpp-api"
+  podAnnotations: {}
+  podLabels: {}
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  service:
+    type: ClusterIP
+    port: "8080"
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    hosts:
+      - host: "{{ .Values.host }}"
+        paths:
+          - path: "{{ .Values.paths.dppApi }}"
+            pathType: ImplementationSpecific
+
+  # The DPP API composes Digital Product Passport data with the shared BaSyx
+  # database. The default history settings mirror the BaSyx DPP API example.
+  environment: {}
+  general: {}
+  history:
+    mode: audit
+    retentionDays: 0
+    fullSnapshotInterval: 1
+    immutability: none
+    auditIdentityMode: extended
+    evidence:
+      enabled: false
+      provider: none
+    integrityAnchor:
+      provider: none
+  eventing: {}
+
+  resources: {}
+    # limits:
+    #   cpu: 500m
+    #   memory: 512Mi
+    # requests:
+    #   cpu: 100m
+    #   memory: 256Mi
+  livenessProbe:
+    httpGet:
+      path: "{{ .Values.paths.dppApi }}/health"
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: "{{ .Values.paths.dppApi }}/health"
+      port: http
+    initialDelaySeconds: 15
+    periodSeconds: 5
+    failureThreshold: 3
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
 cdRepository:
   enabled: false
   replicaCount: 1
@@ -1459,6 +1553,10 @@ abac:
               { "ROUTE": "/concept-descriptions/*" },
               { "ROUTE": "/companies" },
               { "ROUTE": "/companies/*" },
+              { "ROUTE": "/v1/dpps" },
+              { "ROUTE": "/v1/dpps/*" },
+              { "ROUTE": "/v1/dppsByProductId/*" },
+              { "ROUTE": "/v1/dppsByIdAndDate/*" },
               { "ROUTE": "{{ .Values.paths.aasRegistry }}/description" },
               { "ROUTE": "{{ .Values.paths.aasRegistry }}/shell-descriptors" },
               { "ROUTE": "{{ .Values.paths.aasRegistry }}/shell-descriptors/*" },
@@ -1480,7 +1578,12 @@ abac:
               { "ROUTE": "{{ .Values.paths.cdRepository }}/concept-descriptions/*" },
               { "ROUTE": "{{ .Values.paths.companyLookup }}/description" },
               { "ROUTE": "{{ .Values.paths.companyLookup }}/companies" },
-              { "ROUTE": "{{ .Values.paths.companyLookup }}/companies/*" }
+              { "ROUTE": "{{ .Values.paths.companyLookup }}/companies/*" },
+              { "ROUTE": "{{ .Values.paths.dppApi }}/description" },
+              { "ROUTE": "{{ .Values.paths.dppApi }}/v1/dpps" },
+              { "ROUTE": "{{ .Values.paths.dppApi }}/v1/dpps/*" },
+              { "ROUTE": "{{ .Values.paths.dppApi }}/v1/dppsByProductId/*" },
+              { "ROUTE": "{{ .Values.paths.dppApi }}/v1/dppsByIdAndDate/*" }
             ]
           }
         ],
@@ -1508,5 +1611,6 @@ abac:
   services: {}
     # Legacy per-service override location. Prefer `<service>.abac` instead.
     # Supported service keys:
-    # aasDiscovery, aasRegistry, aasRepository, submodelRegistry,
-    # submodelRepository, cdRepository, digitalTwinRegistry
+    # aasDiscovery, aasRegistry, aasRepository, aasEnvironment, dppApi,
+    # submodelRegistry, submodelRepository, cdRepository, companyLookup,
+    # digitalTwinRegistry

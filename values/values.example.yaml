@@ -66,6 +66,10 @@ aasEnvironment:
   enabled: false
 
 
+dppApi:
+  enabled: false
+
+
 submodelRegistry:
   enabled: true
 
