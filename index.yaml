@@ -724,6 +724,30 @@ entries:
   basyx:
   - apiVersion: v2
     appVersion: 1.0.1
+    created: "2026-07-06T13:06:29.127858138Z"
+    description: 'Helm chart for deploying Eclipse BaSyx Go Components on Kubernetes,
+      including AAS registries, repositories, discovery service, and optional Keycloak
+      authentication with ABAC authorization. '
+    digest: 37aee4a82bc3e39d27ecb551173324514225ea39572e9d80e2db4feaa56eafde
+    home: https://github.com/eclipse-basyx/charts
+    keywords:
+    - digital-twin
+    - aas
+    - asset-administration-shell
+    - industry40
+    - basyx
+    maintainers:
+    - name: Eclipse BaSyx Authors
+      url: https://github.com/eclipse-basyx
+    name: basyx
+    sources:
+    - https://github.com/eclipse-basyx/charts
+    type: application
+    urls:
+    - https://github.com/eclipse-basyx/charts/releases/download/basyx-3.1.0/basyx-3.1.0.tgz
+    version: 3.1.0
+  - apiVersion: v2
+    appVersion: 1.0.1
     created: "2026-07-03T17:46:38.662460385Z"
     description: 'Helm chart for deploying Eclipse BaSyx Go Components on Kubernetes,
       including AAS registries, repositories, discovery service, and optional Keycloak
@@ -842,4 +866,4 @@ entries:
     urls:
     - https://github.com/eclipse-basyx/charts/releases/download/basyx-3.0.0-rc.1/basyx-3.0.0-rc.1.tgz
     version: 3.0.0-rc.1
-generated: "2026-07-03T17:46:38.662607553Z"
+generated: "2026-07-06T13:06:29.127908222Z"
