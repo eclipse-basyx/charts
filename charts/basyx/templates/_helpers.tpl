@@ -55,6 +55,10 @@ If release name contains chart name it will be used as a full name.
 {{- printf "%s-aas-environment" (include "basyx.fullname" .) | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
+{{- define "basyx-dppApi.fullname" -}}
+{{- printf "%s-dpp-api" (include "basyx.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
 {{- define "basyx-cdRepository.fullname" -}}
 {{- printf "%s-cd-repository" (include "basyx.fullname" .) | trunc 63 | trimSuffix "-" }}
 {{- end }}
@@ -429,6 +433,15 @@ app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
+{{- define "basyx-dppApi.labels" -}}
+helm.sh/chart: {{ include "basyx.chart" . }}
+{{ include "basyx-dppApi.selectorLabels" . }}
+{{- if .Chart.AppVersion }}
+app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+{{- end }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end }}
+
 {{- define "basyx-cdRepository.labels" -}}
 helm.sh/chart: {{ include "basyx.chart" . }}
 {{ include "basyx-cdRepository.selectorLabels" . }}
@@ -516,6 +529,11 @@ app.kubernetes.io/component: "aas-repository"
 app.kubernetes.io/component: "aas-environment"
 {{- end }}
 
+{{- define "basyx-dppApi.selectorLabels" -}}
+{{ include "basyx.selectorLabels" . }}
+app.kubernetes.io/component: "dpp-api"
+{{- end }}
+
 {{- define "basyx-cdRepository.selectorLabels" -}}
 {{ include "basyx.selectorLabels" . }}
 app.kubernetes.io/component: "cd-repository"
@@ -594,6 +612,14 @@ Create the name of the service account to use
 {{- default (include "basyx-aasEnvironment.fullname" .) .Values.aasEnvironment.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.aasEnvironment.serviceAccount.name }}
+{{- end }}
+{{- end }}
+
+{{- define "basyx-dppApi.serviceAccountName" -}}
+{{- if .Values.dppApi.serviceAccount.create }}
+{{- default (include "basyx-dppApi.fullname" .) .Values.dppApi.serviceAccount.name }}
+{{- else }}
+{{- default "default" .Values.dppApi.serviceAccount.name }}
 {{- end }}
 {{- end }}
 

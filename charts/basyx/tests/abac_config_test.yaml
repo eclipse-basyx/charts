@@ -109,3 +109,26 @@ tests:
       - matchRegex:
           path: data["trustlist.json"]
           pattern: '"audience": "discovery-service"'
+
+  - it: renders ABAC configuration for dpp api when enabled
+    set:
+      dppApi.enabled: true
+      abac.enabled: true
+    documentSelector:
+      path: metadata.name
+      value: basyx-dpp-api-abac-config
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - matchRegex:
+          path: data["access-rules.json"]
+          pattern: '"name": "admin_full"'
+      - matchRegex:
+          path: data["access-rules.json"]
+          pattern: '"ROUTE": "/v1/dpps/\*"'
+      - matchRegex:
+          path: data["access-rules.json"]
+          pattern: '"ROUTE": "/dpp-api/v1/dpps/\*"'
+      - matchRegex:
+          path: data["trustlist.json"]
+          pattern: '"audience": "discovery-service"'

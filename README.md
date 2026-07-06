@@ -24,6 +24,7 @@ The `basyx` chart can deploy these components:
 | `aasRegistry` | AAS registry service |
 | `aasRepository` | AAS repository service |
 | `aasEnvironment` | Integrated AAS environment service bundling AAS, submodel, concept description, registry and discovery APIs |
+| `dppApi` | Digital Product Passport API service |
 | `submodelRegistry` | Submodel registry service |
 | `submodelRepository` | Submodel repository service |
 | `cdRepository` | Concept description repository |
@@ -156,6 +157,8 @@ aasRepository:
   enabled: true
 aasEnvironment:
   enabled: false
+dppApi:
+  enabled: false
 submodelRegistry:
   enabled: true
 submodelRepository:
@@ -182,6 +185,8 @@ The `aasWebGui.infrastructureConfig...security.type: None` override is intention
 Use `values/values.secured.example.yaml` when you want authentication and authorization enabled from the start. It enables Keycloak, initializes an example admin user and enables ABAC with the chart default rule that grants full access to users with token claim `role=admin`.
 
 Use `values/values.minimal.yaml` when you want the BaSyx Go MinimalExample style deployment. It enables only `aasEnvironment` and `aasWebGui`; the individual AAS/Submodel registries and repositories stay disabled because the AAS Environment exposes those APIs through one component.
+
+For DPP API deployments, enable `dppApi` in your own values file. DPP commonly runs together with `aasEnvironment` and `aasWebGui`, but it is configured through the same service block pattern as the other optional BaSyx Go services.
 
 Do not publish production passwords or client secrets. For public examples, use placeholders and inject real credentials through your deployment pipeline or an external secret management solution.
 
@@ -275,12 +280,15 @@ With the default paths, services are exposed below one host:
 | AAS Registry | `https://<host>/aas-registry` |
 | AAS Repository | `https://<host>/aas-repository` |
 | AAS Environment | `https://<host>/aas-environment` |
+| DPP API | `https://<host>/dpp-api/v1/dpps` |
 | Submodel Registry | `https://<host>/submodel-registry` |
 | Submodel Repository | `https://<host>/submodel-repo` or your custom override |
 | Concept Description Repository | `https://<host>/cd-repository` |
 | Company Lookup | `https://<host>/company-lookup/companies` |
 
 Company Lookup intentionally has no resource at the bare `/company-lookup` path. Use `/company-lookup/companies`, `/company-lookup/description`, `/company-lookup/swagger` or `/company-lookup/health`.
+
+DPP API exposes its main API below `/dpp-api/v1/dpps`, Swagger UI below `/dpp-api/swagger`, OpenAPI below `/dpp-api/api-docs/openapi.yaml` and health below `/dpp-api/health` when using the default path.
 
 ## Upgrade A Deployment
 
@@ -481,6 +489,7 @@ Supported service blocks:
 - `aasRegistry`
 - `aasRepository`
 - `aasEnvironment`
+- `dppApi`
 - `submodelRegistry`
 - `submodelRepository`
 - `cdRepository`
@@ -518,6 +527,53 @@ aasEnvironment:
         name: aas-preconfiguration
 ```
 
+`dppApi` uses the `eclipsebasyx/dppapi-go` image and defaults to service port `8080`. It stores DPP data in the shared BaSyx database and defaults to audit history settings matching the BaSyx DPP API Docker Compose example:
+
+```yaml
+dppApi:
+  enabled: true
+  history:
+    mode: audit
+    auditIdentityMode: extended
+```
+
+For a DPP-oriented setup similar to the BaSyx DPP API Docker Compose example, enable DPP API together with AAS Environment and Web UI:
+
+```yaml
+dppApi:
+  enabled: true
+
+aasEnvironment:
+  enabled: true
+
+aasWebGui:
+  enabled: true
+  infrastructureConfig:
+    infrastructures:
+      default: dpp
+      dpp:
+        name: "DPP Shared AAS Environment"
+        components:
+          aasDiscovery:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.aasEnvironment }}/lookup/shells"
+          aasRegistry:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.aasEnvironment }}/shell-descriptors"
+            hasDiscoveryIntegration: true
+          submodelRegistry:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.aasEnvironment }}/submodel-descriptors"
+          aasRepository:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.aasEnvironment }}/shells"
+            hasRegistryIntegration: true
+          submodelRepository:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.aasEnvironment }}/submodels"
+            hasRegistryIntegration: true
+          conceptDescriptionRepository:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.aasEnvironment }}/concept-descriptions"
+        security:
+          type: None
+          config: null
+```
+
 ### BaSyx Runtime Configuration
 
 BaSyx Go runtime options can be configured globally and overridden per backend service. Global values are rendered into the shared `<fullname>-common-config` Secret, for example `basyx-common-config` when installing the chart as release `basyx`, and are loaded by all backend services. Service-local values are rendered as explicit container environment variables and therefore override the global defaults.
@@ -528,6 +584,7 @@ This applies to:
 - `aasRegistry`
 - `aasRepository`
 - `aasEnvironment`
+- `dppApi`
 - `submodelRegistry`
 - `submodelRepository`
 - `cdRepository`
@@ -615,7 +672,7 @@ submodelRepository:
 In this example, history stays disabled globally, the AAS Repository records API
 history, and the Submodel Repository uses audit-oriented history settings. The
 same pattern can be used for `aasDiscovery`, `aasRegistry`, `aasEnvironment`,
-`submodelRegistry`, `cdRepository`, `companyLookup` and `digitalTwinRegistry`.
+`dppApi`, `submodelRegistry`, `cdRepository`, `companyLookup` and `digitalTwinRegistry`.
 
 If you need a parameter that is not modeled as a structured value yet, use the raw environment maps:
 

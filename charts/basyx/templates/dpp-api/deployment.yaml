@@ -1,0 +1,12 @@
+{{- if .Values.dppApi.enabled -}}
+{{- include "basyx.service.deployment" (dict
+  "root" .
+  "component" "dppApi"
+  "nameSuffix" "dpp-api"
+  "fullnameHelper" "basyx-dppApi.fullname"
+  "labelsHelper" "basyx-dppApi.labels"
+  "selectorLabelsHelper" "basyx-dppApi.selectorLabels"
+  "serviceAccountHelper" "basyx-dppApi.serviceAccountName"
+  "containerName" "dpp-api"
+) -}}
+{{- end }}

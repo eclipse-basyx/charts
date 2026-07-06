@@ -30,6 +30,13 @@ tests:
       - failedTemplate:
           errorPattern: "paths.aasEnvironment"
 
+  - it: fails when the dpp api path does not start with a slash
+    values:
+      - fixtures/invalid_dpp_api_path.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "paths.dppApi"
+
   - it: fails when history mode is unsupported
     values:
       - fixtures/invalid_history_mode.yaml

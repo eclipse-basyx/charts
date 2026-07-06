@@ -110,6 +110,9 @@ aasRegistry:
 aasRepository:
   enabled: false
 
+dppApi:
+  enabled: false
+
 submodelRegistry:
   enabled: false
 

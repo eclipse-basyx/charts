@@ -4,6 +4,7 @@ release:
 templates:
   - templates/aas-repository/deployment.yaml
   - templates/aas-environment/deployment.yaml
+  - templates/dpp-api/deployment.yaml
   - templates/company-lookup/deployment.yaml
   - templates/keycloak/deployment.yaml
 tests:
@@ -269,6 +270,49 @@ tests:
           content:
             name: GENERAL_EXTERNALURL
             value: https://basyx.example.com/aas-environment
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: ABAC_ENABLED
+            value: "true"
+          count: 1
+
+  - it: renders dpp api as an optional BaSyx Go backend
+    template: templates/dpp-api/deployment.yaml
+    set:
+      dppApi.enabled: true
+      abac.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: dpp-api
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: "^eclipsebasyx/dppapi-go:[^:]+$"
+      - notMatchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ":SNAPSHOT$"
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 8080
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SERVER_CONTEXTPATH
+            value: /dpp-api
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BASYX_HISTORY_MODE
+            value: audit
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BASYX_AUDIT_IDENTITY_MODE
+            value: extended
           count: 1
       - contains:
           path: spec.template.spec.containers[0].env

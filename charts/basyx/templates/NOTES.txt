@@ -15,6 +15,9 @@ Enabled components:
 {{- if .Values.aasEnvironment.enabled }}
   - AAS Environment:            https://{{ .Values.host }}{{ .Values.paths.aasEnvironment }}
 {{- end }}
+{{- if .Values.dppApi.enabled }}
+  - DPP API:                    https://{{ .Values.host }}{{ .Values.paths.dppApi }}
+{{- end }}
 {{- if .Values.submodelRegistry.enabled }}
   - Submodel Registry:          https://{{ .Values.host }}{{ .Values.paths.submodelRegistry }}
 {{- end }}

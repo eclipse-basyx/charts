@@ -8,6 +8,7 @@ templates:
   - templates/aas-discovery/deployment.yaml
   - templates/aas-discovery/ingress.yaml
   - templates/aas-environment/ingress.yaml
+  - templates/dpp-api/ingress.yaml
   - templates/company-lookup/ingress.yaml
 tests:
   - it: renders the common secret with derived oidc issuer and ssl cert dir
@@ -279,6 +280,21 @@ tests:
           path: spec.rules[0].http.paths[0].backend.service.port.number
           value: 8082
 
+  - it: renders the dpp api ingress with its own path and port
+    template: templates/dpp-api/ingress.yaml
+    set:
+      dppApi.enabled: true
+    asserts:
+      - equal:
+          path: spec.rules[0].host
+          value: basyx.example.com
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: /dpp-api
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.port.number
+          value: 8080
+
   - it: renders the common secret for an aas environment only deployment
     template: templates/secret.yaml
     documentSelector:
@@ -289,6 +305,30 @@ tests:
       aasRegistry.enabled: false
       aasRepository.enabled: false
       aasEnvironment.enabled: true
+      dppApi.enabled: false
+      submodelRegistry.enabled: false
+      submodelRepository.enabled: false
+      cdRepository.enabled: false
+      digitalTwinRegistry.enabled: false
+      companyLookup.enabled: false
+    asserts:
+      - isKind:
+          of: Secret
+      - equal:
+          path: stringData.ABAC_ENABLED
+          value: "false"
+
+  - it: renders the common secret for a dpp api only deployment
+    template: templates/secret.yaml
+    documentSelector:
+      path: metadata.name
+      value: basyx-common-config
+    set:
+      aasDiscovery.enabled: false
+      aasRegistry.enabled: false
+      aasRepository.enabled: false
+      aasEnvironment.enabled: false
+      dppApi.enabled: true
       submodelRegistry.enabled: false
       submodelRepository.enabled: false
       cdRepository.enabled: false
