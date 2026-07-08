@@ -1,0 +1,704 @@
+# Example values for a Catena-X oriented BaSyx Go deployment.
+#
+# This setup focuses on the marker-based Digital Twin Registry and Submodel
+# Repository access pattern used by the BaSyx Go Catena-X examples:
+#
+# - Digital Twin Registry visibility is controlled through
+#   specificAssetIds[].externalSubjectId.keys[].value and
+#   submodelDescriptors[].supplementalSemanticIds[].keys[].value.
+# - Submodel Repository visibility is controlled through
+#   supplementalSemanticIds[].keys[].value on submodels and submodel elements.
+# - PUBLIC_READABLE marks data that can be read without a matching BPN.
+# - BPN values are read from the token claim Edc-Bpn.
+#
+# Copy this file and adapt it for your own cluster:
+#
+#   cp values/values.catena-x.example.yaml values/values.my-catena-x-environment.yaml
+#
+# Do not commit real passwords, client secrets or private certificate material.
+
+instanceName: catena-x
+host: basyx.example.com
+
+fullnameOverride: basyx
+
+tls:
+  enabled: true
+  hosts:
+    - basyx.example.com
+
+internal:
+  CACertificates:
+    trustStore:
+      useDefaultCAs: true
+      chartFileDirectory: ""
+      additionalCACertificates: ""
+  certificateIssuer:
+    name: internal-issuer
+    autocreateCa: true
+    autocreateCaSecretName: internal-issuer-ca
+    spec:
+      ca:
+        secretName: internal-issuer-ca
+
+ingress:
+  # Use this issuer when the chart should create and use its own internal CA.
+  issuer: internal-issuer
+
+database:
+  clusterName: basyx-database
+  instances: 1
+  storage:
+    size: 10Gi
+
+configurationService:
+  enabled: true
+
+environment:
+  common:
+    ABAC_ENABLED: true
+
+keycloak:
+  enabled: true
+  secrets:
+    admin:
+      username: admin
+      password: change-me
+    client:
+      name: basyx-ui
+      clientPassword: change-me
+  initialization:
+    roles:
+      - view_digital_twin
+      - add_digital_twin
+      - update_digital_twin
+      - delete_digital_twin
+    clients:
+      - clientId: basyx-ui
+        publicClient: true
+        standardFlowEnabled: true
+        implicitFlowEnabled: true
+        # Enabled for demo data loading with the upstream Postman collection or
+        # curl examples. Disable this in production and use authorization code
+        # flow or another trusted token issuing flow instead.
+        directAccessGrantsEnabled: true
+        redirectUris:
+          - "https://{{ .Values.host }}{{ .Values.paths.aasWebUiBasePath }}/*"
+        webOrigins:
+          - "+"
+        attributes:
+          post.logout.redirect.uris: "https://{{ .Values.host }}{{ .Values.paths.aasWebUiBasePath }}/*"
+          oauth2.device.authorization.grant.enabled: "true"
+        protocolMappers:
+          - name: Role Mapper
+            protocol: openid-connect
+            protocolMapper: oidc-usermodel-attribute-mapper
+            consentRequired: false
+            config:
+              aggregate.attrs: "false"
+              introspection.token.claim: "true"
+              multivalued: "false"
+              userinfo.token.claim: "true"
+              user.attribute: role
+              id.token.claim: "true"
+              lightweight.claim: "false"
+              access.token.claim: "true"
+              claim.name: role
+              jsonType.label: String
+          - name: Edc BPN Mapper
+            protocol: openid-connect
+            protocolMapper: oidc-usermodel-attribute-mapper
+            consentRequired: false
+            config:
+              aggregate.attrs: "false"
+              introspection.token.claim: "true"
+              multivalued: "false"
+              userinfo.token.claim: "true"
+              user.attribute: Edc-Bpn
+              id.token.claim: "true"
+              lightweight.claim: "false"
+              access.token.claim: "true"
+              claim.name: Edc-Bpn
+              jsonType.label: String
+          - name: discovery-service-aud-mapper
+            protocol: openid-connect
+            protocolMapper: oidc-audience-mapper
+            consentRequired: false
+            config:
+              included.client.audience: discovery-service
+              id.token.claim: "false"
+              lightweight.claim: "false"
+              introspection.token.claim: "true"
+              access.token.claim: "true"
+              userinfo.token.claim: "false"
+      - clientId: discovery-service
+        serviceAccountsEnabled: true
+    users:
+      - username: catena-x.provider
+        enabled: true
+        email: provider@example.com
+        firstName: Catena-X
+        lastName: Provider
+        emailVerified: true
+        attributes:
+          # Keep role as one string value. BaSyx Go ABAC $contains evaluates
+          # strings and unwraps multi-value claims to their first entry.
+          role:
+            - view_digital_twin add_digital_twin update_digital_twin delete_digital_twin
+          Edc-Bpn:
+            - BPN_PROVIDER
+        roles:
+          - view_digital_twin
+          - add_digital_twin
+          - update_digital_twin
+          - delete_digital_twin
+        credentials:
+          - type: password
+            value: change-me
+            temporary: false
+      - username: catena-x.partner-a
+        enabled: true
+        email: partner-a@example.com
+        firstName: Catena-X
+        lastName: Partner A
+        emailVerified: true
+        attributes:
+          Edc-Bpn:
+            - BPN_COMPANY_001
+        credentials:
+          - type: password
+            value: change-me
+            temporary: false
+      - username: catena-x.partner-b
+        enabled: true
+        email: partner-b@example.com
+        firstName: Catena-X
+        lastName: Partner B
+        emailVerified: true
+        attributes:
+          Edc-Bpn:
+            - BPN_COMPANY_002
+        credentials:
+          - type: password
+            value: change-me
+            temporary: false
+
+abac:
+  enabled: true
+
+digitalTwinRegistry:
+  enabled: true
+  general:
+    # Accept singular supplementalSemanticId input for compatibility with
+    # Catena-X/Tractus-X payload variants while emitting supplementalSemanticIds.
+    supportsSingularSupplementalSemanticId: true
+    # Keep this disabled for production. If a trusted ingress or connector maps
+    # Edc-Bpn into a token claim, the service does not need header injection.
+    enableCustomMiddlewareHeaderInjection: false
+  abac:
+    accessRules: |-
+      {
+        "AllAccessPermissionRules": {
+          "DEFATTRIBUTES": [
+            {
+              "name": "anonymous",
+              "attributes": [
+                { "GLOBAL": "ANONYMOUS" }
+              ]
+            }
+          ],
+          "DEFOBJECTS": [
+            {
+              "name": "all_routes",
+              "objects": [
+                { "ROUTE": "*" }
+              ]
+            },
+            {
+              "name": "all_shell_descriptors",
+              "objects": [
+                { "DESCRIPTOR": "$aasdesc(\"*\")" }
+              ]
+            },
+            {
+              "name": "asset_links",
+              "objects": [
+                { "ROUTE": "/lookup/shells" },
+                { "ROUTE": "/lookup/shellsByAssetLink" },
+                { "ROUTE": "{{ .Values.paths.digitalTwinRegistry }}/lookup/shells" },
+                { "ROUTE": "{{ .Values.paths.digitalTwinRegistry }}/lookup/shellsByAssetLink" }
+              ]
+            }
+          ],
+          "DEFACLS": [
+            {
+              "name": "read",
+              "acl": {
+                "USEATTRIBUTES": "anonymous",
+                "RIGHTS": ["READ"],
+                "ACCESS": "ALLOW"
+              }
+            },
+            {
+              "name": "write",
+              "acl": {
+                "USEATTRIBUTES": "anonymous",
+                "RIGHTS": ["CREATE", "UPDATE", "DELETE"],
+                "ACCESS": "ALLOW"
+              }
+            }
+          ],
+          "DEFFORMULAS": [
+            {
+              "name": "data_provider_read",
+              "formula": {
+                "$contains": [
+                  { "$attribute": { "CLAIM": "role" } },
+                  { "$strVal": "view_digital_twin" }
+                ]
+              }
+            },
+            {
+              "name": "data_provider",
+              "formula": {
+                "$or": [
+                  {
+                    "$contains": [
+                      { "$attribute": { "CLAIM": "role" } },
+                      { "$strVal": "add_digital_twin" }
+                    ]
+                  },
+                  {
+                    "$contains": [
+                      { "$attribute": { "CLAIM": "role" } },
+                      { "$strVal": "update_digital_twin" }
+                    ]
+                  },
+                  {
+                    "$contains": [
+                      { "$attribute": { "CLAIM": "role" } },
+                      { "$strVal": "delete_digital_twin" }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "name": "aas_bpn_or_public",
+              "formula": {
+                "$or": [
+                  {
+                    "$eq": [
+                      { "$attribute": { "CLAIM": "Edc-Bpn" } },
+                      { "$field": "$aasdesc#specificAssetIds[].externalSubjectId.keys[].value" }
+                    ]
+                  },
+                  {
+                    "$eq": [
+                      { "$strVal": "PUBLIC_READABLE" },
+                      { "$field": "$aasdesc#specificAssetIds[].externalSubjectId.keys[].value" }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "name": "aas_bpn_match",
+              "formula": {
+                "$eq": [
+                  { "$attribute": { "CLAIM": "Edc-Bpn" } },
+                  { "$field": "$aasdesc#specificAssetIds[].externalSubjectId.keys[].value" }
+                ]
+              }
+            },
+            {
+              "name": "aas_bpn_or_public_with_claim",
+              "formula": {
+                "$or": [
+                  {
+                    "$eq": [
+                      { "$attribute": { "CLAIM": "Edc-Bpn" } },
+                      { "$field": "$aasdesc#specificAssetIds[].externalSubjectId.keys[].value" }
+                    ]
+                  },
+                  {
+                    "$and": [
+                      {
+                        "$eq": [
+                          { "$strVal": "PUBLIC_READABLE" },
+                          { "$field": "$aasdesc#specificAssetIds[].externalSubjectId.keys[].value" }
+                        ]
+                      },
+                      {
+                        "$ne": [
+                          { "$attribute": { "CLAIM": "Edc-Bpn" } },
+                          { "$strVal": "" }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "name": "submodel_descriptor_bpn_or_public",
+              "formula": {
+                "$or": [
+                  {
+                    "$eq": [
+                      { "$attribute": { "CLAIM": "Edc-Bpn" } },
+                      { "$field": "$aasdesc#submodelDescriptors[].supplementalSemanticIds[].keys[].value" }
+                    ]
+                  },
+                  {
+                    "$eq": [
+                      { "$strVal": "PUBLIC_READABLE" },
+                      { "$field": "$aasdesc#submodelDescriptors[].supplementalSemanticIds[].keys[].value" }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "name": "submodel_descriptor_bpn_or_public_with_claim",
+              "formula": {
+                "$or": [
+                  {
+                    "$eq": [
+                      { "$attribute": { "CLAIM": "Edc-Bpn" } },
+                      { "$field": "$aasdesc#submodelDescriptors[].supplementalSemanticIds[].keys[].value" }
+                    ]
+                  },
+                  {
+                    "$and": [
+                      {
+                        "$eq": [
+                          { "$strVal": "PUBLIC_READABLE" },
+                          { "$field": "$aasdesc#submodelDescriptors[].supplementalSemanticIds[].keys[].value" }
+                        ]
+                      },
+                      {
+                        "$ne": [
+                          { "$attribute": { "CLAIM": "Edc-Bpn" } },
+                          { "$strVal": "" }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          "rules": [
+            {
+              "USEACL": "read",
+              "USEOBJECTS": ["all_shell_descriptors", "asset_links"],
+              "USEFORMULA": "data_provider_read"
+            },
+            {
+              "USEACL": "write",
+              "USEOBJECTS": ["all_routes"],
+              "USEFORMULA": "data_provider"
+            },
+            {
+              "USEACL": "write",
+              "USEOBJECTS": ["all_shell_descriptors"],
+              "USEFORMULA": "data_provider"
+            },
+            {
+              "USEACL": "read",
+              "USEOBJECTS": ["all_shell_descriptors"],
+              "USEFORMULA": "aas_bpn_or_public",
+              "FILTERLIST": [
+                { "FRAGMENT": "$aasdesc#administration", "USEFORMULA": "aas_bpn_match" },
+                { "FRAGMENT": "$aasdesc#displayName", "USEFORMULA": "aas_bpn_match" },
+                { "FRAGMENT": "$aasdesc#description", "USEFORMULA": "aas_bpn_match" },
+                { "FRAGMENT": "$aasdesc#assetKind", "USEFORMULA": "aas_bpn_match" },
+                { "FRAGMENT": "$aasdesc#assetType", "USEFORMULA": "aas_bpn_match" },
+                { "FRAGMENT": "$aasdesc#globalAssetId", "USEFORMULA": "aas_bpn_match" },
+                { "FRAGMENT": "$aasdesc#idShort", "USEFORMULA": "aas_bpn_match" },
+                { "FRAGMENT": "$aasdesc#specificAssetIds[]", "USEFORMULA": "aas_bpn_or_public_with_claim", "MATCH": true },
+                { "FRAGMENT": "$aasdesc#specificAssetIds[].externalSubjectId.keys[]", "USEFORMULA": "aas_bpn_or_public_with_claim", "MATCH": true },
+                { "FRAGMENT": "$aasdesc#submodelDescriptors[]", "USEFORMULA": "submodel_descriptor_bpn_or_public", "MATCH": true },
+                { "FRAGMENT": "$aasdesc#submodelDescriptors[].supplementalSemanticIds[]", "USEFORMULA": "submodel_descriptor_bpn_or_public_with_claim", "MATCH": true },
+                { "FRAGMENT": "$aasdesc#submodelDescriptors[].supplementalSemanticIds[].keys[]", "USEFORMULA": "submodel_descriptor_bpn_or_public_with_claim", "MATCH": true }
+              ]
+            },
+            {
+              "USEACL": "read",
+              "USEOBJECTS": ["asset_links"],
+              "USEFORMULA": "aas_bpn_or_public"
+            }
+          ]
+        }
+      }
+
+submodelRepository:
+  enabled: true
+  environment:
+    # The Catena-X marker example uses the Submodel Repository directly without
+    # a separate Submodel Registry.
+    GENERAL_SUBMODELREGISTRYINTEGRATION: false
+    GENERAL_EXTERNALURL: "https://{{ .Values.host }}{{ .Values.paths.submodelRepository }}"
+  general:
+    # Keep this disabled for production. Use a signed token claim or a trusted
+    # ingress/connector mapping for Edc-Bpn instead.
+    enableCustomMiddlewareHeaderInjection: false
+  abac:
+    accessRules: |-
+      {
+        "AllAccessPermissionRules": {
+          "DEFATTRIBUTES": [
+            {
+              "name": "anonymous",
+              "attributes": [
+                { "GLOBAL": "ANONYMOUS" }
+              ]
+            }
+          ],
+          "DEFOBJECTS": [
+            {
+              "name": "all_routes",
+              "objects": [
+                { "ROUTE": "*" }
+              ]
+            },
+            {
+              "name": "submodel_routes",
+              "objects": [
+                { "ROUTE": "/submodels" },
+                { "ROUTE": "/submodels/*" },
+                { "ROUTE": "/submodels/*/submodel-elements" },
+                { "ROUTE": "/submodels/*/submodel-elements/*" },
+                { "ROUTE": "/query/submodels" },
+                { "ROUTE": "{{ .Values.paths.submodelRepository }}/submodels" },
+                { "ROUTE": "{{ .Values.paths.submodelRepository }}/submodels/*" },
+                { "ROUTE": "{{ .Values.paths.submodelRepository }}/submodels/*/submodel-elements" },
+                { "ROUTE": "{{ .Values.paths.submodelRepository }}/submodels/*/submodel-elements/*" },
+                { "ROUTE": "{{ .Values.paths.submodelRepository }}/query/submodels" }
+              ]
+            }
+          ],
+          "DEFACLS": [
+            {
+              "name": "read",
+              "acl": {
+                "USEATTRIBUTES": "anonymous",
+                "RIGHTS": ["READ"],
+                "ACCESS": "ALLOW"
+              }
+            },
+            {
+              "name": "write",
+              "acl": {
+                "USEATTRIBUTES": "anonymous",
+                "RIGHTS": ["CREATE", "UPDATE", "DELETE"],
+                "ACCESS": "ALLOW"
+              }
+            }
+          ],
+          "DEFFORMULAS": [
+            {
+              "name": "data_provider_read",
+              "formula": {
+                "$contains": [
+                  { "$attribute": { "CLAIM": "role" } },
+                  { "$strVal": "view_digital_twin" }
+                ]
+              }
+            },
+            {
+              "name": "data_provider",
+              "formula": {
+                "$or": [
+                  {
+                    "$contains": [
+                      { "$attribute": { "CLAIM": "role" } },
+                      { "$strVal": "add_digital_twin" }
+                    ]
+                  },
+                  {
+                    "$contains": [
+                      { "$attribute": { "CLAIM": "role" } },
+                      { "$strVal": "update_digital_twin" }
+                    ]
+                  },
+                  {
+                    "$contains": [
+                      { "$attribute": { "CLAIM": "role" } },
+                      { "$strVal": "delete_digital_twin" }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "name": "submodel_bpn_or_public",
+              "formula": {
+                "$or": [
+                  {
+                    "$eq": [
+                      { "$attribute": { "CLAIM": "Edc-Bpn" } },
+                      { "$field": "$sm#supplementalSemanticIds[].keys[].value" }
+                    ]
+                  },
+                  {
+                    "$eq": [
+                      { "$strVal": "PUBLIC_READABLE" },
+                      { "$field": "$sm#supplementalSemanticIds[].keys[].value" }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "name": "submodel_bpn_or_public_with_claim",
+              "formula": {
+                "$or": [
+                  {
+                    "$eq": [
+                      { "$attribute": { "CLAIM": "Edc-Bpn" } },
+                      { "$field": "$sm#supplementalSemanticIds[].keys[].value" }
+                    ]
+                  },
+                  {
+                    "$and": [
+                      {
+                        "$eq": [
+                          { "$strVal": "PUBLIC_READABLE" },
+                          { "$field": "$sm#supplementalSemanticIds[].keys[].value" }
+                        ]
+                      },
+                      {
+                        "$ne": [
+                          { "$attribute": { "CLAIM": "Edc-Bpn" } },
+                          { "$strVal": "" }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "name": "submodel_element_bpn_or_public",
+              "formula": {
+                "$or": [
+                  {
+                    "$eq": [
+                      { "$attribute": { "CLAIM": "Edc-Bpn" } },
+                      { "$field": "$sme#supplementalSemanticIds[].keys[].value" }
+                    ]
+                  },
+                  {
+                    "$eq": [
+                      { "$strVal": "PUBLIC_READABLE" },
+                      { "$field": "$sme#supplementalSemanticIds[].keys[].value" }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "name": "submodel_element_bpn_or_public_with_claim",
+              "formula": {
+                "$or": [
+                  {
+                    "$eq": [
+                      { "$attribute": { "CLAIM": "Edc-Bpn" } },
+                      { "$field": "$sme#supplementalSemanticIds[].keys[].value" }
+                    ]
+                  },
+                  {
+                    "$and": [
+                      {
+                        "$eq": [
+                          { "$strVal": "PUBLIC_READABLE" },
+                          { "$field": "$sme#supplementalSemanticIds[].keys[].value" }
+                        ]
+                      },
+                      {
+                        "$ne": [
+                          { "$attribute": { "CLAIM": "Edc-Bpn" } },
+                          { "$strVal": "" }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          "rules": [
+            {
+              "USEACL": "read",
+              "USEOBJECTS": ["submodel_routes"],
+              "USEFORMULA": "data_provider_read"
+            },
+            {
+              "USEACL": "write",
+              "USEOBJECTS": ["all_routes"],
+              "USEFORMULA": "data_provider"
+            },
+            {
+              "USEACL": "read",
+              "USEOBJECTS": ["submodel_routes"],
+              "USEFORMULA": "submodel_bpn_or_public",
+              "FILTERLIST": [
+                { "FRAGMENT": "$sm#supplementalSemanticIds[]", "USEFORMULA": "submodel_bpn_or_public_with_claim", "MATCH": true },
+                { "FRAGMENT": "$sm#supplementalSemanticIds[].keys[]", "USEFORMULA": "submodel_bpn_or_public_with_claim", "MATCH": true },
+                { "FRAGMENT": "$sme", "USEFORMULA": "submodel_element_bpn_or_public", "MATCH": true },
+                { "FRAGMENT": "$sme#supplementalSemanticIds[]", "USEFORMULA": "submodel_element_bpn_or_public_with_claim", "MATCH": true },
+                { "FRAGMENT": "$sme#supplementalSemanticIds[].keys[]", "USEFORMULA": "submodel_element_bpn_or_public_with_claim", "MATCH": true }
+              ]
+            }
+          ]
+        }
+      }
+
+aasDiscovery:
+  enabled: false
+
+aasRegistry:
+  enabled: false
+
+aasRepository:
+  enabled: false
+
+aasEnvironment:
+  enabled: false
+
+dppApi:
+  enabled: false
+
+submodelRegistry:
+  enabled: false
+
+cdRepository:
+  enabled: false
+
+aasWebGui:
+  enabled: true
+  environment:
+    START_PAGE_ROUTE_NAME: CatenaXplorer
+  infrastructureConfig:
+    infrastructures:
+      main: null
+      default: catena-x
+      catena-x:
+        name: "Catena-X BaSyx Go {{ .Values.instanceName }}"
+        template: catena-x
+        components:
+          digitalTwinRegistry:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.digitalTwinRegistry }}"
+          submodelService:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.submodelRepository }}/submodels"
+        security:
+          type: oauth2
+          config:
+            flow: auth_code
+            issuer: "https://{{ .Values.host }}{{ .Values.paths.keycloak }}/realms/{{ .Values.keycloak.realm }}"
+            clientId: "{{ .Values.keycloak.secrets.client.name }}"
+
+companyLookup:
+  enabled: false

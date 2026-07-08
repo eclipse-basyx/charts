@@ -47,6 +47,7 @@ charts/basyx/values.yaml
 Custom values files live outside the chart, for example:
 
 ```text
+values/values.catena-x.example.yaml
 values/values.example.yaml
 values/values.minimal.yaml
 values/values.secured.example.yaml
@@ -124,6 +125,9 @@ cp values/values.minimal.yaml values/values.my-minimal-environment.yaml
 
 # Secured deployment with Keycloak and ABAC.
 cp values/values.secured.example.yaml values/values.my-secured-environment.yaml
+
+# Catena-X oriented deployment with marker-based DTR and Submodel access.
+cp values/values.catena-x.example.yaml values/values.my-catena-x-environment.yaml
 ```
 
 The unsecured example enables the core BaSyx Go services and the Web UI:
@@ -188,6 +192,8 @@ Use `values/values.minimal.yaml` when you want the BaSyx Go MinimalExample style
 
 For DPP API deployments, enable `dppApi` in your own values file. DPP commonly runs together with `aasEnvironment` and `aasWebGui`, but it is configured through the same service block pattern as the other optional BaSyx Go services.
 
+Use `values/values.catena-x.example.yaml` when you want a Catena-X oriented setup. It enables Keycloak, ABAC, Digital Twin Registry and Submodel Repository with BPN-based marker access rules.
+
 Do not publish production passwords or client secrets. For public examples, use placeholders and inject real credentials through your deployment pipeline or an external secret management solution.
 
 ## Render Before Installing
@@ -198,6 +204,7 @@ Always render the chart before the first install. This catches schema errors and
 helm lint charts/basyx -f values/values.example.yaml
 helm lint charts/basyx -f values/values.minimal.yaml
 helm lint charts/basyx -f values/values.secured.example.yaml
+helm lint charts/basyx -f values/values.catena-x.example.yaml
 
 helm template basyx charts/basyx \
   -n basyx-custom \
@@ -285,6 +292,7 @@ With the default paths, services are exposed below one host:
 | Submodel Repository | `https://<host>/submodel-repo` or your custom override |
 | Concept Description Repository | `https://<host>/cd-repository` |
 | Company Lookup | `https://<host>/company-lookup/companies` |
+| Digital Twin Registry | `https://<host>/digital-twin-registry` |
 
 Company Lookup intentionally has no resource at the bare `/company-lookup` path. Use `/company-lookup/companies`, `/company-lookup/description`, `/company-lookup/swagger` or `/company-lookup/health`.
 
@@ -902,6 +910,7 @@ Run lint with custom values:
 helm lint charts/basyx -f values/values.example.yaml
 helm lint charts/basyx -f values/values.minimal.yaml
 helm lint charts/basyx -f values/values.secured.example.yaml
+helm lint charts/basyx -f values/values.catena-x.example.yaml
 ```
 
 Runtime smoke tests after deployment:
@@ -953,6 +962,80 @@ Before publishing publicly:
 - Provide sanitized example values instead of production overlays.
 - Prefer fixed image tags or digests over mutable `SNAPSHOT` tags for reproducible deployments.
 - Review ABAC defaults and document deployment-specific rule sets outside the public chart when needed.
+
+## Catena-X Quick Start
+
+The Catena-X example values deploy the parts needed for marker-based Digital Twin access:
+
+- `digitalTwinRegistry` stores shell descriptors and filters them through AAS descriptor markers.
+- `submodelRepository` stores submodels and filters them through submodel and submodel-element markers.
+- `aasWebGui` is enabled with the `catena-x` infrastructure template, which uses `digitalTwinRegistry` and `submodelService` endpoints instead of the separate `Full` component set.
+- `keycloak` is enabled for a self-contained quick start and initializes demo users and token mappers.
+- `abac` is enabled globally, with service-local rules for Digital Twin Registry and Submodel Repository.
+
+Start from the example values:
+
+```bash
+cp values/values.catena-x.example.yaml values/values.my-catena-x-environment.yaml
+```
+
+Edit at least these values before installing:
+
+```yaml
+host: basyx.example.com
+
+tls:
+  hosts:
+    - basyx.example.com
+
+keycloak:
+  secrets:
+    admin:
+      password: change-me
+    client:
+      clientPassword: change-me
+```
+
+Also replace the demo user passwords before using the file outside a throwaway test namespace.
+
+Then render and install:
+
+```bash
+helm lint charts/basyx -f values/values.my-catena-x-environment.yaml
+
+helm upgrade --install basyx charts/basyx \
+  -n basyx-catena-x \
+  --create-namespace \
+  -f values/values.my-catena-x-environment.yaml
+```
+
+The example initializes these demo users. All example passwords are `change-me`. The passwords are intentionally non-temporary in this example so the upstream Postman collection and command-line data loading examples can fetch OAuth2 password-grant tokens. Change the passwords and disable direct access grants before using this setup beyond a disposable demo namespace.
+
+| User | Initial password | Purpose |
+| --- | --- | --- |
+| `catena-x.provider` | `change-me` | Data provider with `view_digital_twin`, `add_digital_twin`, `update_digital_twin` and `delete_digital_twin` role claims. |
+| `catena-x.partner-a` | `change-me` | Consumer with `Edc-Bpn=BPN_COMPANY_001` for marker-based read access tests. |
+| `catena-x.partner-b` | `change-me` | Consumer with `Edc-Bpn=BPN_COMPANY_002` for marker-based read access tests. |
+
+The upstream BaSyx Go marker example also contains demo data:
+
+- [shell-descriptor.json](https://raw.githubusercontent.com/eclipse-basyx/basyx-go-components/main/examples/BaSyxMarkerAccessExample/data/shell-descriptor.json)
+- [public-submodel.json](https://raw.githubusercontent.com/eclipse-basyx/basyx-go-components/main/examples/BaSyxMarkerAccessExample/data/public-submodel.json)
+- [restricted-submodel.json](https://raw.githubusercontent.com/eclipse-basyx/basyx-go-components/main/examples/BaSyxMarkerAccessExample/data/restricted-submodel.json)
+- [BaSyx-Marker-Access.postman_collection.json](https://raw.githubusercontent.com/eclipse-basyx/basyx-go-components/main/examples/BaSyxMarkerAccessExample/BaSyx-Marker-Access.postman_collection.json)
+
+Helm does not load those objects automatically. Download the files from the upstream example and load them explicitly after deployment, for example with the provided Postman collection.
+
+Do not upload these files through the generic Web UI JSON/UML import. That import expects AAS or AAS Environment payloads and will reject `shell-descriptor.json` with `no AAS imported`. The marker example files must be written to their component APIs instead: `shell-descriptor.json` to Digital Twin Registry and the submodel JSON files to Submodel Repository. If you use the example data outside localhost, adjust embedded endpoint URLs in the descriptor to match your ingress host and paths.
+
+The marker rules follow the BaSyx Go marker access example:
+
+- `PUBLIC_READABLE` marks descriptors or submodels that can be read publicly.
+- Partner-specific visibility is based on the `Edc-Bpn` token claim.
+- Digital Twin Registry checks `specificAssetIds[].externalSubjectId.keys[].value` and `submodelDescriptors[].supplementalSemanticIds[].keys[].value`.
+- Submodel Repository checks `supplementalSemanticIds[].keys[].value` on submodels and submodel elements.
+
+For production Catena-X environments, prefer an external IAM or connector flow that issues a trustworthy `Edc-Bpn` token claim. Do not allow arbitrary external clients to set this claim through request headers. Header-to-claim injection should only be enabled behind a trusted ingress or connector mapping.
 
 ## References
 

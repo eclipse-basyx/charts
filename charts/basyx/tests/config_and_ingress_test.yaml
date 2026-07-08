@@ -3,6 +3,7 @@ release:
   name: basyx
 templates:
   - templates/secret.yaml
+  - templates/aas-web-gui/configmap.yaml
   - templates/aas-web-gui/configmap-infrastructure.yaml
   - templates/aas-web-gui/deployment.yaml
   - templates/aas-discovery/deployment.yaml
@@ -195,6 +196,54 @@ tests:
       - matchRegex:
           path: data["basyx-infra.yml"]
           pattern: 'baseUrl: https://basyx\.example\.com/aas-repository'
+
+  - it: renders Catena-X web ui infrastructure from example values
+    template: templates/aas-web-gui/configmap-infrastructure.yaml
+    values:
+      - ../../../values/values.catena-x.example.yaml
+    documentSelector:
+      path: metadata.name
+      value: basyx-aas-web-ui-infrastructure
+    asserts:
+      - matchRegex:
+          path: data["basyx-infra.yml"]
+          pattern: 'default: catena-x'
+      - matchRegex:
+          path: data["basyx-infra.yml"]
+          pattern: 'template: catena-x'
+      - matchRegex:
+          path: data["basyx-infra.yml"]
+          pattern: 'digitalTwinRegistry:'
+      - matchRegex:
+          path: data["basyx-infra.yml"]
+          pattern: 'baseUrl: https://basyx\.example\.com/digital-twin-registry'
+      - matchRegex:
+          path: data["basyx-infra.yml"]
+          pattern: 'submodelService:'
+      - matchRegex:
+          path: data["basyx-infra.yml"]
+          pattern: 'baseUrl: https://basyx\.example\.com/submodel-repo/submodels'
+      - notMatchRegex:
+          path: data["basyx-infra.yml"]
+          pattern: 'aasRepository:'
+      - notMatchRegex:
+          path: data["basyx-infra.yml"]
+          pattern: 'conceptDescriptionRepository:'
+      - matchRegex:
+          path: data["basyx-infra.yml"]
+          pattern: 'type: oauth2'
+
+  - it: renders Catena-X web ui runtime settings from example values
+    template: templates/aas-web-gui/configmap.yaml
+    values:
+      - ../../../values/values.catena-x.example.yaml
+    documentSelector:
+      path: metadata.name
+      value: basyx-aas-web-ui-config
+    asserts:
+      - equal:
+          path: data.START_PAGE_ROUTE_NAME
+          value: CatenaXplorer
 
   - it: mounts common config and custom ca into aas discovery
     template: templates/aas-discovery/deployment.yaml

@@ -18,6 +18,7 @@ The suites cover stable chart contracts such as:
 - ABAC mounts and rollout checksum annotations in backend deployments
 - optional AAS Environment deployment, ingress and ABAC wiring
 - optional DPP API deployment, ingress and ABAC wiring
+- Catena-X example values and marker-based ABAC wiring
 - common OIDC and ingress configuration
 - additional custom CA certificate mounts and trust-store wiring
 - runtime `helm test` hook for custom CA mount checks
