@@ -5,6 +5,7 @@ templates:
   - templates/secret.yaml
   - templates/aas-web-gui/configmap.yaml
   - templates/aas-web-gui/configmap-infrastructure.yaml
+  - templates/aas-web-gui/configmap-logos.yaml
   - templates/aas-web-gui/deployment.yaml
   - templates/aas-discovery/deployment.yaml
   - templates/aas-discovery/ingress.yaml
@@ -222,7 +223,7 @@ tests:
           pattern: 'submodelService:'
       - matchRegex:
           path: data["basyx-infra.yml"]
-          pattern: 'baseUrl: https://basyx\.example\.com/submodel-repo/submodels'
+          pattern: 'baseUrl: https://basyx\.example\.com/submodel-repo'
       - notMatchRegex:
           path: data["basyx-infra.yml"]
           pattern: 'aasRepository:'
@@ -317,6 +318,12 @@ tests:
     set:
       aasWebGui.enabled: true
     asserts:
+      - exists:
+          path: spec.template.metadata.annotations["checksum/aas-web-gui-config"]
+      - exists:
+          path: spec.template.metadata.annotations["checksum/aas-web-gui-infrastructure"]
+      - exists:
+          path: spec.template.metadata.annotations["checksum/aas-web-gui-logos"]
       - equal:
           path: spec.template.spec.containers[0].livenessProbe.httpGet.path
           value: /aas-gui/

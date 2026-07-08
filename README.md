@@ -1035,6 +1035,8 @@ examples/postman/basyx-catena-x-marker-access.postman_collection.json
 
 The collection contains the marker example payloads and uses the default ingress paths from `values/values.catena-x.example.yaml`.
 
+In the Web UI infrastructure configuration, `submodelService.baseUrl` points to the Submodel Repository service root, for example `https://basyx.example.com/submodel-repo`. The Web UI appends concrete API paths such as `/submodels/{submodelId}` itself.
+
 Before running it, import the collection into Postman and adjust the collection variables:
 
 | Variable | Default | Description |
