@@ -8,6 +8,7 @@ The repository follows the common Helm multi-chart layout:
 
 ```text
 charts/basyx/           Helm chart for BaSyx Go
+examples/postman/       Postman collections for example setups
 values/                 Custom values examples and deployment overlays
 ```
 
@@ -917,6 +918,7 @@ charts/basyx/values.yaml            Default chart values
 charts/basyx/templates/             Kubernetes templates
 charts/basyx/tests/                 helm-unittest suites
 charts/basyx/config-files/          Chart-local files such as logos and optional certs
+examples/postman/                   Postman collections for example setups
 values/                             Custom values overlays
 ```
 
@@ -975,7 +977,7 @@ helm upgrade --install basyx charts/basyx \
   -f values/values.my-catena-x-environment.yaml
 ```
 
-The example initializes these demo users. All example passwords are `change-me`. The passwords are intentionally non-temporary in this example so the upstream Postman collection and command-line data loading examples can fetch OAuth2 password-grant tokens. Change the passwords and disable direct access grants before using this setup beyond a disposable demo namespace.
+The example initializes these demo users. All example passwords are `change-me`. The Postman collection uses OAuth2 password-grant requests for demo data loading. Depending on your Keycloak policies, demo users may need to log in through the Web UI once and complete required account setup before those token requests succeed. Change the passwords and disable direct access grants before using this setup beyond a disposable demo namespace.
 
 | User | Initial password | Purpose |
 | --- | --- | --- |
@@ -988,9 +990,38 @@ The upstream BaSyx Go marker example also contains demo data:
 - [shell-descriptor.json](https://raw.githubusercontent.com/eclipse-basyx/basyx-go-components/main/examples/BaSyxMarkerAccessExample/data/shell-descriptor.json)
 - [public-submodel.json](https://raw.githubusercontent.com/eclipse-basyx/basyx-go-components/main/examples/BaSyxMarkerAccessExample/data/public-submodel.json)
 - [restricted-submodel.json](https://raw.githubusercontent.com/eclipse-basyx/basyx-go-components/main/examples/BaSyxMarkerAccessExample/data/restricted-submodel.json)
-- [BaSyx-Marker-Access.postman_collection.json](https://raw.githubusercontent.com/eclipse-basyx/basyx-go-components/main/examples/BaSyxMarkerAccessExample/BaSyx-Marker-Access.postman_collection.json)
 
-Helm does not load those objects automatically. Download the files from the upstream example and load them explicitly after deployment, for example with the provided Postman collection.
+Helm does not load those objects automatically. Download the files from the upstream example and load them explicitly after deployment.
+
+This repository also includes a generic Postman collection for the Catena-X example:
+
+```text
+examples/postman/basyx-catena-x-marker-access.postman_collection.json
+```
+
+The collection contains the marker example payloads and uses the default ingress paths from `values/values.catena-x.example.yaml`.
+
+Before running it, import the collection into Postman and adjust the collection variables:
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `baseUrl` | `https://basyx.example.com` | Public ingress base URL without a trailing slash. |
+| `realm` | `basyx` | Keycloak realm created by the example values. |
+| `clientId` | `basyx-ui` | OAuth2 client used for password-grant token requests. |
+| `providerUsername` | `catena-x.provider` | Demo provider user. |
+| `providerPassword` | `change-me` | Demo provider password. |
+| `partnerAUsername` | `catena-x.partner-a` | Demo consumer with `Edc-Bpn=BPN_COMPANY_001`. |
+| `partnerAPassword` | `change-me` | Demo partner A password. |
+| `partnerBUsername` | `catena-x.partner-b` | Demo consumer with `Edc-Bpn=BPN_COMPANY_002`. |
+| `partnerBPassword` | `change-me` | Demo partner B password. |
+
+Run the folders in this order:
+
+1. `Auth` fetches OAuth2 access tokens for the provider and both partners.
+2. `Setup - Write Example Data` removes old test objects if present, then creates the shell descriptor and both submodels.
+3. `Read - Provider`, `Read - Partner A`, `Read - Partner B` and `Read - Anonymous` exercise the marker-based read paths with different token claims.
+
+If Postman returns `invalid_grant` with `Account is not fully set up`, the Keycloak user still has a required action such as `UPDATE_PASSWORD`, `VERIFY_EMAIL` or user profile completion. Log in with that user through the Web UI or Keycloak account console first, complete the required setup, and run the `Auth` folder again.
 
 Do not upload these files through the generic Web UI JSON/UML import. That import expects AAS or AAS Environment payloads and will reject `shell-descriptor.json` with `no AAS imported`. The marker example files must be written to their component APIs instead: `shell-descriptor.json` to Digital Twin Registry and the submodel JSON files to Submodel Repository. If you use the example data outside localhost, adjust embedded endpoint URLs in the descriptor to match your ingress host and paths.
 

@@ -1,0 +1,568 @@
+{
+  "info": {
+    "name": "BaSyx Catena-X Marker Access",
+    "description": "Postman collection for the BaSyx Go Catena-X marker access example. Set baseUrl to your ingress host, run the Auth folder first, then Setup - Write Example Data. The JSON payloads are based on BaSyxMarkerAccessExample and use the default paths from values.catena-x.example.yaml.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://basyx.example.com",
+      "type": "string"
+    },
+    {
+      "key": "realm",
+      "value": "basyx",
+      "type": "string"
+    },
+    {
+      "key": "clientId",
+      "value": "basyx-ui",
+      "type": "string"
+    },
+    {
+      "key": "providerUsername",
+      "value": "catena-x.provider",
+      "type": "string"
+    },
+    {
+      "key": "providerPassword",
+      "value": "change-me",
+      "type": "string"
+    },
+    {
+      "key": "partnerAUsername",
+      "value": "catena-x.partner-a",
+      "type": "string"
+    },
+    {
+      "key": "partnerAPassword",
+      "value": "change-me",
+      "type": "string"
+    },
+    {
+      "key": "partnerBUsername",
+      "value": "catena-x.partner-b",
+      "type": "string"
+    },
+    {
+      "key": "partnerBPassword",
+      "value": "change-me",
+      "type": "string"
+    },
+    {
+      "key": "aasIdBase64",
+      "value": "dXJuOmV4YW1wbGU6YWFzOnByb2R1Y3QtMDAx",
+      "type": "string"
+    },
+    {
+      "key": "publicSubmodelIdBase64",
+      "value": "dXJuOmV4YW1wbGU6c3VibW9kZWw6bmFtZXBsYXRl",
+      "type": "string"
+    },
+    {
+      "key": "restrictedSubmodelIdBase64",
+      "value": "dXJuOmV4YW1wbGU6c3VibW9kZWw6c2VyaWFsLXBhcnQtdHlwaXphdGlvbg",
+      "type": "string"
+    },
+    {
+      "key": "providerToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "partnerAToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "partnerBToken",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Get provider token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "password",
+                  "type": "text"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{clientId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "username",
+                  "value": "{{providerUsername}}",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "{{providerPassword}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/identity-management/realms/{{realm}}/protocol/openid-connect/token"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('provider token issued', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('providerToken', json.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get partner A token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "password",
+                  "type": "text"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{clientId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "username",
+                  "value": "{{partnerAUsername}}",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "{{partnerAPassword}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/identity-management/realms/{{realm}}/protocol/openid-connect/token"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('partner A token issued', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('partnerAToken', json.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get partner B token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "password",
+                  "type": "text"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{clientId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "username",
+                  "value": "{{partnerBUsername}}",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "{{partnerBPassword}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/identity-management/realms/{{realm}}/protocol/openid-connect/token"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('partner B token issued', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('partnerBToken', json.access_token);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Setup - Write Example Data",
+      "item": [
+        {
+          "name": "Cleanup - Delete shell descriptor",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{providerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/digital-twin-registry/shell-descriptors/{{aasIdBase64}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('delete shell descriptor is ok or not found', function () { pm.expect([204, 404]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cleanup - Delete public submodel",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{providerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/submodel-repo/submodels/{{publicSubmodelIdBase64}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('delete public submodel is ok or not found', function () { pm.expect([204, 404]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cleanup - Delete restricted submodel",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{providerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/submodel-repo/submodels/{{restrictedSubmodelIdBase64}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('delete restricted submodel is ok or not found', function () { pm.expect([204, 404]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Post shell descriptor to DTR",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{providerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"idShort\":\"ProductTwin\",\"id\":\"urn:example:aas:product-001\",\"description\":[{\"language\":\"en\",\"text\":\"Public and partner-restricted submodel descriptors.\"}],\"globalAssetId\":\"urn:example:asset:product-001\",\"specificAssetIds\":[{\"name\":\"manufacturerPartId\",\"value\":\"PART-001\",\"externalSubjectId\":{\"type\":\"ExternalReference\",\"keys\":[{\"type\":\"GlobalReference\",\"value\":\"PUBLIC_READABLE\"}]}},{\"name\":\"customerPartId\",\"value\":\"CUSTOMER-PART-001\",\"externalSubjectId\":{\"type\":\"ExternalReference\",\"keys\":[{\"type\":\"GlobalReference\",\"value\":\"BPN_COMPANY_001\"},{\"type\":\"GlobalReference\",\"value\":\"BPN_COMPANY_002\"}]}}],\"submodelDescriptors\":[{\"idShort\":\"PublicNameplate\",\"id\":\"urn:example:submodel:nameplate\",\"supplementalSemanticIds\":[{\"type\":\"ExternalReference\",\"keys\":[{\"type\":\"GlobalReference\",\"value\":\"PUBLIC_READABLE\"}]}],\"endpoints\":[{\"interface\":\"SUBMODEL-3.0\",\"protocolInformation\":{\"href\":\"{{baseUrl}}/submodel-repo/submodels/{{publicSubmodelIdBase64}}\",\"endpointProtocol\":\"HTTP\"}}]},{\"idShort\":\"RestrictedSerialPartTypization\",\"id\":\"urn:example:submodel:serial-part-typization\",\"supplementalSemanticIds\":[{\"type\":\"ExternalReference\",\"keys\":[{\"type\":\"GlobalReference\",\"value\":\"BPN_COMPANY_001\"},{\"type\":\"GlobalReference\",\"value\":\"BPN_COMPANY_002\"}]}],\"endpoints\":[{\"interface\":\"SUBMODEL-3.0\",\"protocolInformation\":{\"href\":\"{{baseUrl}}/submodel-repo/submodels/{{restrictedSubmodelIdBase64}}\",\"endpointProtocol\":\"HTTP\"}}]}]}"
+            },
+            "url": "{{baseUrl}}/digital-twin-registry/shell-descriptors"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('shell descriptor created', function () { pm.expect([201, 409]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Post public submodel",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{providerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"id\":\"urn:example:submodel:nameplate\",\"idShort\":\"PublicNameplate\",\"modelType\":\"Submodel\",\"supplementalSemanticIds\":[{\"type\":\"ExternalReference\",\"keys\":[{\"type\":\"GlobalReference\",\"value\":\"PUBLIC_READABLE\"}]}],\"submodelElements\":[{\"idShort\":\"ManufacturerName\",\"modelType\":\"Property\",\"valueType\":\"xs:string\",\"value\":\"Example Corp\"}]}"
+            },
+            "url": "{{baseUrl}}/submodel-repo/submodels"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('public submodel created', function () { pm.expect([201, 409]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Post restricted submodel",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{providerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"id\":\"urn:example:submodel:serial-part-typization\",\"idShort\":\"RestrictedSerialPartTypization\",\"modelType\":\"Submodel\",\"supplementalSemanticIds\":[{\"type\":\"ExternalReference\",\"keys\":[{\"type\":\"GlobalReference\",\"value\":\"BPN_COMPANY_001\"},{\"type\":\"GlobalReference\",\"value\":\"BPN_COMPANY_002\"}]}],\"submodelElements\":[{\"idShort\":\"PublicPartType\",\"modelType\":\"Property\",\"valueType\":\"xs:string\",\"value\":\"PUBLIC-TYPE\"},{\"idShort\":\"PartnerSerialNumber\",\"modelType\":\"Property\",\"valueType\":\"xs:string\",\"value\":\"SECRET-001\"}]}"
+            },
+            "url": "{{baseUrl}}/submodel-repo/submodels"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('restricted submodel created', function () { pm.expect([201, 409]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Read - Provider",
+      "item": [
+        {
+          "name": "Provider - Get shell descriptors",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{providerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/digital-twin-registry/shell-descriptors"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('provider can read descriptors', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Provider - Get public submodel",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{providerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/submodel-repo/submodels/{{publicSubmodelIdBase64}}"
+          }
+        },
+        {
+          "name": "Provider - Get restricted submodel",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{providerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/submodel-repo/submodels/{{restrictedSubmodelIdBase64}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Read - Partner A",
+      "item": [
+        {
+          "name": "Partner A - Get shell descriptors",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{partnerAToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/digital-twin-registry/shell-descriptors"
+          }
+        },
+        {
+          "name": "Partner A - Get public submodel",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{partnerAToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/submodel-repo/submodels/{{publicSubmodelIdBase64}}"
+          }
+        },
+        {
+          "name": "Partner A - Get restricted submodel",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{partnerAToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/submodel-repo/submodels/{{restrictedSubmodelIdBase64}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Read - Partner B",
+      "item": [
+        {
+          "name": "Partner B - Get shell descriptors",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{partnerBToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/digital-twin-registry/shell-descriptors"
+          }
+        },
+        {
+          "name": "Partner B - Get restricted submodel",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{partnerBToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/submodel-repo/submodels/{{restrictedSubmodelIdBase64}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Read - Anonymous",
+      "item": [
+        {
+          "name": "Anonymous - Get shell descriptors",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/digital-twin-registry/shell-descriptors"
+          }
+        },
+        {
+          "name": "Anonymous - Get public submodel",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/submodel-repo/submodels/{{publicSubmodelIdBase64}}"
+          }
+        }
+      ]
+    }
+  ]
+}
