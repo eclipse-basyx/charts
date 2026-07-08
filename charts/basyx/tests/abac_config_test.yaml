@@ -132,3 +132,50 @@ tests:
       - matchRegex:
           path: data["trustlist.json"]
           pattern: '"audience": "discovery-service"'
+
+  - it: renders Catena-X Digital Twin Registry ABAC rules from example values
+    values:
+      - ../../../values/values.catena-x.example.yaml
+    documentSelector:
+      path: metadata.name
+      value: basyx-digital-twin-registry-abac-config
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - matchRegex:
+          path: data["access-rules.json"]
+          pattern: '"CLAIM": "Edc-Bpn"'
+      - matchRegex:
+          path: data["access-rules.json"]
+          pattern: '"PUBLIC_READABLE"'
+      - matchRegex:
+          path: data["access-rules.json"]
+          pattern: '\$aasdesc#submodelDescriptors\[\]\.supplementalSemanticIds\[\]\.keys\[\]\.value'
+      - matchRegex:
+          path: data["access-rules.json"]
+          pattern: '"ROUTE": "/digital-twin-registry/lookup/shells"'
+      - matchRegex:
+          path: data["access-rules.json"]
+          pattern: '"USEOBJECTS": \["all_shell_descriptors"\]'
+
+  - it: renders Catena-X Submodel Repository ABAC rules from example values
+    values:
+      - ../../../values/values.catena-x.example.yaml
+    documentSelector:
+      path: metadata.name
+      value: basyx-submodel-repository-abac-config
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - matchRegex:
+          path: data["access-rules.json"]
+          pattern: '"CLAIM": "Edc-Bpn"'
+      - matchRegex:
+          path: data["access-rules.json"]
+          pattern: '"PUBLIC_READABLE"'
+      - matchRegex:
+          path: data["access-rules.json"]
+          pattern: '\$sme#supplementalSemanticIds\[\]\.keys\[\]\.value'
+      - matchRegex:
+          path: data["access-rules.json"]
+          pattern: '"ROUTE": "/submodel-repo/query/submodels"'
