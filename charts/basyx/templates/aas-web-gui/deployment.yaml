@@ -12,8 +12,15 @@ spec:
       {{- include "basyx-aasWebGui.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      {{- with .Values.aasWebGui.podAnnotations }}
       annotations:
+        checksum/aas-web-gui-config: {{ include (print $.Template.BasePath "/aas-web-gui/configmap.yaml") . | sha256sum }}
+        {{- if .Values.aasWebGui.infrastructureConfig }}
+        checksum/aas-web-gui-infrastructure: {{ include (print $.Template.BasePath "/aas-web-gui/configmap-infrastructure.yaml") . | sha256sum }}
+        {{- end }}
+        {{- if .Values.aasWebGui.logos }}
+        checksum/aas-web-gui-logos: {{ include (print $.Template.BasePath "/aas-web-gui/configmap-logos.yaml") . | sha256sum }}
+        {{- end }}
+      {{- with .Values.aasWebGui.podAnnotations }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
