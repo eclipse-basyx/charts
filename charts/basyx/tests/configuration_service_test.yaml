@@ -32,10 +32,16 @@ tests:
           value: wait-for-database
       - equal:
           path: spec.template.spec.initContainers[0].image
-          value: ghcr.io/cloudnative-pg/postgresql:18.3-system-trixie
+          value: ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie
       - matchRegex:
           path: spec.template.spec.initContainers[0].command[2]
           pattern: "pg_isready"
+      - matchRegex:
+          path: spec.template.spec.initContainers[0].command[2]
+          pattern: "date \\+%s"
+      - notMatchRegex:
+          path: spec.template.spec.initContainers[0].command[2]
+          pattern: "SECONDS"
       - matchRegex:
           path: spec.template.spec.containers[0].image
           pattern: "^eclipsebasyx/basyxconfigurationservice-go:[^:]+$"

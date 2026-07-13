@@ -28,6 +28,21 @@ tests:
       - equal:
           path: stringData.OIDC_AUDIENCE
           value: discovery-service
+      - equal:
+          path: stringData.SERVER_READ_HEADER_TIMEOUT_SECONDS
+          value: "15"
+      - equal:
+          path: stringData.SERVER_READ_TIMEOUT_SECONDS
+          value: "300"
+      - equal:
+          path: stringData.SERVER_WRITE_TIMEOUT_SECONDS
+          value: "300"
+      - equal:
+          path: stringData.SERVER_IDLE_TIMEOUT_SECONDS
+          value: "60"
+      - equal:
+          path: stringData.SERVER_SHUTDOWN_TIMEOUT_SECONDS
+          value: "10"
 
   - it: renders structured BaSyx runtime configuration into the common secret
     template: templates/secret.yaml
@@ -39,6 +54,11 @@ tests:
       general.trustProxyHeaders: true
       general.bulkBatchLimit: 500
       general.aasPreconfigPaths[0]: /app/preconfiguration
+      server.readHeaderTimeoutSeconds: 20
+      server.readTimeoutSeconds: 600
+      server.writeTimeoutSeconds: 700
+      server.idleTimeoutSeconds: 80
+      server.shutdownTimeoutSeconds: 30
       abac.policyFileImport: if_missing
       abac.policyScope: shared-policy-scope
       abac.managementApi.enabled: true
@@ -65,6 +85,21 @@ tests:
       - equal:
           path: stringData.GENERAL_BULK_BATCH_LIMIT
           value: "500"
+      - equal:
+          path: stringData.SERVER_READ_HEADER_TIMEOUT_SECONDS
+          value: "20"
+      - equal:
+          path: stringData.SERVER_READ_TIMEOUT_SECONDS
+          value: "600"
+      - equal:
+          path: stringData.SERVER_WRITE_TIMEOUT_SECONDS
+          value: "700"
+      - equal:
+          path: stringData.SERVER_IDLE_TIMEOUT_SECONDS
+          value: "80"
+      - equal:
+          path: stringData.SERVER_SHUTDOWN_TIMEOUT_SECONDS
+          value: "30"
       - equal:
           path: stringData.ABAC_POLICY_FILE_IMPORT
           value: if_missing
@@ -125,6 +160,8 @@ tests:
       environment.common.BASYX_HISTORY_MODE: api
       general.bulkBatchLimit: 500
       environment.common.GENERAL_BULK_BATCH_LIMIT: 250
+      server.readTimeoutSeconds: 600
+      environment.common.SERVER_READ_TIMEOUT_SECONDS: 120
       abac.policyScope: structured-scope
       environment.common.ABAC_POLICY_SCOPE: raw-scope
     asserts:
@@ -134,6 +171,9 @@ tests:
       - equal:
           path: stringData.GENERAL_BULK_BATCH_LIMIT
           value: "250"
+      - equal:
+          path: stringData.SERVER_READ_TIMEOUT_SECONDS
+          value: "120"
       - equal:
           path: stringData.ABAC_POLICY_SCOPE
           value: raw-scope

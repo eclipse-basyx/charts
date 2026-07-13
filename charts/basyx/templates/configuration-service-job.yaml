@@ -53,9 +53,9 @@ spec:
             - /bin/sh
             - -ec
             - |
-              end=$((SECONDS + {{ .Values.configurationService.waitForDatabase.timeoutSeconds }}))
+              end=$(($(date +%s) + {{ .Values.configurationService.waitForDatabase.timeoutSeconds }}))
               until pg_isready -h "${POSTGRES_HOST}" -p "${POSTGRES_PORT}" -U "${POSTGRES_USER}" -d "${POSTGRES_DBNAME}"; do
-                if [ "${SECONDS}" -ge "${end}" ]; then
+                if [ "$(date +%s)" -ge "${end}" ]; then
                   echo "Timed out waiting for PostgreSQL at ${POSTGRES_HOST}:${POSTGRES_PORT}" >&2
                   exit 1
                 fi

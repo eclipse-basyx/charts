@@ -79,6 +79,20 @@ tests:
       - failedTemplate:
           errorPattern: "general.bulkBatchLimit"
 
+  - it: fails when server timeout is below one
+    values:
+      - fixtures/invalid_server_timeout.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "server.readTimeoutSeconds"
+
+  - it: fails when service-local server timeout is below one
+    values:
+      - fixtures/invalid_service_server_timeout.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "aasRepository.server.shutdownTimeoutSeconds"
+
   - it: fails when ABAC policy scope contains unsupported characters
     values:
       - fixtures/invalid_abac_policy_scope.yaml
