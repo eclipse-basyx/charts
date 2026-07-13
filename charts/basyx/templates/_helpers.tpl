@@ -149,6 +149,7 @@ The environment.common map remains the escape hatch and takes precedence.
 {{- $root := . -}}
 {{- $common := .Values.environment.common | default dict -}}
 {{- $general := .Values.general | default dict -}}
+{{- $server := .Values.server | default dict -}}
 {{- $history := .Values.history | default dict -}}
 {{- $evidence := dig "evidence" (dict) $history -}}
 {{- $signing := dig "signing" (dict) $evidence -}}
@@ -168,6 +169,11 @@ The environment.common map remains the escape hatch and takes precedence.
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_UPLOADMAXSIZEBYTES" "value" (dig "uploadMaxSizeBytes" 0 $general)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_BULK_BATCH_LIMIT" "value" (dig "bulkBatchLimit" 1000 $general)) }}
 {{- include "basyx.commonConfig.listEntry" (dict "common" $common "name" "GENERAL_AAS_PRECONFIG_PATHS" "value" (dig "aasPreconfigPaths" (list) $general)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "SERVER_READ_HEADER_TIMEOUT_SECONDS" "value" (dig "readHeaderTimeoutSeconds" 15 $server)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "SERVER_READ_TIMEOUT_SECONDS" "value" (dig "readTimeoutSeconds" 300 $server)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "SERVER_WRITE_TIMEOUT_SECONDS" "value" (dig "writeTimeoutSeconds" 300 $server)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "SERVER_IDLE_TIMEOUT_SECONDS" "value" (dig "idleTimeoutSeconds" 60 $server)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "SERVER_SHUTDOWN_TIMEOUT_SECONDS" "value" (dig "shutdownTimeoutSeconds" 10 $server)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "ABAC_POLICY_FILE_IMPORT" "value" (dig "policyFileImport" "" $abac)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "ABAC_POLICY_SCOPE" "value" (dig "policyScope" "" $abac)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "ABAC_MANAGEMENT_API_ENABLED" "value" (dig "managementApi" "enabled" false $abac)) }}
@@ -207,6 +213,7 @@ Render service-local BaSyx runtime overrides as explicit container env values.
 {{- $values := .values | default dict -}}
 {{- $environment := $values.environment | default dict -}}
 {{- $general := $values.general | default dict -}}
+{{- $server := $values.server | default dict -}}
 {{- $history := $values.history | default dict -}}
 {{- $evidence := $history.evidence | default dict -}}
 {{- $signing := $evidence.signing | default dict -}}
@@ -227,6 +234,11 @@ Render service-local BaSyx runtime overrides as explicit container env values.
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "uploadMaxSizeBytes" "name" "GENERAL_UPLOADMAXSIZEBYTES") }}
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "bulkBatchLimit" "name" "GENERAL_BULK_BATCH_LIMIT") }}
 {{- include "basyx.serviceRuntimeEnv.listEntry" (dict "environment" $environment "config" $general "key" "aasPreconfigPaths" "name" "GENERAL_AAS_PRECONFIG_PATHS") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $server "key" "readHeaderTimeoutSeconds" "name" "SERVER_READ_HEADER_TIMEOUT_SECONDS") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $server "key" "readTimeoutSeconds" "name" "SERVER_READ_TIMEOUT_SECONDS") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $server "key" "writeTimeoutSeconds" "name" "SERVER_WRITE_TIMEOUT_SECONDS") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $server "key" "idleTimeoutSeconds" "name" "SERVER_IDLE_TIMEOUT_SECONDS") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $server "key" "shutdownTimeoutSeconds" "name" "SERVER_SHUTDOWN_TIMEOUT_SECONDS") }}
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $abac "key" "policyFileImport" "name" "ABAC_POLICY_FILE_IMPORT") }}
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $abac "key" "policyScope" "name" "ABAC_POLICY_SCOPE") }}
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $abacManagementApi "key" "enabled" "name" "ABAC_MANAGEMENT_API_ENABLED") }}

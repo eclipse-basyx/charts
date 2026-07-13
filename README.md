@@ -420,7 +420,7 @@ The default job runs as a Helm hook:
 configurationService:
   enabled: true
   image:
-    tag: "1.0.1"
+    tag: "1.0.2"
   waitForDatabase:
     enabled: true
   hook:
@@ -474,7 +474,7 @@ aasRepository:
   replicaCount: 1
   image:
     repository: eclipsebasyx/aasrepository-go
-    tag: "1.0.1"
+    tag: "1.0.2"
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
@@ -496,7 +496,7 @@ Supported service blocks:
 - `companyLookup`
 - `digitalTwinRegistry`
 
-Most service blocks support `enabled`, `replicaCount`, `image.*`, `imagePullSecrets`, `service.*`, `ingress.*`, `resources`, `nodeSelector`, `tolerations`, `affinity`, `podAnnotations`, `podLabels`, `podSecurityContext`, `securityContext`, `volumes`, `volumeMounts` and optional service-local `abac` overrides.
+Most service blocks support `enabled`, `replicaCount`, `image.*`, `imagePullSecrets`, `service.*`, `ingress.*`, `resources`, `nodeSelector`, `tolerations`, `affinity`, `podAnnotations`, `podLabels`, `podSecurityContext`, `securityContext`, `volumes`, `volumeMounts` and optional service-local `server`, `history`, `eventing`, `general` and `abac` overrides.
 
 `aasEnvironment` uses the `eclipsebasyx/aasenvironment-go` image and defaults to service port `8082`. It can be deployed as a single BaSyx Go API endpoint backed by the chart's PostgreSQL database and Configuration Service. It enables AAS Registry, Submodel Registry and Discovery integration by default:
 
@@ -600,6 +600,13 @@ general:
   bulkBatchLimit: 1000
   aasPreconfigPaths: []
 
+server:
+  readHeaderTimeoutSeconds: 15
+  readTimeoutSeconds: 300
+  writeTimeoutSeconds: 300
+  idleTimeoutSeconds: 60
+  shutdownTimeoutSeconds: 10
+
 history:
   mode: "off"
   immutability: "none"
@@ -626,6 +633,10 @@ history:
   mode: "off"
 
 aasRepository:
+  server:
+    readTimeoutSeconds: 600
+    writeTimeoutSeconds: 600
+    shutdownTimeoutSeconds: 30
   history:
     mode: audit
     immutability: postgres_guarded
@@ -708,6 +719,29 @@ Raw environment maps are the escape hatch and take precedence over structured va
 
 `aasRepository` and `submodelRepository` already set registry integration related values in their service-local `environment` maps by default. Override these service-local values only when you intentionally want different registry synchronization behavior.
 
+#### Server Runtime Values
+
+The `server` block controls BaSyx Go HTTP server timeouts. All timeout values are configured in seconds and must be greater than `0`.
+
+| Value | Rendered environment variable | Default | Description |
+| --- | --- | --- | --- |
+| `server.readHeaderTimeoutSeconds` | `SERVER_READ_HEADER_TIMEOUT_SECONDS` | `15` | Maximum time to read HTTP request headers. |
+| `server.readTimeoutSeconds` | `SERVER_READ_TIMEOUT_SECONDS` | `300` | Maximum time to read a full HTTP request including the body. |
+| `server.writeTimeoutSeconds` | `SERVER_WRITE_TIMEOUT_SECONDS` | `300` | Maximum time to write an HTTP response. |
+| `server.idleTimeoutSeconds` | `SERVER_IDLE_TIMEOUT_SECONDS` | `60` | Maximum keep-alive idle time before waiting for the next request ends. |
+| `server.shutdownTimeoutSeconds` | `SERVER_SHUTDOWN_TIMEOUT_SECONDS` | `10` | Maximum graceful shutdown time for in-flight requests after the service receives a termination signal. |
+
+As with `general`, `history`, `eventing` and `abac`, these values can be set globally or overridden per backend service:
+
+```yaml
+server:
+  readTimeoutSeconds: 300
+
+aasRepository:
+  server:
+    readTimeoutSeconds: 900
+```
+
 #### History, Audit And Evidence Values
 
 | Value | Rendered environment variable | Description |
@@ -762,7 +796,7 @@ Enable the Web UI with:
 aasWebGui:
   enabled: true
   image:
-    tag: 0db02d0
+    tag: v2-260707
 ```
 
 The Web UI infrastructure is rendered from `aasWebGui.infrastructureConfig`. The defaults derive service URLs from `host` and `paths.*`.

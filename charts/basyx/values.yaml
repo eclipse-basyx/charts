@@ -113,6 +113,15 @@ general:
   # directories with the service-specific volumes/volumeMounts when used.
   aasPreconfigPaths: []
 
+# Shared BaSyx Go HTTP server timeout configuration. Values are rendered into
+# SERVER_* environment variables for backend services and must be greater than 0.
+server:
+  readHeaderTimeoutSeconds: 15
+  readTimeoutSeconds: 300
+  writeTimeoutSeconds: 300
+  idleTimeoutSeconds: 60
+  shutdownTimeoutSeconds: 10
+
 # AAS v3.2 history/audit runtime configuration. Defaults keep history disabled.
 history:
   mode: "off"
@@ -176,7 +185,7 @@ configurationService:
     image:
       repository: ghcr.io/cloudnative-pg/postgresql
       pullPolicy: IfNotPresent
-      tag: "18.3-system-trixie"
+      tag: "18.4-system-trixie"
       digest: ""
     intervalSeconds: 5
     timeoutSeconds: 600
@@ -230,7 +239,7 @@ keycloak:
       image:
         repository: curlimages/curl
         pullPolicy: IfNotPresent
-        tag: 8.20.0
+        tag: 8.21.0
         digest: ""
   initialization:
     userProfile:
@@ -475,6 +484,7 @@ submodelRepository:
     GENERAL_SUBMODELREGISTRYINTEGRATION: true
     GENERAL_EXTERNALURL: "https://{{ .Values.host }}{{ .Values.paths.submodelRepository }}"
   general: {}
+  server: {}
   history: {}
   eventing: {}
   resources: {}
@@ -562,6 +572,7 @@ submodelRegistry:
             pathType: ImplementationSpecific
   environment: {}
   general: {}
+  server: {}
   history: {}
   eventing: {}
   resources: {}
@@ -652,6 +663,7 @@ aasRegistry:
   # central environment variables (will be set in configmap.yaml via tpl interpolation)
   environment: {}
   general: {}
+  server: {}
   history: {}
   eventing: {}
 
@@ -750,6 +762,7 @@ digitalTwinRegistry:
   # central environment variables (will be set in configmap.yaml via tpl interpolation)
   environment: {}
   general: {}
+  server: {}
   history: {}
   eventing: {}
 
@@ -851,6 +864,7 @@ aasRepository:
     GENERAL_AASREGISTRYINTEGRATION: true
     GENERAL_EXTERNALURL: "https://{{ .Values.host }}{{ .Values.paths.aasRepository }}"
   general: {}
+  server: {}
   history: {}
   eventing: {}
 
@@ -948,6 +962,7 @@ aasEnvironment:
     GENERAL_DISCOVERYINTEGRATION: true
     GENERAL_EXTERNALURL: "https://{{ .Values.host }}{{ .Values.paths.aasEnvironment }}"
   general: {}
+  server: {}
   history: {}
   eventing: {}
 
@@ -1042,6 +1057,7 @@ dppApi:
   # database. The default history settings mirror the BaSyx DPP API example.
   environment: {}
   general: {}
+  server: {}
   history:
     mode: audit
     retentionDays: 0
@@ -1134,6 +1150,7 @@ cdRepository:
   # central environment variables (will be set in configmap.yaml via tpl interpolation)
   environment: {}
   general: {}
+  server: {}
   history: {}
   eventing: {}
 
@@ -1217,6 +1234,7 @@ companyLookup:
             pathType: ImplementationSpecific
   environment: {}
   general: {}
+  server: {}
   history: {}
   eventing: {}
   resources: {}
@@ -1305,6 +1323,7 @@ aasDiscovery:
   # central environment variables (will be set in configmap.yaml via tpl interpolation)
   environment: {}
   general: {}
+  server: {}
   history: {}
   eventing: {}
   resources: {}
@@ -1350,7 +1369,7 @@ aasWebGui:
   image:
     repository: eclipsebasyx/aas-gui
     pullPolicy: Always
-    tag: 0db02d0
+    tag: v2-260707
   imagePullSecrets: []
   nameOverride: "aas-gui"
   fullnameOverride: "aas-gui"

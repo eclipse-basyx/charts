@@ -75,6 +75,8 @@ tests:
       aasRepository.eventing.topicPrefix: aas-repository-events
       aasRepository.general.aasPreconfigPaths[0]: /aas/preconfigured
       aasRepository.general.bulkBatchLimit: 250
+      aasRepository.server.readTimeoutSeconds: 120
+      aasRepository.server.shutdownTimeoutSeconds: 20
       aasRepository.abac.policyFileImport: if_missing
       aasRepository.abac.policyScope: aas-repository-scope
       aasRepository.abac.managementApi.enabled: true
@@ -112,6 +114,18 @@ tests:
       - contains:
           path: spec.template.spec.containers[0].env
           content:
+            name: SERVER_READ_TIMEOUT_SECONDS
+            value: "120"
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SERVER_SHUTDOWN_TIMEOUT_SECONDS
+            value: "20"
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
             name: ABAC_POLICY_FILE_IMPORT
             value: if_missing
           count: 1
@@ -136,6 +150,8 @@ tests:
       aasRepository.environment.BASYX_HISTORY_MODE: audit
       aasRepository.general.bulkBatchLimit: 250
       aasRepository.environment.GENERAL_BULK_BATCH_LIMIT: 100
+      aasRepository.server.readTimeoutSeconds: 120
+      aasRepository.environment.SERVER_READ_TIMEOUT_SECONDS: 90
       aasRepository.abac.policyScope: structured-scope
       aasRepository.environment.ABAC_POLICY_SCOPE: raw-scope
     asserts:
@@ -150,6 +166,12 @@ tests:
           content:
             name: GENERAL_BULK_BATCH_LIMIT
             value: "100"
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SERVER_READ_TIMEOUT_SECONDS
+            value: "90"
           count: 1
       - contains:
           path: spec.template.spec.containers[0].env

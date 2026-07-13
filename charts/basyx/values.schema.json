@@ -6,6 +6,7 @@
       "type": "object",
       "properties": {
         "general": { "$ref": "#/properties/general" },
+        "server": { "$ref": "#/properties/server" },
         "history": { "$ref": "#/properties/history" },
         "eventing": { "$ref": "#/properties/eventing" },
         "abac": {
@@ -263,6 +264,16 @@
           "type": "array",
           "items": { "type": "string", "minLength": 1 }
         }
+      }
+    },
+    "server": {
+      "type": "object",
+      "properties": {
+        "readHeaderTimeoutSeconds": { "type": "integer", "minimum": 1 },
+        "readTimeoutSeconds": { "type": "integer", "minimum": 1 },
+        "writeTimeoutSeconds": { "type": "integer", "minimum": 1 },
+        "idleTimeoutSeconds": { "type": "integer", "minimum": 1 },
+        "shutdownTimeoutSeconds": { "type": "integer", "minimum": 1 }
       }
     },
     "history": {
