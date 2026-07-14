@@ -455,7 +455,20 @@
         },
         "type": {
           "type": "string",
-          "minLength": 1
+          "enum": ["postgres", "managed", "cnpg", "external"]
+        },
+        "existingSecret": {
+          "type": "string"
+        },
+        "external": {
+          "type": "object",
+          "properties": {
+            "host": { "type": "string" },
+            "port": { "type": ["string", "number"] },
+            "dbname": { "type": "string" },
+            "user": { "type": "string" },
+            "password": { "type": "string" }
+          }
         },
         "instances": {
           "type": "integer",
@@ -471,7 +484,47 @@
             }
           }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": { "const": "external" }
+            }
+          },
+          "then": {
+            "anyOf": [
+              {
+                "properties": {
+                  "existingSecret": { "minLength": 1 }
+                },
+                "required": ["existingSecret"]
+              },
+              {
+                "properties": {
+                  "external": {
+                    "type": "object",
+                    "required": ["host", "port", "dbname", "user", "password"],
+                    "properties": {
+                      "host": { "minLength": 1 },
+                      "port": {
+                        "oneOf": [
+                          { "type": "integer", "minimum": 1 },
+                          { "type": "string", "minLength": 1 }
+                        ]
+                      },
+                      "dbname": { "minLength": 1 },
+                      "user": { "minLength": 1 },
+                      "password": { "minLength": 1 }
+                    }
+                  }
+                },
+                "required": ["external"]
+              }
+            ]
+          }
+        }
+      ]
     }
   }
 }

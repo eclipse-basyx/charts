@@ -1498,7 +1498,22 @@ aasWebGui:
 
 database:
   clusterName: basyx-database
+  # postgres, managed and cnpg deploy a CloudNativePG cluster. Use external to
+  # connect BaSyx Go to an existing PostgreSQL database through existingSecret.
   type: postgres
+  # Existing Secret for database.type=external. It must contain the keys:
+  # host, port, dbname, user and password.
+  existingSecret: ""
+  # Inline external database connection values for database.type=external.
+  # If existingSecret is set, these values are ignored.
+  # Prefer existingSecret for production and GitOps because inline passwords are
+  # stored in Helm release data.
+  external:
+    host: ""
+    port: "5432"
+    dbname: ""
+    user: ""
+    password: ""
   # name for the cnpg cluster ressource
   # clusterName: "basyx-database"
   # name of database

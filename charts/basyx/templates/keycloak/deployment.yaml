@@ -63,7 +63,7 @@ spec:
             - name: KC_HOSTNAME
               value: {{ .Values.host  | quote }}
             - name: KC_DB
-              value: {{ .Values.database.type  | quote }}
+              value: "postgres"
             - name: KC_DB_URL
               valueFrom:
                 secretKeyRef:

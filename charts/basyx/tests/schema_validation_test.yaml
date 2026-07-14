@@ -93,6 +93,27 @@ tests:
       - failedTemplate:
           errorPattern: "aasRepository.server.shutdownTimeoutSeconds"
 
+  - it: fails when external database has no existing secret
+    values:
+      - fixtures/invalid_external_database_missing_secret.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "database"
+
+  - it: fails when inline external database password is empty
+    values:
+      - fixtures/invalid_external_database_empty_password.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "database"
+
+  - it: fails when database type is unsupported
+    values:
+      - fixtures/invalid_database_type.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "database.type"
+
   - it: fails when ABAC policy scope contains unsupported characters
     values:
       - fixtures/invalid_abac_policy_scope.yaml

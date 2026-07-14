@@ -1,0 +1,207 @@
+suite: database configuration
+release:
+  name: basyx
+templates:
+  - templates/postgres.yaml
+  - templates/database-secret.yaml
+  - templates/configuration-service-job.yaml
+  - templates/aas-registry/deployment.yaml
+  - templates/keycloak/deployment.yaml
+tests:
+  - it: renders a managed CloudNativePG cluster by default
+    template: templates/postgres.yaml
+    asserts:
+      - isKind:
+          of: Cluster
+      - equal:
+          path: apiVersion
+          value: postgresql.cnpg.io/v1
+      - equal:
+          path: metadata.name
+          value: basyx-database
+
+  - it: does not render CloudNativePG when an external database is configured
+    template: templates/postgres.yaml
+    set:
+      database.type: external
+      database.existingSecret: basyx-external-postgres
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders an external database secret from inline values
+    template: templates/database-secret.yaml
+    set:
+      database.type: external
+      database.existingSecret: ""
+      database.external.host: postgres.example.internal
+      database.external.port: "5432"
+      database.external.dbname: basyx
+      database.external.user: basyx
+      database.external.password: change-me
+    asserts:
+      - isKind:
+          of: Secret
+      - equal:
+          path: metadata.name
+          value: basyx-external-database
+      - equal:
+          path: stringData.host
+          value: postgres.example.internal
+      - equal:
+          path: stringData.port
+          value: "5432"
+      - equal:
+          path: stringData.dbname
+          value: basyx
+      - equal:
+          path: stringData.user
+          value: basyx
+      - equal:
+          path: stringData.password
+          value: change-me
+      - equal:
+          path: stringData.jdbc-uri
+          value: jdbc:postgresql://postgres.example.internal:5432/basyx
+
+  - it: renders an external database jdbc uri when port is numeric
+    template: templates/database-secret.yaml
+    set:
+      database.type: external
+      database.existingSecret: ""
+      database.external.host: postgres.example.internal
+      database.external.port: 5432
+      database.external.dbname: basyx
+      database.external.user: basyx
+      database.external.password: change-me
+    asserts:
+      - equal:
+          path: stringData.port
+          value: "5432"
+      - equal:
+          path: stringData.jdbc-uri
+          value: jdbc:postgresql://postgres.example.internal:5432/basyx
+
+  - it: does not render an external database secret when existingSecret is configured
+    template: templates/database-secret.yaml
+    set:
+      database.type: external
+      database.existingSecret: basyx-external-postgres
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: wires external database credentials into the configuration service
+    template: templates/configuration-service-job.yaml
+    set:
+      database.type: external
+      database.existingSecret: basyx-external-postgres
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_HOST
+            valueFrom:
+              secretKeyRef:
+                name: basyx-external-postgres
+                key: host
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: basyx-external-postgres
+                key: password
+          count: 1
+
+  - it: wires generated inline external database secret into the configuration service
+    template: templates/configuration-service-job.yaml
+    set:
+      database.type: external
+      database.existingSecret: ""
+      database.external.host: postgres.example.internal
+      database.external.port: "5432"
+      database.external.dbname: basyx
+      database.external.user: basyx
+      database.external.password: change-me
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_HOST
+            valueFrom:
+              secretKeyRef:
+                name: basyx-external-database
+                key: host
+          count: 1
+
+  - it: ignores existingSecret for managed database mode
+    template: templates/configuration-service-job.yaml
+    set:
+      database.existingSecret: should-not-be-used
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_HOST
+            valueFrom:
+              secretKeyRef:
+                name: basyx-database-app
+                key: host
+          count: 1
+
+  - it: wires external database credentials into backend services
+    template: templates/aas-registry/deployment.yaml
+    set:
+      aasRegistry.enabled: true
+      database.type: external
+      database.existingSecret: basyx-external-postgres
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_DBNAME
+            valueFrom:
+              secretKeyRef:
+                name: basyx-external-postgres
+                key: dbname
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_USER
+            valueFrom:
+              secretKeyRef:
+                name: basyx-external-postgres
+                key: user
+          count: 1
+
+  - it: wires generated inline external database secret into keycloak
+    template: templates/keycloak/deployment.yaml
+    set:
+      keycloak.enabled: true
+      database.type: external
+      database.existingSecret: ""
+      database.external.host: postgres.example.internal
+      database.external.port: "5432"
+      database.external.dbname: basyx
+      database.external.user: basyx
+      database.external.password: change-me
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: KC_DB
+            value: "postgres"
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: KC_DB_URL
+            valueFrom:
+              secretKeyRef:
+                name: basyx-external-database
+                key: jdbc-uri
+          count: 1

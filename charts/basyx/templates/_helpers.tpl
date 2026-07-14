@@ -684,7 +684,24 @@ Create the name of the service account to use
 {{- end }}
 
 {{- define "database-secret" -}}
-{{- printf "%s-app" .Values.database.clusterName  | trunc 63 | trimSuffix "-" }}
+{{- if eq (include "database.managed" .) "false" -}}
+{{- if .Values.database.existingSecret -}}
+{{- .Values.database.existingSecret | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- include "database.generatedSecretName" . -}}
+{{- end -}}
+{{- else -}}
+{{- printf "%s-app" .Values.database.clusterName  | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+{{- end}}
+
+{{- define "database.generatedSecretName" -}}
+{{- printf "%s-external-database" (include "basyx.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end}}
+
+{{- define "database.managed" -}}
+{{- $type := .Values.database.type | default "postgres" | toString -}}
+{{- if or (eq $type "postgres") (eq $type "managed") (eq $type "cnpg") -}}true{{- else -}}false{{- end -}}
 {{- end}}
 
 {{/*
@@ -809,7 +826,7 @@ tls:
   valueFrom:
     secretKeyRef:
       name: {{ include "database-secret" . }}
-      key: port    
+      key: port
 - name: POSTGRES_HOST
   valueFrom:
     secretKeyRef:

@@ -1,3 +1,4 @@
+{{- if eq (include "database.managed" .) "true" -}}
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
@@ -14,4 +15,4 @@ spec:
       database: {{.Values.database.database | default "basyx" }}
       owner: {{.Values.database.owner | default "basyx" }}
 
- 
+{{- end }}

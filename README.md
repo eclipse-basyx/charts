@@ -396,11 +396,12 @@ The chart projects configured certificate sources into the pods and updates `SSL
 
 ### Database
 
-The chart creates a CloudNativePG cluster:
+By default, the chart creates a CloudNativePG cluster:
 
 ```yaml
 database:
   clusterName: basyx-database
+  type: postgres
   database: basyx
   owner: basyx
   instances: 3
@@ -417,9 +418,84 @@ database:
     size: 5Gi
 ```
 
+The values `postgres`, `managed` and `cnpg` all keep this managed database behavior for backwards compatibility.
+
+#### Existing PostgreSQL Database
+
+To use an existing PostgreSQL database instead of deploying CloudNativePG, set `database.type` to `external`.
+
+Recommended for production: point the chart to an existing Kubernetes Secret:
+
+```yaml
+database:
+  type: external
+  existingSecret: basyx-external-postgres
+```
+
+The Secret must exist in the same namespace as the BaSyx release and contain these keys:
+
+```text
+host
+port
+dbname
+user
+password
+jdbc-uri
+```
+
+Create such a Secret, for example:
+
+```bash
+kubectl -n basyx-custom create secret generic basyx-external-postgres \
+  --from-literal=host='postgres.example.internal' \
+  --from-literal=port='5432' \
+  --from-literal=dbname='basyx' \
+  --from-literal=user='basyx' \
+  --from-literal=password='change-me' \
+  --from-literal=jdbc-uri='jdbc:postgresql://postgres.example.internal:5432/basyx'
+```
+
+Then install with the external database overlay:
+
+```bash
+helm upgrade --install basyx charts/basyx \
+  -n basyx-custom \
+  --create-namespace \
+  -f values/values.example.yaml \
+  -f values/values.external-db.example.yaml
+```
+
+For quick test deployments, the connection values can also be provided inline. In that case, the chart renders a Secret automatically:
+
+```yaml
+database:
+  type: external
+  existingSecret: ""
+  external:
+    host: postgres.example.internal
+    port: "5432"
+    dbname: basyx
+    user: basyx
+    password: change-me
+```
+
+Inline values are easier to use, but less safe: the password is stored in the values file and in Helm release data. Do not commit real database passwords to Git. Use `existingSecret` for shared, production or GitOps-managed environments.
+
+For the Catena-X example, use the same overlay pattern:
+
+```bash
+helm upgrade --install basyx charts/basyx \
+  -n basyx-catena-x \
+  --create-namespace \
+  -f values/values.catena-x.example.yaml \
+  -f values/values.external-db.example.yaml
+```
+
+When `database.type: external` is used, the chart does not render a CloudNativePG `Cluster`. The configured external database user must be allowed to create and migrate the BaSyx schema. The `configurationService` still runs by default and initializes or migrates the schema in the existing database.
+
 ### BaSyx Configuration Service
 
-BaSyx Go requires the database schema to be prepared before DB-backed services start. The chart enables `configurationService` by default for this. It renders a Kubernetes `Job` using `eclipsebasyx/basyxconfigurationservice-go` and the same CloudNativePG application secret as the runtime services.
+BaSyx Go requires the database schema to be prepared before DB-backed services start. The chart enables `configurationService` by default for this. It renders a Kubernetes `Job` using `eclipsebasyx/basyxconfigurationservice-go` and the same PostgreSQL Secret as the runtime services.
 
 The Configuration Service image is versioned independently from the BaSyx runtime service images. Set `configurationService.image.tag` or, preferably for reproducible deployments, `configurationService.image.digest` explicitly when a schema migration image changes.
 
@@ -439,9 +515,9 @@ configurationService:
       - pre-upgrade
 ```
 
-`pre-upgrade` runs schema migrations before updated runtime pods are rolled out. `post-install` is used for fresh installs because the PostgreSQL cluster is created by the same chart and must exist before the job can connect.
+`pre-upgrade` runs schema migrations before updated runtime pods are rolled out. `post-install` is used for fresh installs because the PostgreSQL database must exist before the job can connect.
 
-On fresh installs, CloudNativePG may need some time before the database accepts connections. The chart therefore adds a `wait-for-database` init container that polls PostgreSQL with `pg_isready` before starting the Configuration Service. This avoids slow Kubernetes Job backoff loops when the database is simply not ready yet.
+On fresh installs, PostgreSQL may need some time before it accepts connections. The chart therefore adds a `wait-for-database` init container that polls PostgreSQL with `pg_isready` before starting the Configuration Service. This avoids slow Kubernetes Job backoff loops when the database is simply not ready yet.
 
 After deployment, verify the job and logs with:
 

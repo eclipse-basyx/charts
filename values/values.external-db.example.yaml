@@ -1,0 +1,21 @@
+# Example overlay for using an existing PostgreSQL database.
+#
+# Create the referenced Secret in the target namespace before installing the
+# chart. The Secret must contain the keys: host, port, dbname, user, password.
+
+database:
+  type: external
+  existingSecret: basyx-external-postgres
+
+  # Alternative for simple test deployments:
+  # Leave existingSecret empty and provide the connection values inline. The
+  # chart renders a Secret from these values. For production and GitOps setups,
+  # prefer existingSecret because inline passwords are stored in Helm release
+  # data and should not be committed to Git.
+  # existingSecret: ""
+  # external:
+  #   host: postgres.example.internal
+  #   port: "5432"
+  #   dbname: basyx
+  #   user: basyx
+  #   password: change-me
