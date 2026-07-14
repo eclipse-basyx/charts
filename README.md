@@ -1095,6 +1095,41 @@ The example initializes these demo users. All example passwords are `change-me`.
 | `catena-x.partner-a` | `change-me` | Consumer with `Edc-Bpn=BPN_COMPANY_001` for marker-based read access tests. |
 | `catena-x.partner-b` | `change-me` | Consumer with `Edc-Bpn=BPN_COMPANY_002` for marker-based read access tests. |
 
+### CatenaXplorer EDC UI Settings
+
+The Catena-X example also preconfigures the AAS Web UI with the CatenaXplorer EDC backend-for-frontend environment variables from the upstream [CatenaXplorerEdcStandalone example](https://github.com/eclipse-basyx/basyx-aas-web-ui/tree/main/examples/CatenaXplorerEdcStandalone).
+
+Non-sensitive EDC settings are stored in `aasWebGui.environment` and rendered into the Web UI ConfigMap:
+
+```yaml
+aasWebGui:
+  environment:
+    CX_EDC_BFF_ENABLED: "true"
+    CX_EDC_BFF_PORT: "3001"
+    CX_EDC_BFF_UPSTREAM_URL: "http://127.0.0.1:3001"
+    CX_EDC_BFF_AUTH_MODE: none
+    CX_EDC_DEFAULT_MANAGEMENT_URL: "https://consumer-edc.example.com/management"
+    CX_EDC_DEFAULT_API_KEY_HEADER: X-Api-Key
+    CX_EDC_DEFAULT_DSP_ENDPOINT: "https://consumer-edc.example.com/api/v1/dsp"
+    CX_EDC_ALLOWED_COUNTER_PARTY_ADDRESSES: "https://provider-edc.example.com/api/v1/dsp"
+```
+
+The EDC Management API key is sensitive. Do not store a real API key in `aasWebGui.environment`. Use `aasWebGui.secretEnvironment` for disposable test overlays, or preferably reference an existing Secret in production:
+
+```yaml
+aasWebGui:
+  existingSecretEnvironment: basyx-aas-web-ui-edc
+```
+
+Create the Secret before installing:
+
+```bash
+kubectl -n basyx-catena-x create secret generic basyx-aas-web-ui-edc \
+  --from-literal=CX_EDC_DEFAULT_API_KEY='change-me'
+```
+
+If `aasWebGui.existingSecretEnvironment` is set, the chart does not render `aasWebGui.secretEnvironment`; it only references the existing Secret from the Web UI Deployment.
+
 The upstream BaSyx Go marker example also contains demo data:
 
 - [shell-descriptor.json](https://raw.githubusercontent.com/eclipse-basyx/basyx-go-components/main/examples/BaSyxMarkerAccessExample/data/shell-descriptor.json)

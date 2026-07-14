@@ -681,6 +681,35 @@ aasWebGui:
   enabled: true
   environment:
     START_PAGE_ROUTE_NAME: CatenaXplorer
+    ALLOW_EDITING: "false"
+    ALLOW_UPLOADING: "false"
+    ALLOW_LOGOUT: "true"
+    SM_VIEWER_EDITOR: "true"
+    AUTHORIZATION_HEADER_PREFIX: Bearer
+    AUTHORIZATION_HEADER_DESCRIPTION_ENDPOINT_EXEMPTION: "true"
+    # Server-side CatenaXplorer EDC backend-for-frontend settings.
+    # These values follow the BaSyx AAS Web UI CatenaXplorerEdcStandalone example.
+    CX_EDC_BFF_ENABLED: "true"
+    CX_EDC_BFF_PORT: "3001"
+    CX_EDC_BFF_UPSTREAM_URL: "http://127.0.0.1:3001"
+    CX_EDC_BFF_AUTH_MODE: none
+    CX_EDC_BFF_AUTH_JWKS_URL: ""
+    CX_EDC_BFF_AUTH_ISSUER: ""
+    CX_EDC_BFF_AUTH_AUDIENCE: ""
+    CX_EDC_BFF_REQUIRED_ROLES: ""
+    CX_EDC_DEFAULT_MANAGEMENT_URL: "https://consumer-edc.example.com/management"
+    CX_EDC_DEFAULT_API_KEY_HEADER: X-Api-Key
+    CX_EDC_DEFAULT_PARTICIPANT_ID: ""
+    CX_EDC_DEFAULT_DSP_ENDPOINT: "https://consumer-edc.example.com/api/v1/dsp"
+    CX_EDC_ALLOWED_COUNTER_PARTY_ADDRESSES: "https://provider-edc.example.com/api/v1/dsp"
+    CX_EDC_ALLOW_INSECURE_COUNTER_PARTY_ADDRESSES: "false"
+    CX_EDC_REQUEST_TIMEOUT_MS: "30000"
+    CX_EDC_EDR_POLLING_ATTEMPTS: "60"
+    CX_EDC_EDR_POLLING_INTERVAL_MS: "2000"
+  secretEnvironment:
+    # Replace this placeholder in a private overlay or use
+    # aasWebGui.existingSecretEnvironment for production.
+    CX_EDC_DEFAULT_API_KEY: ""
   infrastructureConfig:
     infrastructures:
       main: null

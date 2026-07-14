@@ -6,6 +6,7 @@ templates:
   - templates/aas-web-gui/configmap.yaml
   - templates/aas-web-gui/configmap-infrastructure.yaml
   - templates/aas-web-gui/configmap-logos.yaml
+  - templates/aas-web-gui/secret.yaml
   - templates/aas-web-gui/deployment.yaml
   - templates/aas-discovery/deployment.yaml
   - templates/aas-discovery/ingress.yaml
@@ -245,6 +246,56 @@ tests:
       - equal:
           path: data.START_PAGE_ROUTE_NAME
           value: CatenaXplorer
+      - equal:
+          path: data.CX_EDC_BFF_ENABLED
+          value: "true"
+      - equal:
+          path: data.CX_EDC_BFF_PORT
+          value: "3001"
+      - equal:
+          path: data.CX_EDC_BFF_UPSTREAM_URL
+          value: http://127.0.0.1:3001
+      - equal:
+          path: data.CX_EDC_BFF_AUTH_MODE
+          value: none
+      - equal:
+          path: data.CX_EDC_DEFAULT_MANAGEMENT_URL
+          value: https://consumer-edc.example.com/management
+      - equal:
+          path: data.CX_EDC_DEFAULT_API_KEY_HEADER
+          value: X-Api-Key
+      - equal:
+          path: data.CX_EDC_ALLOWED_COUNTER_PARTY_ADDRESSES
+          value: https://provider-edc.example.com/api/v1/dsp
+      - equal:
+          path: data.CX_EDC_EDR_POLLING_ATTEMPTS
+          value: "60"
+
+  - it: renders Catena-X web ui secret runtime settings from example values
+    template: templates/aas-web-gui/secret.yaml
+    values:
+      - ../../../values/values.catena-x.example.yaml
+    documentSelector:
+      path: metadata.name
+      value: basyx-aas-web-ui-secret
+    asserts:
+      - isKind:
+          of: Secret
+      - equal:
+          path: stringData.CX_EDC_DEFAULT_API_KEY
+          value: ""
+
+  - it: wires Catena-X web ui secret runtime settings into the deployment
+    template: templates/aas-web-gui/deployment.yaml
+    values:
+      - ../../../values/values.catena-x.example.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            secretRef:
+              name: basyx-aas-web-ui-secret
+          count: 1
 
   - it: mounts common config and custom ca into aas discovery
     template: templates/aas-discovery/deployment.yaml
