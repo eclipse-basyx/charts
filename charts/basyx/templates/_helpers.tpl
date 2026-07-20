@@ -295,6 +295,7 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
         checksum/common-config: {{ include "common.config.checksum" $root }}
+        checksum/database-config: {{ include "database.serviceChecksum" (dict "root" $root "component" .component "nameSuffix" .nameSuffix) }}
         {{- if eq (include "basyx.abac.enabled" $abac) "true" }}
         checksum/abac-config: {{ include "basyx.abac.checksum" $abac }}
         {{- end }}
@@ -335,7 +336,7 @@ spec:
               containerPort: {{ $values.service.port }}
               protocol: TCP
           env:
-            {{- include "common-database-config" $root | nindent 12 }}
+            {{- include "common-database-config" (dict "root" $root "component" .component "nameSuffix" .nameSuffix) | nindent 12 }}
             - name: SERVER_PORT
               value: {{ $values.service.port | quote }}
             - name: SERVER_CONTEXTPATH
@@ -699,6 +700,42 @@ Create the name of the service account to use
 {{- printf "%s-external-database" (include "basyx.fullname" .) | trunc 63 | trimSuffix "-" -}}
 {{- end}}
 
+{{- define "database.serviceGeneratedSecretName" -}}
+{{- $root := .root -}}
+{{- $name := .nameSuffix | default .component | toString | kebabcase -}}
+{{- printf "%s-%s-database" (include "basyx.fullname" $root) $name | trunc 63 | trimSuffix "-" -}}
+{{- end}}
+
+{{- define "database.serviceSecret" -}}
+{{- $root := .root | default . -}}
+{{- $component := .component | default "" -}}
+{{- $componentValues := dict -}}
+{{- if $component -}}
+{{- $componentValues = get $root.Values $component | default dict -}}
+{{- end -}}
+{{- $serviceDatabase := get $componentValues "database" | default dict -}}
+{{- if and $component $serviceDatabase -}}
+{{- if $serviceDatabase.existingSecret -}}
+{{- $serviceDatabase.existingSecret | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- include "database.serviceGeneratedSecretName" . -}}
+{{- end -}}
+{{- else -}}
+{{- include "database-secret" $root -}}
+{{- end -}}
+{{- end}}
+
+{{- define "database.serviceChecksum" -}}
+{{- $root := .root -}}
+{{- $component := .component | default "" -}}
+{{- $componentValues := dict -}}
+{{- if $component -}}
+{{- $componentValues = get $root.Values $component | default dict -}}
+{{- end -}}
+{{- $serviceDatabase := get $componentValues "database" | default dict -}}
+{{- printf "%s\n%s\n%s\n" (include "database.serviceSecret" .) (toYaml $root.Values.database) (toYaml $serviceDatabase) | sha256sum -}}
+{{- end}}
+
 {{- define "database.managed" -}}
 {{- $type := .Values.database.type | default "postgres" | toString -}}
 {{- if or (eq $type "postgres") (eq $type "managed") (eq $type "cnpg") -}}true{{- else -}}false{{- end -}}
@@ -822,30 +859,39 @@ tls:
 {{- end }}
 
 {{- define "common-database-config" -}}
+{{- $root := . -}}
+{{- $component := "" -}}
+{{- $nameSuffix := "" -}}
+{{- if and (kindIs "map" .) (hasKey . "root") -}}
+{{- $root = .root -}}
+{{- $component = .component | default "" -}}
+{{- $nameSuffix = .nameSuffix | default "" -}}
+{{- end -}}
+{{- $secretContext := dict "root" $root "component" $component "nameSuffix" $nameSuffix -}}
 - name: POSTGRES_PORT
   valueFrom:
     secretKeyRef:
-      name: {{ include "database-secret" . }}
+      name: {{ include "database.serviceSecret" $secretContext }}
       key: port
 - name: POSTGRES_HOST
   valueFrom:
     secretKeyRef:
-      name: {{ include "database-secret" . }}
+      name: {{ include "database.serviceSecret" $secretContext }}
       key: host
 - name: POSTGRES_PASSWORD
   valueFrom:
     secretKeyRef:
-      name: {{ include "database-secret" . }}
+      name: {{ include "database.serviceSecret" $secretContext }}
       key: password
 - name: POSTGRES_DBNAME
   valueFrom:
     secretKeyRef:
-      name: {{ include "database-secret" . }}
+      name: {{ include "database.serviceSecret" $secretContext }}
       key: dbname
 - name: POSTGRES_USER
   valueFrom:
     secretKeyRef:
-      name: {{ include "database-secret" . }}
+      name: {{ include "database.serviceSecret" $secretContext }}
       key: user
 {{- end }}
 

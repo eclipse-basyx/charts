@@ -1522,6 +1522,22 @@ database:
     dbname: ""
     user: ""
     password: ""
+  # Backend services can override this global database connection individually:
+  #
+  # aasRegistry:
+  #   database:
+  #     existingSecret: basyx-aas-registry-postgres
+  #
+  # Or inline for test deployments:
+  #
+  # aasRegistry:
+  #   database:
+  #     type: external
+  #     host: postgres.example.internal
+  #     port: "5432"
+  #     dbname: basyx
+  #     user: basyx
+  #     password: change-me
   # name for the cnpg cluster ressource
   # clusterName: "basyx-database"
   # name of database

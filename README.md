@@ -481,6 +481,50 @@ database:
 
 Inline values are easier to use, but less safe: the password is stored in the values file and in Helm release data. Do not commit real database passwords to Git. Use `existingSecret` for shared, production or GitOps-managed environments.
 
+#### Service-Specific PostgreSQL Databases
+
+The global `database` block is used by all BaSyx Go backend services by default. Individual services can override that connection when a deployment needs separate databases, for example when registries should use a shared core database while repositories use a namespace-local database.
+
+Recommended for production: reference an existing Secret on the service:
+
+```yaml
+database:
+  type: postgres
+  clusterName: basyx-company-database
+
+aasRegistry:
+  enabled: true
+  database:
+    existingSecret: basyx-core-postgres
+
+aasDiscovery:
+  enabled: true
+  database:
+    existingSecret: basyx-core-postgres
+
+aasRepository:
+  enabled: true
+  # No override: uses the global database above.
+```
+
+The referenced Secret must contain the same keys as the global external database Secret: `host`, `port`, `dbname`, `user`, `password` and `jdbc-uri`.
+
+For quick test deployments, a service can also define the connection inline. The chart renders a service-specific Secret automatically:
+
+```yaml
+aasRegistry:
+  enabled: true
+  database:
+    type: external
+    host: postgres.example.internal
+    port: "5432"
+    dbname: basyx_registry
+    user: basyx_registry
+    password: change-me
+```
+
+Service-specific database overrides are runtime connections only. The built-in `configurationService` migrates the global database connection of the release. If a service points to a different external database, that database must already be initialized by another BaSyx release, by a separate Configuration Service run, or by an operational migration process.
+
 For the Catena-X example, use the same overlay pattern:
 
 ```bash
@@ -491,7 +535,7 @@ helm upgrade --install basyx charts/basyx \
   -f values/values.external-db.example.yaml
 ```
 
-When `database.type: external` is used, the chart does not render a CloudNativePG `Cluster`. The configured external database user must be allowed to create and migrate the BaSyx schema. The `configurationService` still runs by default and initializes or migrates the schema in the existing database.
+When global `database.type: external` is used, the chart does not render a CloudNativePG `Cluster`. The configured external database user must be allowed to create and migrate the BaSyx schema. The `configurationService` still runs by default and initializes or migrates the schema in the existing database.
 
 ### BaSyx Configuration Service
 

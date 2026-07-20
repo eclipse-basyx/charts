@@ -9,6 +9,7 @@
         "server": { "$ref": "#/properties/server" },
         "history": { "$ref": "#/properties/history" },
         "eventing": { "$ref": "#/properties/eventing" },
+        "database": { "$ref": "#/definitions/serviceDatabase" },
         "abac": {
           "type": "object",
           "properties": {
@@ -28,6 +29,77 @@
         },
         "environment": { "type": "object" }
       }
+    },
+    "serviceDatabase": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["external"]
+        },
+        "existingSecret": {
+          "type": "string"
+        },
+        "host": { "type": "string" },
+        "port": { "type": ["string", "number"] },
+        "dbname": { "type": "string" },
+        "user": { "type": "string" },
+        "password": { "type": "string" },
+        "external": {
+          "type": "object",
+          "properties": {
+            "host": { "type": "string" },
+            "port": { "type": ["string", "number"] },
+            "dbname": { "type": "string" },
+            "user": { "type": "string" },
+            "password": { "type": "string" }
+          }
+        }
+      },
+      "anyOf": [
+        {
+          "properties": {
+            "existingSecret": { "minLength": 1 }
+          },
+          "required": ["existingSecret"]
+        },
+        {
+          "properties": {
+            "host": { "minLength": 1 },
+            "port": {
+              "oneOf": [
+                { "type": "integer", "minimum": 1 },
+                { "type": "string", "minLength": 1 }
+              ]
+            },
+            "dbname": { "minLength": 1 },
+            "user": { "minLength": 1 },
+            "password": { "minLength": 1 }
+          },
+          "required": ["host", "port", "dbname", "user", "password"]
+        },
+        {
+          "properties": {
+            "external": {
+              "type": "object",
+              "required": ["host", "port", "dbname", "user", "password"],
+              "properties": {
+                "host": { "minLength": 1 },
+                "port": {
+                  "oneOf": [
+                    { "type": "integer", "minimum": 1 },
+                    { "type": "string", "minLength": 1 }
+                  ]
+                },
+                "dbname": { "minLength": 1 },
+                "user": { "minLength": 1 },
+                "password": { "minLength": 1 }
+              }
+            }
+          },
+          "required": ["external"]
+        }
+      ]
     }
   },
   "required": [
