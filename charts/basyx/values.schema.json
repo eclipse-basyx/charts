@@ -45,6 +45,24 @@
         "dbname": { "type": "string" },
         "user": { "type": "string" },
         "password": { "type": "string" },
+        "sslmode": {
+          "type": "string",
+          "enum": ["", "disable", "allow", "prefer", "require", "verify-ca", "verify-full"]
+        },
+        "sslcert": { "type": "string" },
+        "sslkey": { "type": "string" },
+        "sslrootcert": { "type": "string" },
+        "connectTimeoutSeconds": {
+          "oneOf": [
+            { "type": "integer", "minimum": 0 },
+            { "type": "string", "pattern": "^[0-9]*$" }
+          ]
+        },
+        "applicationName": { "type": "string" },
+        "fallbackApplicationName": { "type": "string" },
+        "searchPath": { "type": "string" },
+        "options": { "type": "string" },
+        "timezone": { "type": "string" },
         "external": {
           "type": "object",
           "properties": {
@@ -52,7 +70,25 @@
             "port": { "type": ["string", "number"] },
             "dbname": { "type": "string" },
             "user": { "type": "string" },
-            "password": { "type": "string" }
+            "password": { "type": "string" },
+            "sslmode": {
+              "type": "string",
+              "enum": ["", "disable", "allow", "prefer", "require", "verify-ca", "verify-full"]
+            },
+            "sslcert": { "type": "string" },
+            "sslkey": { "type": "string" },
+            "sslrootcert": { "type": "string" },
+            "connectTimeoutSeconds": {
+              "oneOf": [
+                { "type": "integer", "minimum": 0 },
+                { "type": "string", "pattern": "^[0-9]*$" }
+              ]
+            },
+            "applicationName": { "type": "string" },
+            "fallbackApplicationName": { "type": "string" },
+            "searchPath": { "type": "string" },
+            "options": { "type": "string" },
+            "timezone": { "type": "string" }
           }
         }
       },
@@ -539,7 +575,25 @@
             "port": { "type": ["string", "number"] },
             "dbname": { "type": "string" },
             "user": { "type": "string" },
-            "password": { "type": "string" }
+            "password": { "type": "string" },
+            "sslmode": {
+              "type": "string",
+              "enum": ["", "disable", "allow", "prefer", "require", "verify-ca", "verify-full"]
+            },
+            "sslcert": { "type": "string" },
+            "sslkey": { "type": "string" },
+            "sslrootcert": { "type": "string" },
+            "connectTimeoutSeconds": {
+              "oneOf": [
+                { "type": "integer", "minimum": 0 },
+                { "type": "string", "pattern": "^[0-9]*$" }
+              ]
+            },
+            "applicationName": { "type": "string" },
+            "fallbackApplicationName": { "type": "string" },
+            "searchPath": { "type": "string" },
+            "options": { "type": "string" },
+            "timezone": { "type": "string" }
           }
         },
         "instances": {

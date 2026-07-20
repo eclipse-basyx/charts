@@ -1522,6 +1522,18 @@ database:
     dbname: ""
     user: ""
     password: ""
+    # Optional BaSyx Go PostgreSQL settings. These are rendered as optional
+    # POSTGRES_* environment variables for backend services.
+    # sslmode: require
+    # sslcert: /etc/ssl/certs/postgres/client.crt
+    # sslkey: /etc/ssl/certs/postgres/client.key
+    # sslrootcert: /etc/ssl/certs/postgres/ca.crt
+    # connectTimeoutSeconds: 10
+    # applicationName: basyx-go
+    # fallbackApplicationName: basyx-go
+    # searchPath: basyx
+    # options: "-c statement_timeout=30000"
+    # timezone: UTC
   # Backend services can override this global database connection individually:
   #
   # aasRegistry:
@@ -1538,6 +1550,8 @@ database:
   #     dbname: basyx
   #     user: basyx
   #     password: change-me
+  #     sslmode: require
+  #     searchPath: registry_schema
   # name for the cnpg cluster ressource
   # clusterName: "basyx-database"
   # name of database

@@ -443,6 +443,23 @@ password
 jdbc-uri
 ```
 
+For BaSyx Go backend services, the Secret can additionally contain optional PostgreSQL keys:
+
+```text
+sslmode
+sslcert
+sslkey
+sslrootcert
+connectTimeoutSeconds
+applicationName
+fallbackApplicationName
+searchPath
+options
+timezone
+```
+
+These optional keys are rendered as optional `POSTGRES_*` environment variables. `searchPath` becomes `POSTGRES_SEARCHPATH` for BaSyx Go. For generated inline Secrets, it is also translated into the JDBC parameter `currentSchema` so Keycloak can use the same generated `jdbc-uri`.
+
 Create such a Secret, for example:
 
 ```bash
@@ -452,7 +469,9 @@ kubectl -n basyx-custom create secret generic basyx-external-postgres \
   --from-literal=dbname='basyx' \
   --from-literal=user='basyx' \
   --from-literal=password='change-me' \
-  --from-literal=jdbc-uri='jdbc:postgresql://postgres.example.internal:5432/basyx'
+  --from-literal=jdbc-uri='jdbc:postgresql://postgres.example.internal:5432/basyx?sslmode=require&currentSchema=myschema' \
+  --from-literal=sslmode='require' \
+  --from-literal=searchPath='myschema'
 ```
 
 Then install with the external database overlay:
@@ -477,9 +496,19 @@ database:
     dbname: basyx
     user: basyx
     password: change-me
+    sslmode: require
+    searchPath: myschema
 ```
 
 Inline values are easier to use, but less safe: the password is stored in the values file and in Helm release data. Do not commit real database passwords to Git. Use `existingSecret` for shared, production or GitOps-managed environments.
+
+When the external database is independently managed and expected to be reachable before installing the chart, the Configuration Service database wait initContainer can be disabled:
+
+```yaml
+configurationService:
+  waitForDatabase:
+    enabled: false
+```
 
 #### Service-Specific PostgreSQL Databases
 
@@ -507,7 +536,7 @@ aasRepository:
   # No override: uses the global database above.
 ```
 
-The referenced Secret must contain the same keys as the global external database Secret: `host`, `port`, `dbname`, `user`, `password` and `jdbc-uri`.
+The referenced Secret must contain the same required keys as the global external database Secret: `host`, `port`, `dbname`, `user`, `password` and `jdbc-uri`. It can also contain the optional PostgreSQL keys listed above, for example `sslmode` and `searchPath`.
 
 For quick test deployments, a service can also define the connection inline. The chart renders a service-specific Secret automatically:
 
@@ -521,6 +550,8 @@ aasRegistry:
     dbname: basyx_registry
     user: basyx_registry
     password: change-me
+    sslmode: require
+    searchPath: registry_schema
 ```
 
 Service-specific database overrides are runtime connections only. The built-in `configurationService` migrates the global database connection of the release. If a service points to a different external database, that database must already be initialized by another BaSyx release, by a separate Configuration Service run, or by an operational migration process.
@@ -535,7 +566,7 @@ helm upgrade --install basyx charts/basyx \
   -f values/values.external-db.example.yaml
 ```
 
-When global `database.type: external` is used, the chart does not render a CloudNativePG `Cluster`. The configured external database user must be allowed to create and migrate the BaSyx schema. The `configurationService` still runs by default and initializes or migrates the schema in the existing database.
+When global `database.type: external` is used, the chart does not render a CloudNativePG `Cluster`. The configured external database user must be allowed to create and migrate the BaSyx schema. The `configurationService` still runs by default and initializes or migrates the schema in the existing database. `configurationService.waitForDatabase.enabled: false` only disables the Configuration Service wait initContainer.
 
 ### BaSyx Configuration Service
 

@@ -107,6 +107,13 @@ tests:
       - failedTemplate:
           errorPattern: "database"
 
+  - it: fails when external database sslmode is unsupported
+    values:
+      - fixtures/invalid_external_database_sslmode.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "database"
+
   - it: fails when service-specific external database values are incomplete
     values:
       - fixtures/invalid_service_database_empty_password.yaml

@@ -736,6 +736,15 @@ Create the name of the service account to use
 {{- printf "%s\n%s\n%s\n" (include "database.serviceSecret" .) (toYaml $root.Values.database) (toYaml $serviceDatabase) | sha256sum -}}
 {{- end}}
 
+{{- define "database.optionalEnv" -}}
+- name: {{ .name }}
+  valueFrom:
+    secretKeyRef:
+      name: {{ .secret }}
+      key: {{ .key }}
+      optional: true
+{{- end }}
+
 {{- define "database.managed" -}}
 {{- $type := .Values.database.type | default "postgres" | toString -}}
 {{- if or (eq $type "postgres") (eq $type "managed") (eq $type "cnpg") -}}true{{- else -}}false{{- end -}}
@@ -868,31 +877,42 @@ tls:
 {{- $nameSuffix = .nameSuffix | default "" -}}
 {{- end -}}
 {{- $secretContext := dict "root" $root "component" $component "nameSuffix" $nameSuffix -}}
+{{- $databaseSecret := include "database.serviceSecret" $secretContext -}}
 - name: POSTGRES_PORT
   valueFrom:
     secretKeyRef:
-      name: {{ include "database.serviceSecret" $secretContext }}
+      name: {{ $databaseSecret }}
       key: port
 - name: POSTGRES_HOST
   valueFrom:
     secretKeyRef:
-      name: {{ include "database.serviceSecret" $secretContext }}
+      name: {{ $databaseSecret }}
       key: host
 - name: POSTGRES_PASSWORD
   valueFrom:
     secretKeyRef:
-      name: {{ include "database.serviceSecret" $secretContext }}
+      name: {{ $databaseSecret }}
       key: password
 - name: POSTGRES_DBNAME
   valueFrom:
     secretKeyRef:
-      name: {{ include "database.serviceSecret" $secretContext }}
+      name: {{ $databaseSecret }}
       key: dbname
 - name: POSTGRES_USER
   valueFrom:
     secretKeyRef:
-      name: {{ include "database.serviceSecret" $secretContext }}
+      name: {{ $databaseSecret }}
       key: user
+{{ include "database.optionalEnv" (dict "secret" $databaseSecret "name" "POSTGRES_SSLMODE" "key" "sslmode") }}
+{{ include "database.optionalEnv" (dict "secret" $databaseSecret "name" "POSTGRES_SSLCERT" "key" "sslcert") }}
+{{ include "database.optionalEnv" (dict "secret" $databaseSecret "name" "POSTGRES_SSLKEY" "key" "sslkey") }}
+{{ include "database.optionalEnv" (dict "secret" $databaseSecret "name" "POSTGRES_SSLROOTCERT" "key" "sslrootcert") }}
+{{ include "database.optionalEnv" (dict "secret" $databaseSecret "name" "POSTGRES_CONNECTTIMEOUTSECONDS" "key" "connectTimeoutSeconds") }}
+{{ include "database.optionalEnv" (dict "secret" $databaseSecret "name" "POSTGRES_APPLICATIONNAME" "key" "applicationName") }}
+{{ include "database.optionalEnv" (dict "secret" $databaseSecret "name" "POSTGRES_FALLBACKAPPLICATIONNAME" "key" "fallbackApplicationName") }}
+{{ include "database.optionalEnv" (dict "secret" $databaseSecret "name" "POSTGRES_SEARCHPATH" "key" "searchPath") }}
+{{ include "database.optionalEnv" (dict "secret" $databaseSecret "name" "POSTGRES_OPTIONS" "key" "options") }}
+{{ include "database.optionalEnv" (dict "secret" $databaseSecret "name" "POSTGRES_TIMEZONE" "key" "timezone") }}
 {{- end }}
 
 {{- define "basyx.abac.enabled" -}}

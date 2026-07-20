@@ -1,7 +1,10 @@
 # Example overlay for using an existing PostgreSQL database.
 #
 # Create the referenced Secret in the target namespace before installing the
-# chart. The Secret must contain the keys: host, port, dbname, user, password.
+# chart. The Secret must contain the keys: host, port, dbname, user, password,
+# jdbc-uri. Optional BaSyx Go keys include sslmode, sslcert, sslkey,
+# sslrootcert, connectTimeoutSeconds, applicationName,
+# fallbackApplicationName, searchPath, options and timezone.
 
 database:
   type: external
@@ -19,3 +22,12 @@ database:
   #   dbname: basyx
   #   user: basyx
   #   password: change-me
+  #   sslmode: require
+  #   searchPath: basyx
+
+# External PostgreSQL databases are usually managed independently. Disable the
+# Configuration Service wait initContainer when the database is expected to be
+# reachable before this chart is installed.
+configurationService:
+  waitForDatabase:
+    enabled: false

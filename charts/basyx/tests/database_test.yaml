@@ -64,6 +64,29 @@ tests:
           path: stringData.jdbc-uri
           value: jdbc:postgresql://postgres.example.internal:5432/basyx
 
+  - it: renders optional external database parameters
+    template: templates/database-secret.yaml
+    set:
+      database.type: external
+      database.existingSecret: ""
+      database.external.host: postgres.example.internal
+      database.external.port: "5432"
+      database.external.dbname: basyx
+      database.external.user: basyx
+      database.external.password: change-me
+      database.external.sslmode: require
+      database.external.searchPath: myschema
+    asserts:
+      - equal:
+          path: stringData.sslmode
+          value: require
+      - equal:
+          path: stringData.searchPath
+          value: myschema
+      - equal:
+          path: stringData.jdbc-uri
+          value: jdbc:postgresql://postgres.example.internal:5432/basyx?sslmode=require&currentSchema=myschema
+
   - it: renders an external database jdbc uri when port is numeric
     template: templates/database-secret.yaml
     set:
@@ -177,6 +200,26 @@ tests:
                 name: basyx-external-postgres
                 key: user
           count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_SSLMODE
+            valueFrom:
+              secretKeyRef:
+                name: basyx-external-postgres
+                key: sslmode
+                optional: true
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_SEARCHPATH
+            valueFrom:
+              secretKeyRef:
+                name: basyx-external-postgres
+                key: searchPath
+                optional: true
+          count: 1
 
   - it: lets a backend service use its own existing database secret
     template: templates/aas-registry/deployment.yaml
@@ -214,6 +257,8 @@ tests:
       aasRegistry.database.dbname: aas_registry
       aasRegistry.database.user: aas_registry
       aasRegistry.database.password: change-me
+      aasRegistry.database.sslmode: require
+      aasRegistry.database.searchPath: registry_schema
     asserts:
       - hasDocuments:
           count: 1
@@ -229,8 +274,14 @@ tests:
           path: stringData.dbname
           value: aas_registry
       - equal:
+          path: stringData.sslmode
+          value: require
+      - equal:
+          path: stringData.searchPath
+          value: registry_schema
+      - equal:
           path: stringData.jdbc-uri
-          value: jdbc:postgresql://aas-registry-postgres.example.internal:5432/aas_registry
+          value: jdbc:postgresql://aas-registry-postgres.example.internal:5432/aas_registry?sslmode=require&currentSchema=registry_schema
 
   - it: wires an inline service-specific database secret into a backend service
     template: templates/aas-registry/deployment.yaml
@@ -260,6 +311,16 @@ tests:
               secretKeyRef:
                 name: basyx-aas-registry-database
                 key: user
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_SEARCHPATH
+            valueFrom:
+              secretKeyRef:
+                name: basyx-aas-registry-database
+                key: searchPath
+                optional: true
           count: 1
 
   - it: wires generated inline external database secret into keycloak
