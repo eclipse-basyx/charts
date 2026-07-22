@@ -403,7 +403,7 @@ keycloak:
       - host: "{{ .Values.host }}"
         paths:
           - path: "{{ .Values.paths.keycloak }}"
-            pathType: ImplementationSpecific
+            pathType: Prefix
 
   resources:
     {}
@@ -490,7 +490,7 @@ submodelRepository:
       - host: "{{ .Values.host }}"
         paths:
           - path: "{{ .Values.paths.submodelRepository }}"
-            pathType: ImplementationSpecific
+            pathType: Prefix
   environment:
     # Keep the Submodel Registry in sync when submodels are created, updated or deleted.
     GENERAL_SUBMODELREGISTRYINTEGRATION: true
@@ -580,7 +580,7 @@ submodelRegistry:
       - host: "{{ .Values.host }}"
         paths:
           - path: "{{ .Values.paths.submodelRegistry }}"
-            pathType: ImplementationSpecific
+            pathType: Prefix
   environment: {}
   general: {}
   server: {}
@@ -667,7 +667,7 @@ aasRegistry:
       - host: "{{ .Values.host }}"
         paths:
           - path: "{{ .Values.paths.aasRegistry }}"
-            pathType: ImplementationSpecific
+            pathType: Prefix
 
   # Content of application.yaml
   # central environment variables (will be set in configmap.yaml via tpl interpolation)
@@ -765,7 +765,7 @@ digitalTwinRegistry:
       - host: "{{ .Values.host }}"
         paths:
           - path: "{{ .Values.paths.digitalTwinRegistry }}"
-            pathType: ImplementationSpecific
+            pathType: Prefix
 
   # Content of application.yaml
   # central environment variables (will be set in configmap.yaml via tpl interpolation)
@@ -863,7 +863,7 @@ aasRepository:
       - host: "{{ .Values.host }}"
         paths:
           - path: "{{ .Values.paths.aasRepository }}"
-            pathType: ImplementationSpecific
+            pathType: Prefix
 
   # Content of application.yaml
   # central environment variables (will be set in configmap.yaml via tpl interpolation)
@@ -958,7 +958,7 @@ aasEnvironment:
       - host: "{{ .Values.host }}"
         paths:
           - path: "{{ .Values.paths.aasEnvironment }}"
-            pathType: ImplementationSpecific
+            pathType: Prefix
 
   # AAS Environment bundles the AAS, submodel, concept description, registry
   # and discovery APIs in one service. Preconfigured AAS files can be imported
@@ -1057,7 +1057,7 @@ dppApi:
       - host: "{{ .Values.host }}"
         paths:
           - path: "{{ .Values.paths.dppApi }}"
-            pathType: ImplementationSpecific
+            pathType: Prefix
 
   # The DPP API composes Digital Product Passport data with the shared BaSyx
   # database. The default history settings mirror the BaSyx DPP API example.
@@ -1149,7 +1149,7 @@ cdRepository:
       - host: "{{ .Values.host }}"
         paths:
           - path: "{{ .Values.paths.cdRepository }}"
-            pathType: ImplementationSpecific
+            pathType: Prefix
 
   # Content of application.yaml
   # central environment variables (will be set in configmap.yaml via tpl interpolation)
@@ -1235,7 +1235,7 @@ companyLookup:
       - host: "{{ .Values.host }}"
         paths:
           - path: "{{ .Values.paths.companyLookup }}"
-            pathType: ImplementationSpecific
+            pathType: Prefix
   environment: {}
   general: {}
   server: {}
@@ -1321,7 +1321,7 @@ aasDiscovery:
       - host: "{{ .Values.host }}"
         paths:
           - path: "{{ .Values.paths.aasDiscovery }}"
-            pathType: ImplementationSpecific
+            pathType: Prefix
 
   # central environment variables (will be set in configmap.yaml via tpl interpolation)
   environment: {}
@@ -1453,7 +1453,7 @@ aasWebGui:
       - host: "{{ .Values.host }}"
         paths:
           - path: "{{ .Values.paths.aasWebUi }}"
-            pathType: ImplementationSpecific
+            pathType: Prefix
 
   resources: {}
     # limits:

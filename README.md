@@ -364,6 +364,8 @@ The chart sets `spec.privateKey.rotationPolicy: Always` on the generated CA cert
 
 The chart defaults to nginx ingress, but the generated Kubernetes Ingress resources are not nginx-specific. Configure another ingress controller globally with `ingress.className` and `ingress.annotations`; individual services can still override those settings under `<service>.ingress`.
 
+Service routes use Kubernetes `pathType: Prefix` by default because it is portable across common ingress controllers. Override `<service>.ingress.hosts[].paths[].pathType` only when your controller explicitly requires another mode such as `ImplementationSpecific`.
+
 Example for Azure Application Gateway Ingress Controller:
 
 ```yaml
