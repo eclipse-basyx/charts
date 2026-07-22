@@ -26,6 +26,9 @@ tls:
   enabled: true
   hosts:
     - "{{ .Values.host }}"
+  # Optional existing TLS Secret for all generated ingress resources. Defaults
+  # to "<release-name>-tls-secret" when empty.
+  secretName: ""
 
 internal:
   CACertificates:
@@ -54,6 +57,11 @@ internal:
 
 
 ingress:
+  # Global ingress defaults inherited by all service ingress resources. Services
+  # can still override className and annotations under <service>.ingress.
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
   clusterIssuer: ""
   issuer: ""
   certificateIssuer:
@@ -389,7 +397,7 @@ keycloak:
 
   ingress:
     enabled: true
-    className: nginx
+    className: ""
     annotations: {}
     hosts:
       - host: "{{ .Values.host }}"
@@ -476,9 +484,8 @@ submodelRepository:
     port: "8080"
   ingress:
     enabled: true
-    className: nginx
-    annotations:
-      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    className: ""
+    annotations: {}
     hosts:
       - host: "{{ .Values.host }}"
         paths:
@@ -567,9 +574,8 @@ submodelRegistry:
     port: "8080"
   ingress:
     enabled: true
-    className: nginx
-    annotations:
-      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    className: ""
+    annotations: {}
     hosts:
       - host: "{{ .Values.host }}"
         paths:
@@ -655,9 +661,8 @@ aasRegistry:
     port: "8080"
   ingress:
     enabled: true
-    className: nginx
-    annotations:
-      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    className: ""
+    annotations: {}
     hosts:
       - host: "{{ .Values.host }}"
         paths:
@@ -754,9 +759,8 @@ digitalTwinRegistry:
     port: "8080"
   ingress:
     enabled: true
-    className: nginx
-    annotations:
-      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    className: ""
+    annotations: {}
     hosts:
       - host: "{{ .Values.host }}"
         paths:
@@ -853,9 +857,8 @@ aasRepository:
     port: "8080"
   ingress:
     enabled: true
-    className: nginx
-    annotations:
-      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    className: ""
+    annotations: {}
     hosts:
       - host: "{{ .Values.host }}"
         paths:
@@ -949,9 +952,8 @@ aasEnvironment:
     port: "8082"
   ingress:
     enabled: true
-    className: nginx
-    annotations:
-      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    className: ""
+    annotations: {}
     hosts:
       - host: "{{ .Values.host }}"
         paths:
@@ -1049,9 +1051,8 @@ dppApi:
     port: "8080"
   ingress:
     enabled: true
-    className: nginx
-    annotations:
-      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    className: ""
+    annotations: {}
     hosts:
       - host: "{{ .Values.host }}"
         paths:
@@ -1142,9 +1143,8 @@ cdRepository:
     port: "8080"
   ingress:
     enabled: true
-    className: nginx
-    annotations:
-      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    className: ""
+    annotations: {}
     hosts:
       - host: "{{ .Values.host }}"
         paths:
@@ -1229,9 +1229,8 @@ companyLookup:
     port: "5080"
   ingress:
     enabled: true
-    className: nginx
-    annotations:
-      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    className: ""
+    annotations: {}
     hosts:
       - host: "{{ .Values.host }}"
         paths:
@@ -1316,9 +1315,8 @@ aasDiscovery:
     port: "8081"
   ingress:
     enabled: true
-    className: nginx
-    annotations:
-      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    className: ""
+    annotations: {}
     hosts:
       - host: "{{ .Values.host }}"
         paths:
@@ -1449,9 +1447,8 @@ aasWebGui:
 
   ingress:
     enabled: true
-    className: nginx
-    annotations:
-      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    className: ""
+    annotations: {}
     hosts:
       - host: "{{ .Values.host }}"
         paths:

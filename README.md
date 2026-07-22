@@ -62,7 +62,7 @@ You need:
 
 - A Kubernetes cluster and a working `kubectl` context
 - Helm 3
-- An ingress controller, usually nginx ingress
+- An ingress controller, for example nginx ingress or Azure Application Gateway Ingress Controller
 - cert-manager, because the chart renders `cert-manager.io/v1` resources
 - CloudNativePG, because the chart renders `postgresql.cnpg.io/v1` database clusters
 - Optional: `helm-unittest` for local chart tests
@@ -350,12 +350,41 @@ CloudNativePG database PVCs and manually created secrets may need separate clean
 | --- | --- |
 | `tls.enabled` | Enables TLS-related mounts and ingress TLS rendering. |
 | `tls.hosts` | Hosts included in rendered TLS resources. |
+| `tls.secretName` | Existing TLS Secret used by all generated ingress resources. Defaults to `<release-name>-tls-secret` when empty. |
+| `ingress.className` | Global `spec.ingressClassName` default inherited by all service ingress resources. Defaults to `nginx`. |
+| `ingress.annotations` | Global ingress annotations merged into all service ingress resources. Service-local annotations override global annotations. |
 | `ingress.issuer` | Existing namespaced cert-manager issuer for ingress certificates. |
 | `ingress.clusterIssuer` | Existing cluster issuer for ingress certificates. |
 | `internal.certificateIssuer.autocreateCa` | Creates an internal self-signed CA and issuer. |
 | `internal.certificateIssuer.name` | Internal issuer name used by generated certificates. |
 
 The chart sets `spec.privateKey.rotationPolicy: Always` on the generated CA certificate to avoid cert-manager v1.18+ default-change warnings.
+
+### Ingress Controllers
+
+The chart defaults to nginx ingress, but the generated Kubernetes Ingress resources are not nginx-specific. Configure another ingress controller globally with `ingress.className` and `ingress.annotations`; individual services can still override those settings under `<service>.ingress`.
+
+Example for Azure Application Gateway Ingress Controller:
+
+```yaml
+host: basyx.example.com
+
+tls:
+  enabled: true
+  secretName: tls-secret
+  hosts:
+    - "{{ .Values.host }}"
+
+ingress:
+  className: azure-application-gateway
+  clusterIssuer: letsencrypt
+  annotations:
+    kubernetes.io/ingress.class: azure/application-gateway
+    appgw.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: null
+```
+
+`null` removes an inherited default annotation. This is useful when switching away from nginx and avoiding nginx-specific annotations on non-nginx controllers.
 
 ### Additional CA Certificates
 

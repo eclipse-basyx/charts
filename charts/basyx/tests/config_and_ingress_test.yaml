@@ -10,6 +10,7 @@ templates:
   - templates/aas-web-gui/deployment.yaml
   - templates/aas-discovery/deployment.yaml
   - templates/aas-discovery/ingress.yaml
+  - templates/aas-registry/ingress.yaml
   - templates/aas-environment/ingress.yaml
   - templates/dpp-api/ingress.yaml
   - templates/company-lookup/ingress.yaml
@@ -449,6 +450,50 @@ tests:
       - equal:
           path: spec.tls[0].secretName
           value: basyx-tls-secret
+
+  - it: renders global ingress defaults for backend services
+    template: templates/aas-registry/ingress.yaml
+    set:
+      aasRegistry.enabled: true
+    asserts:
+      - equal:
+          path: spec.ingressClassName
+          value: nginx
+      - equal:
+          path: metadata.annotations["nginx.ingress.kubernetes.io/proxy-body-size"]
+          value: "0"
+      - equal:
+          path: spec.tls[0].hosts[0]
+          value: basyx.example.com
+      - equal:
+          path: spec.tls[0].secretName
+          value: basyx-tls-secret
+
+  - it: renders Azure Application Gateway ingress settings from global ingress values
+    template: templates/aas-registry/ingress.yaml
+    values:
+      - fixtures/azure_application_gateway_ingress.yaml
+    asserts:
+      - equal:
+          path: spec.ingressClassName
+          value: azure-application-gateway
+      - equal:
+          path: metadata.annotations["kubernetes.io/ingress.class"]
+          value: azure/application-gateway
+      - equal:
+          path: metadata.annotations["appgw.ingress.kubernetes.io/ssl-redirect"]
+          value: "true"
+      - equal:
+          path: metadata.annotations["cert-manager.io/cluster-issuer"]
+          value: letsencrypt
+      - notExists:
+          path: metadata.annotations["nginx.ingress.kubernetes.io/proxy-body-size"]
+      - equal:
+          path: spec.tls[0].hosts[0]
+          value: agic.example.com
+      - equal:
+          path: spec.tls[0].secretName
+          value: tls-secret
 
   - it: renders the company lookup ingress with its own path and port
     template: templates/company-lookup/ingress.yaml
