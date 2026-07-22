@@ -107,7 +107,12 @@ general:
   externalUrl: ""
   trustProxyHeaders: false
   trustedProxyCIDRs: []
-  uploadMaxSizeBytes: 0
+  uploadMaxSizeBytes: 134217728
+  aasxMaxPartCount: 10000
+  aasxMaxOPCMetadataSizeBytes: 16777216
+  aasxMaxPartExpandedSizeBytes: 134217728
+  aasxMaxTotalExpandedSizeBytes: 134217728
+  aasxMaxThumbnailSizeBytes: 16777216
   bulkBatchLimit: 1000
   # Comma-rendered into GENERAL_AAS_PRECONFIG_PATHS. Mount matching files or
   # directories with the service-specific volumes/volumeMounts when used.
@@ -230,9 +235,9 @@ keycloak:
   webUiClientId: basyx-ui
   initJob:
     image:
-      repository: peterevans/curl-jq
+      repository: registry.gitlab.com/gitlab-ci-utils/curl-jq
       pullPolicy: IfNotPresent
-      tag: "1.0"
+      tag: "4.0.3"
       digest: ""
   tests:
     realmCheck:
@@ -1369,7 +1374,7 @@ aasWebGui:
   image:
     repository: eclipsebasyx/aas-gui
     pullPolicy: Always
-    tag: v2-260707
+    tag: v2-260721
   imagePullSecrets: []
   nameOverride: "aas-gui"
   fullnameOverride: "aas-gui"

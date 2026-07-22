@@ -366,7 +366,12 @@
           "type": "array",
           "items": { "type": "string" }
         },
-        "uploadMaxSizeBytes": { "type": "integer", "minimum": 0 },
+        "uploadMaxSizeBytes": { "type": "integer", "minimum": 1 },
+        "aasxMaxPartCount": { "type": "integer", "minimum": 1 },
+        "aasxMaxOPCMetadataSizeBytes": { "type": "integer", "minimum": 1 },
+        "aasxMaxPartExpandedSizeBytes": { "type": "integer", "minimum": 1 },
+        "aasxMaxTotalExpandedSizeBytes": { "type": "integer", "minimum": 1 },
+        "aasxMaxThumbnailSizeBytes": { "type": "integer", "minimum": 1 },
         "bulkBatchLimit": { "type": "integer", "minimum": 1 },
         "aasPreconfigPaths": {
           "type": "array",

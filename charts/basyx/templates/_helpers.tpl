@@ -102,11 +102,23 @@ Render an image reference, preferring digest over tag when provided.
 {{- end }}
 
 {{/*
+Render scalar config values. Large numeric YAML values may arrive as float64;
+format them without scientific notation so environment variables stay valid.
+*/}}
+{{- define "basyx.configValue" -}}
+{{- if kindIs "float64" .value -}}
+{{- printf "%.0f" .value -}}
+{{- else -}}
+{{- tpl (print .value) .root -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Render a common config entry unless the raw environment map explicitly overrides it.
 */}}
 {{- define "basyx.commonConfig.entry" -}}
 {{- if not (hasKey .common .name) }}
-{{ .name }}: {{ tpl (print .value) .root | quote }}
+{{ .name }}: {{ include "basyx.configValue" (dict "root" .root "value" .value) | quote }}
 {{- end }}
 {{- end }}
 
@@ -127,7 +139,7 @@ and takes precedence.
 {{- define "basyx.serviceRuntimeEnv.entry" -}}
 {{- if and (hasKey .config .key) (not (hasKey .environment .name)) }}
 - name: {{ .name }}
-  value: {{ tpl (print (get .config .key)) .root | quote }}
+  value: {{ include "basyx.configValue" (dict "root" .root "value" (get .config .key)) | quote }}
 {{- end }}
 {{- end }}
 
@@ -166,7 +178,12 @@ The environment.common map remains the escape hatch and takes precedence.
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_EXTERNALURL" "value" (dig "externalUrl" "" $general)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_TRUSTPROXYHEADERS" "value" (dig "trustProxyHeaders" false $general)) }}
 {{- include "basyx.commonConfig.listEntry" (dict "common" $common "name" "GENERAL_TRUSTEDPROXYCIDRS" "value" (dig "trustedProxyCIDRs" (list) $general)) }}
-{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_UPLOADMAXSIZEBYTES" "value" (dig "uploadMaxSizeBytes" 0 $general)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_UPLOADMAXSIZEBYTES" "value" (dig "uploadMaxSizeBytes" 134217728 $general)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_AASXMAXPARTCOUNT" "value" (dig "aasxMaxPartCount" 10000 $general)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_AASXMAXOPCMETADATASIZEBYTES" "value" (dig "aasxMaxOPCMetadataSizeBytes" 16777216 $general)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_AASXMAXPARTEXPANDEDSIZEBYTES" "value" (dig "aasxMaxPartExpandedSizeBytes" 134217728 $general)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_AASXMAXTOTALEXPANDEDSIZEBYTES" "value" (dig "aasxMaxTotalExpandedSizeBytes" 134217728 $general)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_AASXMAXTHUMBNAILSIZEBYTES" "value" (dig "aasxMaxThumbnailSizeBytes" 16777216 $general)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_BULK_BATCH_LIMIT" "value" (dig "bulkBatchLimit" 1000 $general)) }}
 {{- include "basyx.commonConfig.listEntry" (dict "common" $common "name" "GENERAL_AAS_PRECONFIG_PATHS" "value" (dig "aasPreconfigPaths" (list) $general)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "SERVER_READ_HEADER_TIMEOUT_SECONDS" "value" (dig "readHeaderTimeoutSeconds" 15 $server)) }}
@@ -232,6 +249,11 @@ Render service-local BaSyx runtime overrides as explicit container env values.
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "trustProxyHeaders" "name" "GENERAL_TRUSTPROXYHEADERS") }}
 {{- include "basyx.serviceRuntimeEnv.listEntry" (dict "environment" $environment "config" $general "key" "trustedProxyCIDRs" "name" "GENERAL_TRUSTEDPROXYCIDRS") }}
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "uploadMaxSizeBytes" "name" "GENERAL_UPLOADMAXSIZEBYTES") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "aasxMaxPartCount" "name" "GENERAL_AASXMAXPARTCOUNT") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "aasxMaxOPCMetadataSizeBytes" "name" "GENERAL_AASXMAXOPCMETADATASIZEBYTES") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "aasxMaxPartExpandedSizeBytes" "name" "GENERAL_AASXMAXPARTEXPANDEDSIZEBYTES") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "aasxMaxTotalExpandedSizeBytes" "name" "GENERAL_AASXMAXTOTALEXPANDEDSIZEBYTES") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "aasxMaxThumbnailSizeBytes" "name" "GENERAL_AASXMAXTHUMBNAILSIZEBYTES") }}
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "bulkBatchLimit" "name" "GENERAL_BULK_BATCH_LIMIT") }}
 {{- include "basyx.serviceRuntimeEnv.listEntry" (dict "environment" $environment "config" $general "key" "aasPreconfigPaths" "name" "GENERAL_AAS_PRECONFIG_PATHS") }}
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $server "key" "readHeaderTimeoutSeconds" "name" "SERVER_READ_HEADER_TIMEOUT_SECONDS") }}

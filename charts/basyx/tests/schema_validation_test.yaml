@@ -79,6 +79,13 @@ tests:
       - failedTemplate:
           errorPattern: "general.bulkBatchLimit"
 
+  - it: fails when upload and AASX package limits are below one
+    values:
+      - fixtures/invalid_general_aasx_limits.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "general"
+
   - it: fails when server timeout is below one
     values:
       - fixtures/invalid_server_timeout.yaml

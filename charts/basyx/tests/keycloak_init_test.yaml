@@ -74,6 +74,9 @@ tests:
           path: metadata.name
           value: basyx-keycloak-init
       - equal:
+          path: spec.template.spec.containers[0].image
+          value: registry.gitlab.com/gitlab-ci-utils/curl-jq:4.0.3
+      - equal:
           path: spec.template.spec.containers[0].env[0].value
           value: http://basyx-keycloak:9096
       - equal:

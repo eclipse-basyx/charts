@@ -873,7 +873,12 @@ Raw environment maps are the escape hatch and take precedence over structured va
 | `general.externalUrl` | `GENERAL_EXTERNALURL` | Public external URL used by registry synchronization. |
 | `general.trustProxyHeaders` | `GENERAL_TRUSTPROXYHEADERS` | Trusts forwarded proxy headers. Only enable behind trusted reverse proxies. |
 | `general.trustedProxyCIDRs` | `GENERAL_TRUSTEDPROXYCIDRS` | Comma-separated trusted proxy CIDR list. |
-| `general.uploadMaxSizeBytes` | `GENERAL_UPLOADMAXSIZEBYTES` | Maximum upload size in bytes. `0` keeps the service default. |
+| `general.uploadMaxSizeBytes` | `GENERAL_UPLOADMAXSIZEBYTES` | Maximum compressed HTTP request size, including multipart overhead, in bytes. Must be greater than `0`. |
+| `general.aasxMaxPartCount` | `GENERAL_AASXMAXPARTCOUNT` | Maximum number of non-directory entries in an AASX package. |
+| `general.aasxMaxOPCMetadataSizeBytes` | `GENERAL_AASXMAXOPCMETADATASIZEBYTES` | Maximum combined expanded size of AASX OPC metadata. |
+| `general.aasxMaxPartExpandedSizeBytes` | `GENERAL_AASXMAXPARTEXPANDEDSIZEBYTES` | Maximum expanded size of one AASX payload part. |
+| `general.aasxMaxTotalExpandedSizeBytes` | `GENERAL_AASXMAXTOTALEXPANDEDSIZEBYTES` | Maximum combined expanded size of all AASX payload parts. |
+| `general.aasxMaxThumbnailSizeBytes` | `GENERAL_AASXMAXTHUMBNAILSIZEBYTES` | Maximum expanded size of an AASX thumbnail. |
 | `general.bulkBatchLimit` | `GENERAL_BULK_BATCH_LIMIT` | Maximum row count per generated bulk SQL statement. Must be greater than `0`. |
 | `general.aasPreconfigPaths` | `GENERAL_AAS_PRECONFIG_PATHS` | Comma-separated paths for preconfigured AAS input. Mount matching files or directories with service-specific `volumes` and `volumeMounts`. |
 

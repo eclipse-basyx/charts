@@ -46,6 +46,24 @@ tests:
       - equal:
           path: stringData.SERVER_SHUTDOWN_TIMEOUT_SECONDS
           value: "10"
+      - equal:
+          path: stringData.GENERAL_UPLOADMAXSIZEBYTES
+          value: "134217728"
+      - equal:
+          path: stringData.GENERAL_AASXMAXPARTCOUNT
+          value: "10000"
+      - equal:
+          path: stringData.GENERAL_AASXMAXOPCMETADATASIZEBYTES
+          value: "16777216"
+      - equal:
+          path: stringData.GENERAL_AASXMAXPARTEXPANDEDSIZEBYTES
+          value: "134217728"
+      - equal:
+          path: stringData.GENERAL_AASXMAXTOTALEXPANDEDSIZEBYTES
+          value: "134217728"
+      - equal:
+          path: stringData.GENERAL_AASXMAXTHUMBNAILSIZEBYTES
+          value: "16777216"
 
   - it: renders structured BaSyx runtime configuration into the common secret
     template: templates/secret.yaml
@@ -55,6 +73,12 @@ tests:
     set:
       aasDiscovery.enabled: true
       general.trustProxyHeaders: true
+      general.uploadMaxSizeBytes: 268435456
+      general.aasxMaxPartCount: 20000
+      general.aasxMaxOPCMetadataSizeBytes: 33554432
+      general.aasxMaxPartExpandedSizeBytes: 268435456
+      general.aasxMaxTotalExpandedSizeBytes: 536870912
+      general.aasxMaxThumbnailSizeBytes: 8388608
       general.bulkBatchLimit: 500
       general.aasPreconfigPaths[0]: /app/preconfiguration
       server.readHeaderTimeoutSeconds: 20
@@ -85,6 +109,24 @@ tests:
       - equal:
           path: stringData.GENERAL_AAS_PRECONFIG_PATHS
           value: /app/preconfiguration
+      - equal:
+          path: stringData.GENERAL_UPLOADMAXSIZEBYTES
+          value: "268435456"
+      - equal:
+          path: stringData.GENERAL_AASXMAXPARTCOUNT
+          value: "20000"
+      - equal:
+          path: stringData.GENERAL_AASXMAXOPCMETADATASIZEBYTES
+          value: "33554432"
+      - equal:
+          path: stringData.GENERAL_AASXMAXPARTEXPANDEDSIZEBYTES
+          value: "268435456"
+      - equal:
+          path: stringData.GENERAL_AASXMAXTOTALEXPANDEDSIZEBYTES
+          value: "536870912"
+      - equal:
+          path: stringData.GENERAL_AASXMAXTHUMBNAILSIZEBYTES
+          value: "8388608"
       - equal:
           path: stringData.GENERAL_BULK_BATCH_LIMIT
           value: "500"
@@ -163,6 +205,8 @@ tests:
       environment.common.BASYX_HISTORY_MODE: api
       general.bulkBatchLimit: 500
       environment.common.GENERAL_BULK_BATCH_LIMIT: 250
+      general.aasxMaxPartCount: 20000
+      environment.common.GENERAL_AASXMAXPARTCOUNT: 15000
       server.readTimeoutSeconds: 600
       environment.common.SERVER_READ_TIMEOUT_SECONDS: 120
       abac.policyScope: structured-scope
@@ -174,6 +218,9 @@ tests:
       - equal:
           path: stringData.GENERAL_BULK_BATCH_LIMIT
           value: "250"
+      - equal:
+          path: stringData.GENERAL_AASXMAXPARTCOUNT
+          value: "15000"
       - equal:
           path: stringData.SERVER_READ_TIMEOUT_SECONDS
           value: "120"
