@@ -10,7 +10,6 @@ ingress:
   className: azure-application-gateway
   clusterIssuer: letsencrypt
   annotations:
-    kubernetes.io/ingress.class: azure/application-gateway
     appgw.ingress.kubernetes.io/ssl-redirect: "true"
     nginx.ingress.kubernetes.io/proxy-body-size: null
 

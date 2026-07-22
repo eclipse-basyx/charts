@@ -379,12 +379,11 @@ ingress:
   className: azure-application-gateway
   clusterIssuer: letsencrypt
   annotations:
-    kubernetes.io/ingress.class: azure/application-gateway
     appgw.ingress.kubernetes.io/ssl-redirect: "true"
     nginx.ingress.kubernetes.io/proxy-body-size: null
 ```
 
-`null` removes an inherited default annotation. This is useful when switching away from nginx and avoiding nginx-specific annotations on non-nginx controllers.
+Use `ingress.className` for AGIC instead of the legacy `kubernetes.io/ingress.class` annotation. Kubernetes rejects manifests when both values are set and do not match exactly. `null` removes an inherited default annotation, which is useful when switching away from nginx and avoiding nginx-specific annotations on non-nginx controllers.
 
 ### Additional CA Certificates
 

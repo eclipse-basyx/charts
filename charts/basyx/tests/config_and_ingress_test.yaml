@@ -477,9 +477,8 @@ tests:
       - equal:
           path: spec.ingressClassName
           value: azure-application-gateway
-      - equal:
+      - notExists:
           path: metadata.annotations["kubernetes.io/ingress.class"]
-          value: azure/application-gateway
       - equal:
           path: metadata.annotations["appgw.ingress.kubernetes.io/ssl-redirect"]
           value: "true"
