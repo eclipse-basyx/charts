@@ -1557,7 +1557,7 @@ database:
   #     password: change-me
   #     sslmode: require
   #     searchPath: registry_schema
-  # name for the cnpg cluster ressource
+  # name for the cnpg cluster resource
   # clusterName: "basyx-database"
   # name of database
   # database: "basyx"
