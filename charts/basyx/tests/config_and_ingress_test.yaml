@@ -271,7 +271,13 @@ tests:
           pattern: 'submodelService:'
       - matchRegex:
           path: data["basyx-infra.yml"]
-          pattern: 'baseUrl: https://basyx\.example\.com/submodel-repo'
+          pattern: 'baseUrl: https://basyx\.example\.com/submodel-repo/submodels'
+      - matchRegex:
+          path: data["basyx-infra.yml"]
+          pattern: 'companyLookup:'
+      - matchRegex:
+          path: data["basyx-infra.yml"]
+          pattern: 'baseUrl: https://basyx\.example\.com/company-lookup'
       - notMatchRegex:
           path: data["basyx-infra.yml"]
           pattern: 'aasRepository:'
