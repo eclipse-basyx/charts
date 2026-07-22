@@ -74,6 +74,8 @@ tests:
       aasRepository.history.evidence.enabled: true
       aasRepository.eventing.topicPrefix: aas-repository-events
       aasRepository.general.aasPreconfigPaths[0]: /aas/preconfigured
+      aasRepository.general.aasxMaxPartCount: 12000
+      aasRepository.general.aasxMaxTotalExpandedSizeBytes: 268435456
       aasRepository.general.bulkBatchLimit: 250
       aasRepository.server.readTimeoutSeconds: 120
       aasRepository.server.shutdownTimeoutSeconds: 20
@@ -104,6 +106,18 @@ tests:
           content:
             name: GENERAL_AAS_PRECONFIG_PATHS
             value: /aas/preconfigured
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GENERAL_AASXMAXPARTCOUNT
+            value: "12000"
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GENERAL_AASXMAXTOTALEXPANDEDSIZEBYTES
+            value: "268435456"
           count: 1
       - contains:
           path: spec.template.spec.containers[0].env
@@ -150,6 +164,8 @@ tests:
       aasRepository.environment.BASYX_HISTORY_MODE: audit
       aasRepository.general.bulkBatchLimit: 250
       aasRepository.environment.GENERAL_BULK_BATCH_LIMIT: 100
+      aasRepository.general.aasxMaxPartCount: 12000
+      aasRepository.environment.GENERAL_AASXMAXPARTCOUNT: 11000
       aasRepository.server.readTimeoutSeconds: 120
       aasRepository.environment.SERVER_READ_TIMEOUT_SECONDS: 90
       aasRepository.abac.policyScope: structured-scope
@@ -166,6 +182,12 @@ tests:
           content:
             name: GENERAL_BULK_BATCH_LIMIT
             value: "100"
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GENERAL_AASXMAXPARTCOUNT
+            value: "11000"
           count: 1
       - contains:
           path: spec.template.spec.containers[0].env

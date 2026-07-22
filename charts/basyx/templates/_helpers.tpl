@@ -102,11 +102,23 @@ Render an image reference, preferring digest over tag when provided.
 {{- end }}
 
 {{/*
+Render scalar config values. Large numeric YAML values may arrive as float64;
+format them without scientific notation so environment variables stay valid.
+*/}}
+{{- define "basyx.configValue" -}}
+{{- if kindIs "float64" .value -}}
+{{- printf "%.0f" .value -}}
+{{- else -}}
+{{- tpl (print .value) .root -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Render a common config entry unless the raw environment map explicitly overrides it.
 */}}
 {{- define "basyx.commonConfig.entry" -}}
 {{- if not (hasKey .common .name) }}
-{{ .name }}: {{ tpl (print .value) .root | quote }}
+{{ .name }}: {{ include "basyx.configValue" (dict "root" .root "value" .value) | quote }}
 {{- end }}
 {{- end }}
 
@@ -127,7 +139,7 @@ and takes precedence.
 {{- define "basyx.serviceRuntimeEnv.entry" -}}
 {{- if and (hasKey .config .key) (not (hasKey .environment .name)) }}
 - name: {{ .name }}
-  value: {{ tpl (print (get .config .key)) .root | quote }}
+  value: {{ include "basyx.configValue" (dict "root" .root "value" (get .config .key)) | quote }}
 {{- end }}
 {{- end }}
 
@@ -166,7 +178,12 @@ The environment.common map remains the escape hatch and takes precedence.
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_EXTERNALURL" "value" (dig "externalUrl" "" $general)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_TRUSTPROXYHEADERS" "value" (dig "trustProxyHeaders" false $general)) }}
 {{- include "basyx.commonConfig.listEntry" (dict "common" $common "name" "GENERAL_TRUSTEDPROXYCIDRS" "value" (dig "trustedProxyCIDRs" (list) $general)) }}
-{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_UPLOADMAXSIZEBYTES" "value" (dig "uploadMaxSizeBytes" 0 $general)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_UPLOADMAXSIZEBYTES" "value" (dig "uploadMaxSizeBytes" 134217728 $general)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_AASXMAXPARTCOUNT" "value" (dig "aasxMaxPartCount" 10000 $general)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_AASXMAXOPCMETADATASIZEBYTES" "value" (dig "aasxMaxOPCMetadataSizeBytes" 16777216 $general)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_AASXMAXPARTEXPANDEDSIZEBYTES" "value" (dig "aasxMaxPartExpandedSizeBytes" 134217728 $general)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_AASXMAXTOTALEXPANDEDSIZEBYTES" "value" (dig "aasxMaxTotalExpandedSizeBytes" 134217728 $general)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_AASXMAXTHUMBNAILSIZEBYTES" "value" (dig "aasxMaxThumbnailSizeBytes" 16777216 $general)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_BULK_BATCH_LIMIT" "value" (dig "bulkBatchLimit" 1000 $general)) }}
 {{- include "basyx.commonConfig.listEntry" (dict "common" $common "name" "GENERAL_AAS_PRECONFIG_PATHS" "value" (dig "aasPreconfigPaths" (list) $general)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "SERVER_READ_HEADER_TIMEOUT_SECONDS" "value" (dig "readHeaderTimeoutSeconds" 15 $server)) }}
@@ -232,6 +249,11 @@ Render service-local BaSyx runtime overrides as explicit container env values.
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "trustProxyHeaders" "name" "GENERAL_TRUSTPROXYHEADERS") }}
 {{- include "basyx.serviceRuntimeEnv.listEntry" (dict "environment" $environment "config" $general "key" "trustedProxyCIDRs" "name" "GENERAL_TRUSTEDPROXYCIDRS") }}
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "uploadMaxSizeBytes" "name" "GENERAL_UPLOADMAXSIZEBYTES") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "aasxMaxPartCount" "name" "GENERAL_AASXMAXPARTCOUNT") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "aasxMaxOPCMetadataSizeBytes" "name" "GENERAL_AASXMAXOPCMETADATASIZEBYTES") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "aasxMaxPartExpandedSizeBytes" "name" "GENERAL_AASXMAXPARTEXPANDEDSIZEBYTES") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "aasxMaxTotalExpandedSizeBytes" "name" "GENERAL_AASXMAXTOTALEXPANDEDSIZEBYTES") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "aasxMaxThumbnailSizeBytes" "name" "GENERAL_AASXMAXTHUMBNAILSIZEBYTES") }}
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "bulkBatchLimit" "name" "GENERAL_BULK_BATCH_LIMIT") }}
 {{- include "basyx.serviceRuntimeEnv.listEntry" (dict "environment" $environment "config" $general "key" "aasPreconfigPaths" "name" "GENERAL_AAS_PRECONFIG_PATHS") }}
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $server "key" "readHeaderTimeoutSeconds" "name" "SERVER_READ_HEADER_TIMEOUT_SECONDS") }}
@@ -295,6 +317,7 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
         checksum/common-config: {{ include "common.config.checksum" $root }}
+        checksum/database-config: {{ include "database.serviceChecksum" (dict "root" $root "component" .component "nameSuffix" .nameSuffix) }}
         {{- if eq (include "basyx.abac.enabled" $abac) "true" }}
         checksum/abac-config: {{ include "basyx.abac.checksum" $abac }}
         {{- end }}
@@ -335,7 +358,7 @@ spec:
               containerPort: {{ $values.service.port }}
               protocol: TCP
           env:
-            {{- include "common-database-config" $root | nindent 12 }}
+            {{- include "common-database-config" (dict "root" $root "component" .component "nameSuffix" .nameSuffix) | nindent 12 }}
             - name: SERVER_PORT
               value: {{ $values.service.port | quote }}
             - name: SERVER_CONTEXTPATH
@@ -684,7 +707,69 @@ Create the name of the service account to use
 {{- end }}
 
 {{- define "database-secret" -}}
-{{- printf "%s-app" .Values.database.clusterName  | trunc 63 | trimSuffix "-" }}
+{{- if eq (include "database.managed" .) "false" -}}
+{{- if .Values.database.existingSecret -}}
+{{- .Values.database.existingSecret | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- include "database.generatedSecretName" . -}}
+{{- end -}}
+{{- else -}}
+{{- printf "%s-app" .Values.database.clusterName  | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+{{- end}}
+
+{{- define "database.generatedSecretName" -}}
+{{- printf "%s-external-database" (include "basyx.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end}}
+
+{{- define "database.serviceGeneratedSecretName" -}}
+{{- $root := .root -}}
+{{- $name := .nameSuffix | default .component | toString | kebabcase -}}
+{{- printf "%s-%s-database" (include "basyx.fullname" $root) $name | trunc 63 | trimSuffix "-" -}}
+{{- end}}
+
+{{- define "database.serviceSecret" -}}
+{{- $root := .root | default . -}}
+{{- $component := .component | default "" -}}
+{{- $componentValues := dict -}}
+{{- if $component -}}
+{{- $componentValues = get $root.Values $component | default dict -}}
+{{- end -}}
+{{- $serviceDatabase := get $componentValues "database" | default dict -}}
+{{- if and $component $serviceDatabase -}}
+{{- if $serviceDatabase.existingSecret -}}
+{{- $serviceDatabase.existingSecret | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- include "database.serviceGeneratedSecretName" . -}}
+{{- end -}}
+{{- else -}}
+{{- include "database-secret" $root -}}
+{{- end -}}
+{{- end}}
+
+{{- define "database.serviceChecksum" -}}
+{{- $root := .root -}}
+{{- $component := .component | default "" -}}
+{{- $componentValues := dict -}}
+{{- if $component -}}
+{{- $componentValues = get $root.Values $component | default dict -}}
+{{- end -}}
+{{- $serviceDatabase := get $componentValues "database" | default dict -}}
+{{- printf "%s\n%s\n%s\n" (include "database.serviceSecret" .) (toYaml $root.Values.database) (toYaml $serviceDatabase) | sha256sum -}}
+{{- end}}
+
+{{- define "database.optionalEnv" -}}
+- name: {{ .name }}
+  valueFrom:
+    secretKeyRef:
+      name: {{ .secret }}
+      key: {{ .key }}
+      optional: true
+{{- end }}
+
+{{- define "database.managed" -}}
+{{- $type := .Values.database.type | default "postgres" | toString -}}
+{{- if or (eq $type "postgres") (eq $type "managed") (eq $type "cnpg") -}}true{{- else -}}false{{- end -}}
 {{- end}}
 
 {{/*
@@ -805,31 +890,51 @@ tls:
 {{- end }}
 
 {{- define "common-database-config" -}}
+{{- $root := . -}}
+{{- $component := "" -}}
+{{- $nameSuffix := "" -}}
+{{- if and (kindIs "map" .) (hasKey . "root") -}}
+{{- $root = .root -}}
+{{- $component = .component | default "" -}}
+{{- $nameSuffix = .nameSuffix | default "" -}}
+{{- end -}}
+{{- $secretContext := dict "root" $root "component" $component "nameSuffix" $nameSuffix -}}
+{{- $databaseSecret := include "database.serviceSecret" $secretContext -}}
 - name: POSTGRES_PORT
   valueFrom:
     secretKeyRef:
-      name: {{ include "database-secret" . }}
-      key: port    
+      name: {{ $databaseSecret }}
+      key: port
 - name: POSTGRES_HOST
   valueFrom:
     secretKeyRef:
-      name: {{ include "database-secret" . }}
+      name: {{ $databaseSecret }}
       key: host
 - name: POSTGRES_PASSWORD
   valueFrom:
     secretKeyRef:
-      name: {{ include "database-secret" . }}
+      name: {{ $databaseSecret }}
       key: password
 - name: POSTGRES_DBNAME
   valueFrom:
     secretKeyRef:
-      name: {{ include "database-secret" . }}
+      name: {{ $databaseSecret }}
       key: dbname
 - name: POSTGRES_USER
   valueFrom:
     secretKeyRef:
-      name: {{ include "database-secret" . }}
+      name: {{ $databaseSecret }}
       key: user
+{{ include "database.optionalEnv" (dict "secret" $databaseSecret "name" "POSTGRES_SSLMODE" "key" "sslmode") }}
+{{ include "database.optionalEnv" (dict "secret" $databaseSecret "name" "POSTGRES_SSLCERT" "key" "sslcert") }}
+{{ include "database.optionalEnv" (dict "secret" $databaseSecret "name" "POSTGRES_SSLKEY" "key" "sslkey") }}
+{{ include "database.optionalEnv" (dict "secret" $databaseSecret "name" "POSTGRES_SSLROOTCERT" "key" "sslrootcert") }}
+{{ include "database.optionalEnv" (dict "secret" $databaseSecret "name" "POSTGRES_CONNECTTIMEOUTSECONDS" "key" "connectTimeoutSeconds") }}
+{{ include "database.optionalEnv" (dict "secret" $databaseSecret "name" "POSTGRES_APPLICATIONNAME" "key" "applicationName") }}
+{{ include "database.optionalEnv" (dict "secret" $databaseSecret "name" "POSTGRES_FALLBACKAPPLICATIONNAME" "key" "fallbackApplicationName") }}
+{{ include "database.optionalEnv" (dict "secret" $databaseSecret "name" "POSTGRES_SEARCHPATH" "key" "searchPath") }}
+{{ include "database.optionalEnv" (dict "secret" $databaseSecret "name" "POSTGRES_OPTIONS" "key" "options") }}
+{{ include "database.optionalEnv" (dict "secret" $databaseSecret "name" "POSTGRES_TIMEZONE" "key" "timezone") }}
 {{- end }}
 
 {{- define "basyx.abac.enabled" -}}

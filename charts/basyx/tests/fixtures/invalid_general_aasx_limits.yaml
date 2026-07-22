@@ -1,0 +1,7 @@
+general:
+  uploadMaxSizeBytes: 0
+  aasxMaxPartCount: 0
+  aasxMaxOPCMetadataSizeBytes: 0
+  aasxMaxPartExpandedSizeBytes: 0
+  aasxMaxTotalExpandedSizeBytes: 0
+  aasxMaxThumbnailSizeBytes: 0

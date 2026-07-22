@@ -12,8 +12,18 @@ spec:
       {{- include "basyx-aasWebGui.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      {{- with .Values.aasWebGui.podAnnotations }}
       annotations:
+        checksum/aas-web-gui-config: {{ include (print $.Template.BasePath "/aas-web-gui/configmap.yaml") . | sha256sum }}
+        {{- if and .Values.aasWebGui.secretEnvironment (not .Values.aasWebGui.existingSecretEnvironment) }}
+        checksum/aas-web-gui-secret: {{ include (print $.Template.BasePath "/aas-web-gui/secret.yaml") . | sha256sum }}
+        {{- end }}
+        {{- if .Values.aasWebGui.infrastructureConfig }}
+        checksum/aas-web-gui-infrastructure: {{ include (print $.Template.BasePath "/aas-web-gui/configmap-infrastructure.yaml") . | sha256sum }}
+        {{- end }}
+        {{- if .Values.aasWebGui.logos }}
+        checksum/aas-web-gui-logos: {{ include (print $.Template.BasePath "/aas-web-gui/configmap-logos.yaml") . | sha256sum }}
+        {{- end }}
+      {{- with .Values.aasWebGui.podAnnotations }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
@@ -55,6 +65,10 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ include "basyx-aasWebGui.fullname" . }}-config
+            {{- if or .Values.aasWebGui.secretEnvironment .Values.aasWebGui.existingSecretEnvironment }}
+            - secretRef:
+                name: {{ default (printf "%s-secret" (include "basyx-aasWebGui.fullname" .)) .Values.aasWebGui.existingSecretEnvironment }}
+            {{- end }}
           resources:
             {{- toYaml .Values.aasWebGui.resources | nindent 12 }}
           {{- with .Values.aasWebGui.livenessProbe }}

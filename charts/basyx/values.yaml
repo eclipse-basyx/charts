@@ -107,7 +107,12 @@ general:
   externalUrl: ""
   trustProxyHeaders: false
   trustedProxyCIDRs: []
-  uploadMaxSizeBytes: 0
+  uploadMaxSizeBytes: 134217728
+  aasxMaxPartCount: 10000
+  aasxMaxOPCMetadataSizeBytes: 16777216
+  aasxMaxPartExpandedSizeBytes: 134217728
+  aasxMaxTotalExpandedSizeBytes: 134217728
+  aasxMaxThumbnailSizeBytes: 16777216
   bulkBatchLimit: 1000
   # Comma-rendered into GENERAL_AAS_PRECONFIG_PATHS. Mount matching files or
   # directories with the service-specific volumes/volumeMounts when used.
@@ -230,9 +235,9 @@ keycloak:
   webUiClientId: basyx-ui
   initJob:
     image:
-      repository: peterevans/curl-jq
+      repository: registry.gitlab.com/gitlab-ci-utils/curl-jq
       pullPolicy: IfNotPresent
-      tag: "1.0"
+      tag: "4.0.3"
       digest: ""
   tests:
     realmCheck:
@@ -1369,7 +1374,7 @@ aasWebGui:
   image:
     repository: eclipsebasyx/aas-gui
     pullPolicy: Always
-    tag: v2-260707
+    tag: v2-260721
   imagePullSecrets: []
   nameOverride: "aas-gui"
   fullnameOverride: "aas-gui"
@@ -1432,6 +1437,14 @@ aasWebGui:
   environment:
     LOGO_LIGHT_PATH: BaSyx_Logo.svg
     LOGO_DARK_PATH: BaSyx_Logo.svg
+  # Environment values that should be stored in a Kubernetes Secret and exposed
+  # to the UI container through envFrom.secretRef. Use this for server-side
+  # credentials such as EDC API keys.
+  secretEnvironment: {}
+  # Reference an existing Secret instead of rendering secretEnvironment.
+  # The Secret must live in the same namespace and contain environment variable
+  # names as keys.
+  existingSecretEnvironment: ""
 
 
   ingress:
@@ -1498,8 +1511,53 @@ aasWebGui:
 
 database:
   clusterName: basyx-database
+  # postgres, managed and cnpg deploy a CloudNativePG cluster. Use external to
+  # connect BaSyx Go to an existing PostgreSQL database through existingSecret.
   type: postgres
-  # name for the cnpg cluster ressource
+  # Existing Secret for database.type=external. It must contain the keys:
+  # host, port, dbname, user, password and jdbc-uri.
+  existingSecret: ""
+  # Inline external database connection values for database.type=external.
+  # If existingSecret is set, these values are ignored.
+  # Prefer existingSecret for production and GitOps because inline passwords are
+  # stored in Helm release data.
+  external:
+    host: ""
+    port: "5432"
+    dbname: ""
+    user: ""
+    password: ""
+    # Optional BaSyx Go PostgreSQL settings. These are rendered as optional
+    # POSTGRES_* environment variables for backend services.
+    # sslmode: require
+    # sslcert: /etc/ssl/certs/postgres/client.crt
+    # sslkey: /etc/ssl/certs/postgres/client.key
+    # sslrootcert: /etc/ssl/certs/postgres/ca.crt
+    # connectTimeoutSeconds: 10
+    # applicationName: basyx-go
+    # fallbackApplicationName: basyx-go
+    # searchPath: basyx
+    # options: "-c statement_timeout=30000"
+    # timezone: UTC
+  # Backend services can override this global database connection individually:
+  #
+  # aasRegistry:
+  #   database:
+  #     existingSecret: basyx-aas-registry-postgres
+  #
+  # Or inline for test deployments:
+  #
+  # aasRegistry:
+  #   database:
+  #     type: external
+  #     host: postgres.example.internal
+  #     port: "5432"
+  #     dbname: basyx
+  #     user: basyx
+  #     password: change-me
+  #     sslmode: require
+  #     searchPath: registry_schema
+  # name for the cnpg cluster resource
   # clusterName: "basyx-database"
   # name of database
   # database: "basyx"

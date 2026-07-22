@@ -79,6 +79,13 @@ tests:
       - failedTemplate:
           errorPattern: "general.bulkBatchLimit"
 
+  - it: fails when upload and AASX package limits are below one
+    values:
+      - fixtures/invalid_general_aasx_limits.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "general"
+
   - it: fails when server timeout is below one
     values:
       - fixtures/invalid_server_timeout.yaml
@@ -92,6 +99,41 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "aasRepository.server.shutdownTimeoutSeconds"
+
+  - it: fails when external database has no existing secret
+    values:
+      - fixtures/invalid_external_database_missing_secret.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "database"
+
+  - it: fails when inline external database password is empty
+    values:
+      - fixtures/invalid_external_database_empty_password.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "database"
+
+  - it: fails when external database sslmode is unsupported
+    values:
+      - fixtures/invalid_external_database_sslmode.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "database"
+
+  - it: fails when service-specific external database values are incomplete
+    values:
+      - fixtures/invalid_service_database_empty_password.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "aasRegistry.database"
+
+  - it: fails when database type is unsupported
+    values:
+      - fixtures/invalid_database_type.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "database.type"
 
   - it: fails when ABAC policy scope contains unsupported characters
     values:

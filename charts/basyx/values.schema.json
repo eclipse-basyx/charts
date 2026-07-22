@@ -9,6 +9,7 @@
         "server": { "$ref": "#/properties/server" },
         "history": { "$ref": "#/properties/history" },
         "eventing": { "$ref": "#/properties/eventing" },
+        "database": { "$ref": "#/definitions/serviceDatabase" },
         "abac": {
           "type": "object",
           "properties": {
@@ -28,6 +29,113 @@
         },
         "environment": { "type": "object" }
       }
+    },
+    "serviceDatabase": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["external"]
+        },
+        "existingSecret": {
+          "type": "string"
+        },
+        "host": { "type": "string" },
+        "port": { "type": ["string", "number"] },
+        "dbname": { "type": "string" },
+        "user": { "type": "string" },
+        "password": { "type": "string" },
+        "sslmode": {
+          "type": "string",
+          "enum": ["", "disable", "allow", "prefer", "require", "verify-ca", "verify-full"]
+        },
+        "sslcert": { "type": "string" },
+        "sslkey": { "type": "string" },
+        "sslrootcert": { "type": "string" },
+        "connectTimeoutSeconds": {
+          "oneOf": [
+            { "type": "integer", "minimum": 0 },
+            { "type": "string", "pattern": "^[0-9]*$" }
+          ]
+        },
+        "applicationName": { "type": "string" },
+        "fallbackApplicationName": { "type": "string" },
+        "searchPath": { "type": "string" },
+        "options": { "type": "string" },
+        "timezone": { "type": "string" },
+        "external": {
+          "type": "object",
+          "properties": {
+            "host": { "type": "string" },
+            "port": { "type": ["string", "number"] },
+            "dbname": { "type": "string" },
+            "user": { "type": "string" },
+            "password": { "type": "string" },
+            "sslmode": {
+              "type": "string",
+              "enum": ["", "disable", "allow", "prefer", "require", "verify-ca", "verify-full"]
+            },
+            "sslcert": { "type": "string" },
+            "sslkey": { "type": "string" },
+            "sslrootcert": { "type": "string" },
+            "connectTimeoutSeconds": {
+              "oneOf": [
+                { "type": "integer", "minimum": 0 },
+                { "type": "string", "pattern": "^[0-9]*$" }
+              ]
+            },
+            "applicationName": { "type": "string" },
+            "fallbackApplicationName": { "type": "string" },
+            "searchPath": { "type": "string" },
+            "options": { "type": "string" },
+            "timezone": { "type": "string" }
+          }
+        }
+      },
+      "anyOf": [
+        {
+          "properties": {
+            "existingSecret": { "minLength": 1 }
+          },
+          "required": ["existingSecret"]
+        },
+        {
+          "properties": {
+            "host": { "minLength": 1 },
+            "port": {
+              "oneOf": [
+                { "type": "integer", "minimum": 1 },
+                { "type": "string", "minLength": 1 }
+              ]
+            },
+            "dbname": { "minLength": 1 },
+            "user": { "minLength": 1 },
+            "password": { "minLength": 1 }
+          },
+          "required": ["host", "port", "dbname", "user", "password"]
+        },
+        {
+          "properties": {
+            "external": {
+              "type": "object",
+              "required": ["host", "port", "dbname", "user", "password"],
+              "properties": {
+                "host": { "minLength": 1 },
+                "port": {
+                  "oneOf": [
+                    { "type": "integer", "minimum": 1 },
+                    { "type": "string", "minLength": 1 }
+                  ]
+                },
+                "dbname": { "minLength": 1 },
+                "user": { "minLength": 1 },
+                "password": { "minLength": 1 }
+              }
+            }
+          },
+          "required": ["external"]
+        }
+      ]
     }
   },
   "required": [
@@ -258,7 +366,12 @@
           "type": "array",
           "items": { "type": "string" }
         },
-        "uploadMaxSizeBytes": { "type": "integer", "minimum": 0 },
+        "uploadMaxSizeBytes": { "type": "integer", "minimum": 1 },
+        "aasxMaxPartCount": { "type": "integer", "minimum": 1 },
+        "aasxMaxOPCMetadataSizeBytes": { "type": "integer", "minimum": 1 },
+        "aasxMaxPartExpandedSizeBytes": { "type": "integer", "minimum": 1 },
+        "aasxMaxTotalExpandedSizeBytes": { "type": "integer", "minimum": 1 },
+        "aasxMaxThumbnailSizeBytes": { "type": "integer", "minimum": 1 },
         "bulkBatchLimit": { "type": "integer", "minimum": 1 },
         "aasPreconfigPaths": {
           "type": "array",
@@ -455,7 +568,38 @@
         },
         "type": {
           "type": "string",
-          "minLength": 1
+          "enum": ["postgres", "managed", "cnpg", "external"]
+        },
+        "existingSecret": {
+          "type": "string"
+        },
+        "external": {
+          "type": "object",
+          "properties": {
+            "host": { "type": "string" },
+            "port": { "type": ["string", "number"] },
+            "dbname": { "type": "string" },
+            "user": { "type": "string" },
+            "password": { "type": "string" },
+            "sslmode": {
+              "type": "string",
+              "enum": ["", "disable", "allow", "prefer", "require", "verify-ca", "verify-full"]
+            },
+            "sslcert": { "type": "string" },
+            "sslkey": { "type": "string" },
+            "sslrootcert": { "type": "string" },
+            "connectTimeoutSeconds": {
+              "oneOf": [
+                { "type": "integer", "minimum": 0 },
+                { "type": "string", "pattern": "^[0-9]*$" }
+              ]
+            },
+            "applicationName": { "type": "string" },
+            "fallbackApplicationName": { "type": "string" },
+            "searchPath": { "type": "string" },
+            "options": { "type": "string" },
+            "timezone": { "type": "string" }
+          }
         },
         "instances": {
           "type": "integer",
@@ -471,7 +615,47 @@
             }
           }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": { "const": "external" }
+            }
+          },
+          "then": {
+            "anyOf": [
+              {
+                "properties": {
+                  "existingSecret": { "minLength": 1 }
+                },
+                "required": ["existingSecret"]
+              },
+              {
+                "properties": {
+                  "external": {
+                    "type": "object",
+                    "required": ["host", "port", "dbname", "user", "password"],
+                    "properties": {
+                      "host": { "minLength": 1 },
+                      "port": {
+                        "oneOf": [
+                          { "type": "integer", "minimum": 1 },
+                          { "type": "string", "minLength": 1 }
+                        ]
+                      },
+                      "dbname": { "minLength": 1 },
+                      "user": { "minLength": 1 },
+                      "password": { "minLength": 1 }
+                    }
+                  }
+                },
+                "required": ["external"]
+              }
+            ]
+          }
+        }
+      ]
     }
   }
 }

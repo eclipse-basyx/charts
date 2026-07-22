@@ -3,7 +3,10 @@ release:
   name: basyx
 templates:
   - templates/secret.yaml
+  - templates/aas-web-gui/configmap.yaml
   - templates/aas-web-gui/configmap-infrastructure.yaml
+  - templates/aas-web-gui/configmap-logos.yaml
+  - templates/aas-web-gui/secret.yaml
   - templates/aas-web-gui/deployment.yaml
   - templates/aas-discovery/deployment.yaml
   - templates/aas-discovery/ingress.yaml
@@ -43,6 +46,24 @@ tests:
       - equal:
           path: stringData.SERVER_SHUTDOWN_TIMEOUT_SECONDS
           value: "10"
+      - equal:
+          path: stringData.GENERAL_UPLOADMAXSIZEBYTES
+          value: "134217728"
+      - equal:
+          path: stringData.GENERAL_AASXMAXPARTCOUNT
+          value: "10000"
+      - equal:
+          path: stringData.GENERAL_AASXMAXOPCMETADATASIZEBYTES
+          value: "16777216"
+      - equal:
+          path: stringData.GENERAL_AASXMAXPARTEXPANDEDSIZEBYTES
+          value: "134217728"
+      - equal:
+          path: stringData.GENERAL_AASXMAXTOTALEXPANDEDSIZEBYTES
+          value: "134217728"
+      - equal:
+          path: stringData.GENERAL_AASXMAXTHUMBNAILSIZEBYTES
+          value: "16777216"
 
   - it: renders structured BaSyx runtime configuration into the common secret
     template: templates/secret.yaml
@@ -52,6 +73,12 @@ tests:
     set:
       aasDiscovery.enabled: true
       general.trustProxyHeaders: true
+      general.uploadMaxSizeBytes: 268435456
+      general.aasxMaxPartCount: 20000
+      general.aasxMaxOPCMetadataSizeBytes: 33554432
+      general.aasxMaxPartExpandedSizeBytes: 268435456
+      general.aasxMaxTotalExpandedSizeBytes: 536870912
+      general.aasxMaxThumbnailSizeBytes: 8388608
       general.bulkBatchLimit: 500
       general.aasPreconfigPaths[0]: /app/preconfiguration
       server.readHeaderTimeoutSeconds: 20
@@ -82,6 +109,24 @@ tests:
       - equal:
           path: stringData.GENERAL_AAS_PRECONFIG_PATHS
           value: /app/preconfiguration
+      - equal:
+          path: stringData.GENERAL_UPLOADMAXSIZEBYTES
+          value: "268435456"
+      - equal:
+          path: stringData.GENERAL_AASXMAXPARTCOUNT
+          value: "20000"
+      - equal:
+          path: stringData.GENERAL_AASXMAXOPCMETADATASIZEBYTES
+          value: "33554432"
+      - equal:
+          path: stringData.GENERAL_AASXMAXPARTEXPANDEDSIZEBYTES
+          value: "268435456"
+      - equal:
+          path: stringData.GENERAL_AASXMAXTOTALEXPANDEDSIZEBYTES
+          value: "536870912"
+      - equal:
+          path: stringData.GENERAL_AASXMAXTHUMBNAILSIZEBYTES
+          value: "8388608"
       - equal:
           path: stringData.GENERAL_BULK_BATCH_LIMIT
           value: "500"
@@ -160,6 +205,8 @@ tests:
       environment.common.BASYX_HISTORY_MODE: api
       general.bulkBatchLimit: 500
       environment.common.GENERAL_BULK_BATCH_LIMIT: 250
+      general.aasxMaxPartCount: 20000
+      environment.common.GENERAL_AASXMAXPARTCOUNT: 15000
       server.readTimeoutSeconds: 600
       environment.common.SERVER_READ_TIMEOUT_SECONDS: 120
       abac.policyScope: structured-scope
@@ -171,6 +218,9 @@ tests:
       - equal:
           path: stringData.GENERAL_BULK_BATCH_LIMIT
           value: "250"
+      - equal:
+          path: stringData.GENERAL_AASXMAXPARTCOUNT
+          value: "15000"
       - equal:
           path: stringData.SERVER_READ_TIMEOUT_SECONDS
           value: "120"
@@ -195,6 +245,110 @@ tests:
       - matchRegex:
           path: data["basyx-infra.yml"]
           pattern: 'baseUrl: https://basyx\.example\.com/aas-repository'
+
+  - it: renders Catena-X web ui infrastructure from example values
+    template: templates/aas-web-gui/configmap-infrastructure.yaml
+    values:
+      - ../../../values/values.catena-x.example.yaml
+    documentSelector:
+      path: metadata.name
+      value: basyx-aas-web-ui-infrastructure
+    asserts:
+      - matchRegex:
+          path: data["basyx-infra.yml"]
+          pattern: 'default: catena-x'
+      - matchRegex:
+          path: data["basyx-infra.yml"]
+          pattern: 'template: catena-x'
+      - matchRegex:
+          path: data["basyx-infra.yml"]
+          pattern: 'digitalTwinRegistry:'
+      - matchRegex:
+          path: data["basyx-infra.yml"]
+          pattern: 'baseUrl: https://basyx\.example\.com/digital-twin-registry'
+      - matchRegex:
+          path: data["basyx-infra.yml"]
+          pattern: 'submodelService:'
+      - matchRegex:
+          path: data["basyx-infra.yml"]
+          pattern: 'baseUrl: https://basyx\.example\.com/submodel-repo'
+      - matchRegex:
+          path: data["basyx-infra.yml"]
+          pattern: 'companyLookup:'
+      - matchRegex:
+          path: data["basyx-infra.yml"]
+          pattern: 'baseUrl: https://basyx\.example\.com/company-lookup'
+      - notMatchRegex:
+          path: data["basyx-infra.yml"]
+          pattern: 'aasRepository:'
+      - notMatchRegex:
+          path: data["basyx-infra.yml"]
+          pattern: 'conceptDescriptionRepository:'
+      - matchRegex:
+          path: data["basyx-infra.yml"]
+          pattern: 'type: oauth2'
+
+  - it: renders Catena-X web ui runtime settings from example values
+    template: templates/aas-web-gui/configmap.yaml
+    values:
+      - ../../../values/values.catena-x.example.yaml
+    documentSelector:
+      path: metadata.name
+      value: basyx-aas-web-ui-config
+    asserts:
+      - equal:
+          path: data.START_PAGE_ROUTE_NAME
+          value: CatenaXplorer
+      - equal:
+          path: data.CX_EDC_BFF_ENABLED
+          value: "true"
+      - equal:
+          path: data.CX_EDC_BFF_PORT
+          value: "3001"
+      - equal:
+          path: data.CX_EDC_BFF_UPSTREAM_URL
+          value: http://127.0.0.1:3001
+      - equal:
+          path: data.CX_EDC_BFF_AUTH_MODE
+          value: none
+      - equal:
+          path: data.CX_EDC_DEFAULT_MANAGEMENT_URL
+          value: https://consumer-edc.example.com/management
+      - equal:
+          path: data.CX_EDC_DEFAULT_API_KEY_HEADER
+          value: X-Api-Key
+      - equal:
+          path: data.CX_EDC_ALLOWED_COUNTER_PARTY_ADDRESSES
+          value: https://provider-edc.example.com/api/v1/dsp
+      - equal:
+          path: data.CX_EDC_EDR_POLLING_ATTEMPTS
+          value: "60"
+
+  - it: renders Catena-X web ui secret runtime settings from example values
+    template: templates/aas-web-gui/secret.yaml
+    values:
+      - ../../../values/values.catena-x.example.yaml
+    documentSelector:
+      path: metadata.name
+      value: basyx-aas-web-ui-secret
+    asserts:
+      - isKind:
+          of: Secret
+      - equal:
+          path: stringData.CX_EDC_DEFAULT_API_KEY
+          value: ""
+
+  - it: wires Catena-X web ui secret runtime settings into the deployment
+    template: templates/aas-web-gui/deployment.yaml
+    values:
+      - ../../../values/values.catena-x.example.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            secretRef:
+              name: basyx-aas-web-ui-secret
+          count: 1
 
   - it: mounts common config and custom ca into aas discovery
     template: templates/aas-discovery/deployment.yaml
@@ -268,6 +422,12 @@ tests:
     set:
       aasWebGui.enabled: true
     asserts:
+      - exists:
+          path: spec.template.metadata.annotations["checksum/aas-web-gui-config"]
+      - exists:
+          path: spec.template.metadata.annotations["checksum/aas-web-gui-infrastructure"]
+      - exists:
+          path: spec.template.metadata.annotations["checksum/aas-web-gui-logos"]
       - equal:
           path: spec.template.spec.containers[0].livenessProbe.httpGet.path
           value: /aas-gui/

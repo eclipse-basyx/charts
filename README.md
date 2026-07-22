@@ -8,6 +8,7 @@ The repository follows the common Helm multi-chart layout:
 
 ```text
 charts/basyx/           Helm chart for BaSyx Go
+examples/postman/       Postman collections for example setups
 values/                 Custom values examples and deployment overlays
 ```
 
@@ -47,6 +48,7 @@ charts/basyx/values.yaml
 Custom values files live outside the chart, for example:
 
 ```text
+values/values.catena-x.example.yaml
 values/values.example.yaml
 values/values.minimal.yaml
 values/values.secured.example.yaml
@@ -124,6 +126,9 @@ cp values/values.minimal.yaml values/values.my-minimal-environment.yaml
 
 # Secured deployment with Keycloak and ABAC.
 cp values/values.secured.example.yaml values/values.my-secured-environment.yaml
+
+# Catena-X oriented deployment with marker-based DTR and Submodel access.
+cp values/values.catena-x.example.yaml values/values.my-catena-x-environment.yaml
 ```
 
 The unsecured example enables the core BaSyx Go services and the Web UI:
@@ -188,6 +193,8 @@ Use `values/values.minimal.yaml` when you want the BaSyx Go MinimalExample style
 
 For DPP API deployments, enable `dppApi` in your own values file. DPP commonly runs together with `aasEnvironment` and `aasWebGui`, but it is configured through the same service block pattern as the other optional BaSyx Go services.
 
+Use `values/values.catena-x.example.yaml` when you want a Catena-X oriented setup. It enables Keycloak, ABAC, Digital Twin Registry and Submodel Repository with BPN-based marker access rules.
+
 Do not publish production passwords or client secrets. For public examples, use placeholders and inject real credentials through your deployment pipeline or an external secret management solution.
 
 ## Render Before Installing
@@ -198,6 +205,7 @@ Always render the chart before the first install. This catches schema errors and
 helm lint charts/basyx -f values/values.example.yaml
 helm lint charts/basyx -f values/values.minimal.yaml
 helm lint charts/basyx -f values/values.secured.example.yaml
+helm lint charts/basyx -f values/values.catena-x.example.yaml
 
 helm template basyx charts/basyx \
   -n basyx-custom \
@@ -285,6 +293,7 @@ With the default paths, services are exposed below one host:
 | Submodel Repository | `https://<host>/submodel-repo` or your custom override |
 | Concept Description Repository | `https://<host>/cd-repository` |
 | Company Lookup | `https://<host>/company-lookup/companies` |
+| Digital Twin Registry | `https://<host>/digital-twin-registry` |
 
 Company Lookup intentionally has no resource at the bare `/company-lookup` path. Use `/company-lookup/companies`, `/company-lookup/description`, `/company-lookup/swagger` or `/company-lookup/health`.
 
@@ -387,11 +396,12 @@ The chart projects configured certificate sources into the pods and updates `SSL
 
 ### Database
 
-The chart creates a CloudNativePG cluster:
+By default, the chart creates a CloudNativePG cluster:
 
 ```yaml
 database:
   clusterName: basyx-database
+  type: postgres
   database: basyx
   owner: basyx
   instances: 3
@@ -408,9 +418,159 @@ database:
     size: 5Gi
 ```
 
+The values `postgres`, `managed` and `cnpg` all keep this managed database behavior for backwards compatibility.
+
+#### Existing PostgreSQL Database
+
+To use an existing PostgreSQL database instead of deploying CloudNativePG, set `database.type` to `external`.
+
+Recommended for production: point the chart to an existing Kubernetes Secret:
+
+```yaml
+database:
+  type: external
+  existingSecret: basyx-external-postgres
+```
+
+The Secret must exist in the same namespace as the BaSyx release and contain these keys:
+
+```text
+host
+port
+dbname
+user
+password
+jdbc-uri
+```
+
+For BaSyx Go backend services, the Secret can additionally contain optional PostgreSQL keys:
+
+```text
+sslmode
+sslcert
+sslkey
+sslrootcert
+connectTimeoutSeconds
+applicationName
+fallbackApplicationName
+searchPath
+options
+timezone
+```
+
+These optional keys are rendered as optional `POSTGRES_*` environment variables. `searchPath` becomes `POSTGRES_SEARCHPATH` for BaSyx Go. For generated inline Secrets, it is also translated into the JDBC parameter `currentSchema` so Keycloak can use the same generated `jdbc-uri`.
+
+Create such a Secret, for example:
+
+```bash
+kubectl -n basyx-custom create secret generic basyx-external-postgres \
+  --from-literal=host='postgres.example.internal' \
+  --from-literal=port='5432' \
+  --from-literal=dbname='basyx' \
+  --from-literal=user='basyx' \
+  --from-literal=password='change-me' \
+  --from-literal=jdbc-uri='jdbc:postgresql://postgres.example.internal:5432/basyx?sslmode=require&currentSchema=myschema' \
+  --from-literal=sslmode='require' \
+  --from-literal=searchPath='myschema'
+```
+
+Then install with the external database overlay:
+
+```bash
+helm upgrade --install basyx charts/basyx \
+  -n basyx-custom \
+  --create-namespace \
+  -f values/values.example.yaml \
+  -f values/values.external-db.example.yaml
+```
+
+For quick test deployments, the connection values can also be provided inline. In that case, the chart renders a Secret automatically:
+
+```yaml
+database:
+  type: external
+  existingSecret: ""
+  external:
+    host: postgres.example.internal
+    port: "5432"
+    dbname: basyx
+    user: basyx
+    password: change-me
+    sslmode: require
+    searchPath: myschema
+```
+
+Inline values are easier to use, but less safe: the password is stored in the values file and in Helm release data. Do not commit real database passwords to Git. Use `existingSecret` for shared, production or GitOps-managed environments.
+
+When the external database is independently managed and expected to be reachable before installing the chart, the Configuration Service database wait initContainer can be disabled:
+
+```yaml
+configurationService:
+  waitForDatabase:
+    enabled: false
+```
+
+#### Service-Specific PostgreSQL Databases
+
+The global `database` block is used by all BaSyx Go backend services by default. Individual services can override that connection when a deployment needs separate databases, for example when registries should use a shared core database while repositories use a namespace-local database.
+
+Recommended for production: reference an existing Secret on the service:
+
+```yaml
+database:
+  type: postgres
+  clusterName: basyx-company-database
+
+aasRegistry:
+  enabled: true
+  database:
+    existingSecret: basyx-core-postgres
+
+aasDiscovery:
+  enabled: true
+  database:
+    existingSecret: basyx-core-postgres
+
+aasRepository:
+  enabled: true
+  # No override: uses the global database above.
+```
+
+The referenced Secret must contain the same required keys as the global external database Secret: `host`, `port`, `dbname`, `user`, `password` and `jdbc-uri`. It can also contain the optional PostgreSQL keys listed above, for example `sslmode` and `searchPath`.
+
+For quick test deployments, a service can also define the connection inline. The chart renders a service-specific Secret automatically:
+
+```yaml
+aasRegistry:
+  enabled: true
+  database:
+    type: external
+    host: postgres.example.internal
+    port: "5432"
+    dbname: basyx_registry
+    user: basyx_registry
+    password: change-me
+    sslmode: require
+    searchPath: registry_schema
+```
+
+Service-specific database overrides are runtime connections only. The built-in `configurationService` migrates the global database connection of the release. If a service points to a different external database, that database must already be initialized by another BaSyx release, by a separate Configuration Service run, or by an operational migration process.
+
+For the Catena-X example, use the same overlay pattern:
+
+```bash
+helm upgrade --install basyx charts/basyx \
+  -n basyx-catena-x \
+  --create-namespace \
+  -f values/values.catena-x.example.yaml \
+  -f values/values.external-db.example.yaml
+```
+
+When global `database.type: external` is used, the chart does not render a CloudNativePG `Cluster`. The configured external database user must be allowed to create and migrate the BaSyx schema. The `configurationService` still runs by default and initializes or migrates the schema in the existing database. `configurationService.waitForDatabase.enabled: false` only disables the Configuration Service wait initContainer.
+
 ### BaSyx Configuration Service
 
-BaSyx Go requires the database schema to be prepared before DB-backed services start. The chart enables `configurationService` by default for this. It renders a Kubernetes `Job` using `eclipsebasyx/basyxconfigurationservice-go` and the same CloudNativePG application secret as the runtime services.
+BaSyx Go requires the database schema to be prepared before DB-backed services start. The chart enables `configurationService` by default for this. It renders a Kubernetes `Job` using `eclipsebasyx/basyxconfigurationservice-go` and the same PostgreSQL Secret as the runtime services.
 
 The Configuration Service image is versioned independently from the BaSyx runtime service images. Set `configurationService.image.tag` or, preferably for reproducible deployments, `configurationService.image.digest` explicitly when a schema migration image changes.
 
@@ -430,9 +590,9 @@ configurationService:
       - pre-upgrade
 ```
 
-`pre-upgrade` runs schema migrations before updated runtime pods are rolled out. `post-install` is used for fresh installs because the PostgreSQL cluster is created by the same chart and must exist before the job can connect.
+`pre-upgrade` runs schema migrations before updated runtime pods are rolled out. `post-install` is used for fresh installs because the PostgreSQL database must exist before the job can connect.
 
-On fresh installs, CloudNativePG may need some time before the database accepts connections. The chart therefore adds a `wait-for-database` init container that polls PostgreSQL with `pg_isready` before starting the Configuration Service. This avoids slow Kubernetes Job backoff loops when the database is simply not ready yet.
+On fresh installs, PostgreSQL may need some time before it accepts connections. The chart therefore adds a `wait-for-database` init container that polls PostgreSQL with `pg_isready` before starting the Configuration Service. This avoids slow Kubernetes Job backoff loops when the database is simply not ready yet.
 
 After deployment, verify the job and logs with:
 
@@ -713,7 +873,12 @@ Raw environment maps are the escape hatch and take precedence over structured va
 | `general.externalUrl` | `GENERAL_EXTERNALURL` | Public external URL used by registry synchronization. |
 | `general.trustProxyHeaders` | `GENERAL_TRUSTPROXYHEADERS` | Trusts forwarded proxy headers. Only enable behind trusted reverse proxies. |
 | `general.trustedProxyCIDRs` | `GENERAL_TRUSTEDPROXYCIDRS` | Comma-separated trusted proxy CIDR list. |
-| `general.uploadMaxSizeBytes` | `GENERAL_UPLOADMAXSIZEBYTES` | Maximum upload size in bytes. `0` keeps the service default. |
+| `general.uploadMaxSizeBytes` | `GENERAL_UPLOADMAXSIZEBYTES` | Maximum compressed HTTP request size, including multipart overhead, in bytes. Must be greater than `0`. |
+| `general.aasxMaxPartCount` | `GENERAL_AASXMAXPARTCOUNT` | Maximum number of non-directory entries in an AASX package. |
+| `general.aasxMaxOPCMetadataSizeBytes` | `GENERAL_AASXMAXOPCMETADATASIZEBYTES` | Maximum combined expanded size of AASX OPC metadata. |
+| `general.aasxMaxPartExpandedSizeBytes` | `GENERAL_AASXMAXPARTEXPANDEDSIZEBYTES` | Maximum expanded size of one AASX payload part. |
+| `general.aasxMaxTotalExpandedSizeBytes` | `GENERAL_AASXMAXTOTALEXPANDEDSIZEBYTES` | Maximum combined expanded size of all AASX payload parts. |
+| `general.aasxMaxThumbnailSizeBytes` | `GENERAL_AASXMAXTHUMBNAILSIZEBYTES` | Maximum expanded size of an AASX thumbnail. |
 | `general.bulkBatchLimit` | `GENERAL_BULK_BATCH_LIMIT` | Maximum row count per generated bulk SQL statement. Must be greater than `0`. |
 | `general.aasPreconfigPaths` | `GENERAL_AAS_PRECONFIG_PATHS` | Comma-separated paths for preconfigured AAS input. Mount matching files or directories with service-specific `volumes` and `volumeMounts`. |
 
@@ -902,6 +1067,7 @@ Run lint with custom values:
 helm lint charts/basyx -f values/values.example.yaml
 helm lint charts/basyx -f values/values.minimal.yaml
 helm lint charts/basyx -f values/values.secured.example.yaml
+helm lint charts/basyx -f values/values.catena-x.example.yaml
 ```
 
 Runtime smoke tests after deployment:
@@ -942,6 +1108,7 @@ charts/basyx/values.yaml            Default chart values
 charts/basyx/templates/             Kubernetes templates
 charts/basyx/tests/                 helm-unittest suites
 charts/basyx/config-files/          Chart-local files such as logos and optional certs
+examples/postman/                   Postman collections for example setups
 values/                             Custom values overlays
 ```
 
@@ -953,6 +1120,146 @@ Before publishing publicly:
 - Provide sanitized example values instead of production overlays.
 - Prefer fixed image tags or digests over mutable `SNAPSHOT` tags for reproducible deployments.
 - Review ABAC defaults and document deployment-specific rule sets outside the public chart when needed.
+
+## Catena-X Quick Start
+
+The Catena-X example values deploy the parts needed for marker-based Digital Twin access:
+
+- `digitalTwinRegistry` stores shell descriptors and filters them through AAS descriptor markers.
+- `submodelRepository` stores submodels and filters them through submodel and submodel-element markers.
+- `aasWebGui` is enabled with the `catena-x` infrastructure template, which uses `digitalTwinRegistry` and `submodelService` endpoints instead of the separate `Full` component set.
+- `keycloak` is enabled for a self-contained quick start and initializes demo users and token mappers.
+- `abac` is enabled globally, with service-local rules for Digital Twin Registry and Submodel Repository.
+
+Start from the example values:
+
+```bash
+cp values/values.catena-x.example.yaml values/values.my-catena-x-environment.yaml
+```
+
+Edit at least these values before installing:
+
+```yaml
+host: basyx.example.com
+
+tls:
+  hosts:
+    - basyx.example.com
+
+keycloak:
+  secrets:
+    admin:
+      password: change-me
+    client:
+      clientPassword: change-me
+```
+
+Also replace the demo user passwords before using the file outside a throwaway test namespace.
+
+Then render and install:
+
+```bash
+helm lint charts/basyx -f values/values.my-catena-x-environment.yaml
+
+helm upgrade --install basyx charts/basyx \
+  -n basyx-catena-x \
+  --create-namespace \
+  -f values/values.my-catena-x-environment.yaml
+```
+
+The example initializes these demo users. All example passwords are `change-me`. The Postman collection uses OAuth2 password-grant requests for demo data loading. Depending on your Keycloak policies, demo users may need to log in through the Web UI once and complete required account setup before those token requests succeed. Change the passwords and disable direct access grants before using this setup beyond a disposable demo namespace.
+
+| User | Initial password | Purpose |
+| --- | --- | --- |
+| `catena-x.provider` | `change-me` | Data provider with `view_digital_twin`, `add_digital_twin`, `update_digital_twin` and `delete_digital_twin` role claims. |
+| `catena-x.partner-a` | `change-me` | Consumer with `Edc-Bpn=BPN_COMPANY_001` for marker-based read access tests. |
+| `catena-x.partner-b` | `change-me` | Consumer with `Edc-Bpn=BPN_COMPANY_002` for marker-based read access tests. |
+
+### CatenaXplorer EDC UI Settings
+
+The Catena-X example also preconfigures the AAS Web UI with the CatenaXplorer EDC backend-for-frontend environment variables from the upstream [CatenaXplorerEdcStandalone example](https://github.com/eclipse-basyx/basyx-aas-web-ui/tree/main/examples/CatenaXplorerEdcStandalone).
+
+Non-sensitive EDC settings are stored in `aasWebGui.environment` and rendered into the Web UI ConfigMap:
+
+```yaml
+aasWebGui:
+  environment:
+    CX_EDC_BFF_ENABLED: "true"
+    CX_EDC_BFF_PORT: "3001"
+    CX_EDC_BFF_UPSTREAM_URL: "http://127.0.0.1:3001"
+    CX_EDC_BFF_AUTH_MODE: none
+    CX_EDC_DEFAULT_MANAGEMENT_URL: "https://consumer-edc.example.com/management"
+    CX_EDC_DEFAULT_API_KEY_HEADER: X-Api-Key
+    CX_EDC_DEFAULT_DSP_ENDPOINT: "https://consumer-edc.example.com/api/v1/dsp"
+    CX_EDC_ALLOWED_COUNTER_PARTY_ADDRESSES: "https://provider-edc.example.com/api/v1/dsp"
+```
+
+The EDC Management API key is sensitive. Do not store a real API key in `aasWebGui.environment`. Use `aasWebGui.secretEnvironment` for disposable test overlays, or preferably reference an existing Secret in production:
+
+```yaml
+aasWebGui:
+  existingSecretEnvironment: basyx-aas-web-ui-edc
+```
+
+Create the Secret before installing:
+
+```bash
+kubectl -n basyx-catena-x create secret generic basyx-aas-web-ui-edc \
+  --from-literal=CX_EDC_DEFAULT_API_KEY='change-me'
+```
+
+If `aasWebGui.existingSecretEnvironment` is set, the chart does not render `aasWebGui.secretEnvironment`; it only references the existing Secret from the Web UI Deployment.
+
+The upstream BaSyx Go marker example also contains demo data:
+
+- [shell-descriptor.json](https://raw.githubusercontent.com/eclipse-basyx/basyx-go-components/main/examples/BaSyxMarkerAccessExample/data/shell-descriptor.json)
+- [public-submodel.json](https://raw.githubusercontent.com/eclipse-basyx/basyx-go-components/main/examples/BaSyxMarkerAccessExample/data/public-submodel.json)
+- [restricted-submodel.json](https://raw.githubusercontent.com/eclipse-basyx/basyx-go-components/main/examples/BaSyxMarkerAccessExample/data/restricted-submodel.json)
+
+Helm does not load those objects automatically. Download the files from the upstream example and load them explicitly after deployment.
+
+This repository also includes a generic Postman collection for the Catena-X example:
+
+```text
+examples/postman/basyx-catena-x-marker-access.postman_collection.json
+```
+
+The collection contains the marker example payloads and uses the default ingress paths from `values/values.catena-x.example.yaml`.
+
+In the Web UI infrastructure configuration, `submodelService.baseUrl` points to the Submodel Repository service root, for example `https://basyx.example.com/submodel-repo`. The Web UI appends concrete API paths such as `/submodels/{submodelId}` itself.
+
+Before running it, import the collection into Postman and adjust the collection variables:
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `baseUrl` | `https://basyx.example.com` | Public ingress base URL without a trailing slash. |
+| `realm` | `basyx` | Keycloak realm created by the example values. |
+| `clientId` | `basyx-ui` | OAuth2 client used for password-grant token requests. |
+| `providerUsername` | `catena-x.provider` | Demo provider user. |
+| `providerPassword` | `change-me` | Demo provider password. |
+| `partnerAUsername` | `catena-x.partner-a` | Demo consumer with `Edc-Bpn=BPN_COMPANY_001`. |
+| `partnerAPassword` | `change-me` | Demo partner A password. |
+| `partnerBUsername` | `catena-x.partner-b` | Demo consumer with `Edc-Bpn=BPN_COMPANY_002`. |
+| `partnerBPassword` | `change-me` | Demo partner B password. |
+
+Run the folders in this order:
+
+1. `Auth` fetches OAuth2 access tokens for the provider and both partners.
+2. `Setup - Write Example Data` removes old test objects if present, then creates the shell descriptor and both submodels.
+3. `Read - Provider`, `Read - Partner A`, `Read - Partner B` and `Read - Anonymous` exercise the marker-based read paths with different token claims.
+
+If Postman returns `invalid_grant` with `Account is not fully set up`, the Keycloak user still has a required action such as `UPDATE_PASSWORD`, `VERIFY_EMAIL` or user profile completion. Log in with that user through the Web UI or Keycloak account console first, complete the required setup, and run the `Auth` folder again.
+
+Do not upload these files through the generic Web UI JSON/UML import. That import expects AAS or AAS Environment payloads and will reject `shell-descriptor.json` with `no AAS imported`. The marker example files must be written to their component APIs instead: `shell-descriptor.json` to Digital Twin Registry and the submodel JSON files to Submodel Repository. If you use the example data outside localhost, adjust embedded endpoint URLs in the descriptor to match your ingress host and paths.
+
+The marker rules follow the BaSyx Go marker access example:
+
+- `PUBLIC_READABLE` marks descriptors or submodels that can be read publicly.
+- Partner-specific visibility is based on the `Edc-Bpn` token claim.
+- Digital Twin Registry checks `specificAssetIds[].externalSubjectId.keys[].value` and `submodelDescriptors[].supplementalSemanticIds[].keys[].value`.
+- Submodel Repository checks `supplementalSemanticIds[].keys[].value` on submodels and submodel elements.
+
+For production Catena-X environments, prefer an external IAM or connector flow that issues a trustworthy `Edc-Bpn` token claim. Do not allow arbitrary external clients to set this claim through request headers. Header-to-claim injection should only be enabled behind a trusted ingress or connector mapping.
 
 ## References
 
