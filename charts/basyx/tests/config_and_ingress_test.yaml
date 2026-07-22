@@ -271,7 +271,7 @@ tests:
           pattern: 'submodelService:'
       - matchRegex:
           path: data["basyx-infra.yml"]
-          pattern: 'baseUrl: https://basyx\.example\.com/submodel-repo/submodels'
+          pattern: 'baseUrl: https://basyx\.example\.com/submodel-repo'
       - matchRegex:
           path: data["basyx-infra.yml"]
           pattern: 'companyLookup:'

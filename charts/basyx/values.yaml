@@ -1515,7 +1515,7 @@ database:
   # connect BaSyx Go to an existing PostgreSQL database through existingSecret.
   type: postgres
   # Existing Secret for database.type=external. It must contain the keys:
-  # host, port, dbname, user and password.
+  # host, port, dbname, user, password and jdbc-uri.
   existingSecret: ""
   # Inline external database connection values for database.type=external.
   # If existingSecret is set, these values are ignored.

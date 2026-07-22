@@ -721,7 +721,7 @@ aasWebGui:
           digitalTwinRegistry:
             baseUrl: "https://{{ .Values.host }}{{ .Values.paths.digitalTwinRegistry }}"
           submodelService:
-            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.submodelRepository }}/submodels"
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.submodelRepository }}"
           companyLookup:
             baseUrl: "https://{{ .Values.host }}{{ .Values.paths.companyLookup }}"
         security:
