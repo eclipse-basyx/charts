@@ -1372,7 +1372,7 @@ aasWebGui:
   image:
     repository: eclipsebasyx/aas-gui
     pullPolicy: Always
-    tag: v2-260721
+    tag: 66ff34d
   imagePullSecrets: []
   nameOverride: "aas-gui"
   fullnameOverride: "aas-gui"
