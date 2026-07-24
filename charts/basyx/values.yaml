@@ -26,6 +26,9 @@ tls:
   enabled: true
   hosts:
     - "{{ .Values.host }}"
+  # Optional existing TLS Secret for all generated ingress resources. Defaults
+  # to "<release-name>-tls-secret" when empty.
+  secretName: ""
 
 internal:
   CACertificates:
@@ -54,6 +57,11 @@ internal:
 
 
 ingress:
+  # Global ingress defaults inherited by all service ingress resources. Services
+  # can still override className and annotations under <service>.ingress.
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
   clusterIssuer: ""
   issuer: ""
   certificateIssuer:
@@ -389,13 +397,13 @@ keycloak:
 
   ingress:
     enabled: true
-    className: nginx
+    className: ""
     annotations: {}
     hosts:
       - host: "{{ .Values.host }}"
         paths:
           - path: "{{ .Values.paths.keycloak }}"
-            pathType: ImplementationSpecific
+            pathType: Prefix
 
   resources:
     {}
@@ -476,14 +484,13 @@ submodelRepository:
     port: "8080"
   ingress:
     enabled: true
-    className: nginx
-    annotations:
-      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    className: ""
+    annotations: {}
     hosts:
       - host: "{{ .Values.host }}"
         paths:
           - path: "{{ .Values.paths.submodelRepository }}"
-            pathType: ImplementationSpecific
+            pathType: Prefix
   environment:
     # Keep the Submodel Registry in sync when submodels are created, updated or deleted.
     GENERAL_SUBMODELREGISTRYINTEGRATION: true
@@ -567,14 +574,13 @@ submodelRegistry:
     port: "8080"
   ingress:
     enabled: true
-    className: nginx
-    annotations:
-      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    className: ""
+    annotations: {}
     hosts:
       - host: "{{ .Values.host }}"
         paths:
           - path: "{{ .Values.paths.submodelRegistry }}"
-            pathType: ImplementationSpecific
+            pathType: Prefix
   environment: {}
   general: {}
   server: {}
@@ -655,14 +661,13 @@ aasRegistry:
     port: "8080"
   ingress:
     enabled: true
-    className: nginx
-    annotations:
-      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    className: ""
+    annotations: {}
     hosts:
       - host: "{{ .Values.host }}"
         paths:
           - path: "{{ .Values.paths.aasRegistry }}"
-            pathType: ImplementationSpecific
+            pathType: Prefix
 
   # Content of application.yaml
   # central environment variables (will be set in configmap.yaml via tpl interpolation)
@@ -754,14 +759,13 @@ digitalTwinRegistry:
     port: "8080"
   ingress:
     enabled: true
-    className: nginx
-    annotations:
-      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    className: ""
+    annotations: {}
     hosts:
       - host: "{{ .Values.host }}"
         paths:
           - path: "{{ .Values.paths.digitalTwinRegistry }}"
-            pathType: ImplementationSpecific
+            pathType: Prefix
 
   # Content of application.yaml
   # central environment variables (will be set in configmap.yaml via tpl interpolation)
@@ -853,14 +857,13 @@ aasRepository:
     port: "8080"
   ingress:
     enabled: true
-    className: nginx
-    annotations:
-      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    className: ""
+    annotations: {}
     hosts:
       - host: "{{ .Values.host }}"
         paths:
           - path: "{{ .Values.paths.aasRepository }}"
-            pathType: ImplementationSpecific
+            pathType: Prefix
 
   # Content of application.yaml
   # central environment variables (will be set in configmap.yaml via tpl interpolation)
@@ -949,14 +952,13 @@ aasEnvironment:
     port: "8082"
   ingress:
     enabled: true
-    className: nginx
-    annotations:
-      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    className: ""
+    annotations: {}
     hosts:
       - host: "{{ .Values.host }}"
         paths:
           - path: "{{ .Values.paths.aasEnvironment }}"
-            pathType: ImplementationSpecific
+            pathType: Prefix
 
   # AAS Environment bundles the AAS, submodel, concept description, registry
   # and discovery APIs in one service. Preconfigured AAS files can be imported
@@ -1049,14 +1051,13 @@ dppApi:
     port: "8080"
   ingress:
     enabled: true
-    className: nginx
-    annotations:
-      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    className: ""
+    annotations: {}
     hosts:
       - host: "{{ .Values.host }}"
         paths:
           - path: "{{ .Values.paths.dppApi }}"
-            pathType: ImplementationSpecific
+            pathType: Prefix
 
   # The DPP API composes Digital Product Passport data with the shared BaSyx
   # database. The default history settings mirror the BaSyx DPP API example.
@@ -1142,14 +1143,13 @@ cdRepository:
     port: "8080"
   ingress:
     enabled: true
-    className: nginx
-    annotations:
-      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    className: ""
+    annotations: {}
     hosts:
       - host: "{{ .Values.host }}"
         paths:
           - path: "{{ .Values.paths.cdRepository }}"
-            pathType: ImplementationSpecific
+            pathType: Prefix
 
   # Content of application.yaml
   # central environment variables (will be set in configmap.yaml via tpl interpolation)
@@ -1229,14 +1229,13 @@ companyLookup:
     port: "5080"
   ingress:
     enabled: true
-    className: nginx
-    annotations:
-      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    className: ""
+    annotations: {}
     hosts:
       - host: "{{ .Values.host }}"
         paths:
           - path: "{{ .Values.paths.companyLookup }}"
-            pathType: ImplementationSpecific
+            pathType: Prefix
   environment: {}
   general: {}
   server: {}
@@ -1316,14 +1315,13 @@ aasDiscovery:
     port: "8081"
   ingress:
     enabled: true
-    className: nginx
-    annotations:
-      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    className: ""
+    annotations: {}
     hosts:
       - host: "{{ .Values.host }}"
         paths:
           - path: "{{ .Values.paths.aasDiscovery }}"
-            pathType: ImplementationSpecific
+            pathType: Prefix
 
   # central environment variables (will be set in configmap.yaml via tpl interpolation)
   environment: {}
@@ -1374,7 +1372,7 @@ aasWebGui:
   image:
     repository: eclipsebasyx/aas-gui
     pullPolicy: Always
-    tag: v2-260721
+    tag: 66ff34d
   imagePullSecrets: []
   nameOverride: "aas-gui"
   fullnameOverride: "aas-gui"
@@ -1449,14 +1447,13 @@ aasWebGui:
 
   ingress:
     enabled: true
-    className: nginx
-    annotations:
-      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    className: ""
+    annotations: {}
     hosts:
       - host: "{{ .Values.host }}"
         paths:
           - path: "{{ .Values.paths.aasWebUi }}"
-            pathType: ImplementationSpecific
+            pathType: Prefix
 
   resources: {}
     # limits:

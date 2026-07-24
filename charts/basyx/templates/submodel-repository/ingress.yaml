@@ -6,14 +6,10 @@ metadata:
   name: {{ include "basyx-submodelRepository.fullname" . }}
   labels:
     {{- include "basyx-submodelRepository.labels" . | nindent 4 }}
-  annotations: &commonIngressAnnotations
-  {{- include "common.ingressTLS.annotations" . | nindent 2}}
-  {{- with .Values.submodelRepository.ingress.annotations }}
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
+  {{- include "common.ingress.metadataAnnotations" (dict "root" . "ingress" .Values.submodelRepository.ingress) | nindent 2 }}
 spec:
-  ingressClassName: {{ .Values.submodelRepository.ingress.className | quote }}
-  {{- include "common.ingressTLS" .  | indent 2}}
+  {{- include "common.ingress.className" (dict "root" . "ingress" .Values.submodelRepository.ingress) | nindent 2 }}
+  {{- include "common.ingressTLS" . | nindent 2 }}
   rules:
     {{- range .Values.submodelRepository.ingress.hosts }}
     - host: {{ tpl .host $ | quote }}

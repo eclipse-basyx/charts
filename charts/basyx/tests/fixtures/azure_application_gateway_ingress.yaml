@@ -1,0 +1,17 @@
+host: agic.example.com
+
+tls:
+  enabled: true
+  secretName: tls-secret
+  hosts:
+    - "{{ .Values.host }}"
+
+ingress:
+  className: azure-application-gateway
+  clusterIssuer: letsencrypt
+  annotations:
+    appgw.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: null
+
+aasRegistry:
+  enabled: true

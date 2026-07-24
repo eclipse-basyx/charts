@@ -6,14 +6,10 @@ metadata:
   name: {{ include "basyx-keycloak.fullname" . }}
   labels:
     {{- include "basyx-keycloak.labels" . | nindent 4 }}
-  annotations: &commonIngressAnnotations
-  {{- include "common.ingressTLS.annotations" . | nindent 2}}
-  {{- with .Values.keycloak.ingress.annotations }}
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
+  {{- include "common.ingress.metadataAnnotations" (dict "root" . "ingress" .Values.keycloak.ingress) | nindent 2 }}
 spec:
-  ingressClassName: {{ .Values.keycloak.ingress.className | quote }}
-  {{- include "common.ingressTLS" .  | indent 2}}
+  {{- include "common.ingress.className" (dict "root" . "ingress" .Values.keycloak.ingress) | nindent 2 }}
+  {{- include "common.ingressTLS" . | nindent 2 }}
   rules:
     {{- range .Values.keycloak.ingress.hosts }}
     - host: {{ tpl .host $ | quote }}

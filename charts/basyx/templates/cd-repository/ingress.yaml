@@ -6,14 +6,10 @@ metadata:
   name: {{ include "basyx-cdRepository.fullname" . }}
   labels:
     {{- include "basyx-cdRepository.labels" . | nindent 4 }}
-  annotations: &commonIngressAnnotations
-  {{- include "common.ingressTLS.annotations" . | nindent 2}}
-  {{- with .Values.cdRepository.ingress.annotations }}
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
+  {{- include "common.ingress.metadataAnnotations" (dict "root" . "ingress" .Values.cdRepository.ingress) | nindent 2 }}
 spec:
-  ingressClassName: {{ .Values.cdRepository.ingress.className | quote }}
-  {{- include "common.ingressTLS" .  | indent 2}}
+  {{- include "common.ingress.className" (dict "root" . "ingress" .Values.cdRepository.ingress) | nindent 2 }}
+  {{- include "common.ingressTLS" . | nindent 2 }}
   rules:
     {{- range .Values.cdRepository.ingress.hosts }}
     - host: {{ tpl .host $ | quote }}

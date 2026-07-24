@@ -780,9 +780,61 @@ Helper to render TLS block if enabled
 tls:
   - hosts:
       {{- range .Values.tls.hosts }}
-      - {{ . | quote }}
+      - {{ tpl (print .) $ | quote }}
       {{- end }}
-    secretName: {{ .Release.Name }}-tls-secret
+    secretName: {{ .Values.tls.secretName | default (printf "%s-tls-secret" .Release.Name) | quote }}
+{{- end }}
+{{- end }}
+
+{{- define "common.ingress.className" -}}
+{{- $root := .root -}}
+{{- $ingress := .ingress | default dict -}}
+{{- $className := $root.Values.ingress.className | default "" -}}
+{{- with $ingress.className -}}
+{{- $className = . -}}
+{{- end -}}
+{{- if $className }}
+ingressClassName: {{ tpl (print $className) $root | quote }}
+{{- end }}
+{{- end }}
+
+{{- define "common.ingress.annotations" -}}
+{{- $root := .root -}}
+{{- $ingress := .ingress | default dict -}}
+{{- $annotations := dict -}}
+{{- if $root.Values.tls.enabled -}}
+{{- if $root.Values.ingress.certificateIssuer.enabled -}}
+{{- $_ := set $annotations "cert-manager.io/issuer" ($root.Values.ingress.certificateIssuer.name | toString) -}}
+{{- else if $root.Values.ingress.issuer -}}
+{{- $_ := set $annotations "cert-manager.io/issuer" ($root.Values.ingress.issuer | toString) -}}
+{{- else if $root.Values.ingress.clusterIssuer -}}
+{{- $_ := set $annotations "cert-manager.io/cluster-issuer" ($root.Values.ingress.clusterIssuer | toString) -}}
+{{- end -}}
+{{- end -}}
+{{- range $key, $value := ($root.Values.ingress.annotations | default dict) -}}
+{{- if kindIs "invalid" $value -}}
+{{- $_ := unset $annotations $key -}}
+{{- else -}}
+{{- $_ := set $annotations $key (tpl (print $value) $root) -}}
+{{- end -}}
+{{- end -}}
+{{- range $key, $value := ($ingress.annotations | default dict) -}}
+{{- if kindIs "invalid" $value -}}
+{{- $_ := unset $annotations $key -}}
+{{- else -}}
+{{- $_ := set $annotations $key (tpl (print $value) $root) -}}
+{{- end -}}
+{{- end -}}
+{{- if $annotations -}}
+{{- toYaml $annotations -}}
+{{- end -}}
+{{- end }}
+
+{{- define "common.ingress.metadataAnnotations" -}}
+{{- $annotations := include "common.ingress.annotations" . -}}
+{{- if $annotations }}
+annotations:
+{{ $annotations | nindent 2 }}
 {{- end }}
 {{- end }}
 

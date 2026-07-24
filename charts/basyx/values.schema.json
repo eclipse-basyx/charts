@@ -344,9 +344,27 @@
       "type": "object",
       "properties": {
         "enabled": { "type": "boolean" },
+        "secretName": { "type": "string" },
         "hosts": {
           "type": "array",
           "items": { "type": "string" }
+        }
+      }
+    },
+    "ingress": {
+      "type": "object",
+      "properties": {
+        "className": { "type": "string" },
+        "annotations": { "type": "object" },
+        "clusterIssuer": { "type": "string" },
+        "issuer": { "type": "string" },
+        "certificateIssuer": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "name": { "type": "string" },
+            "spec": { "type": "object" }
+          }
         }
       }
     },
