@@ -1,0 +1,28 @@
+# Observability overlay for BaSyx Go 1.0.4 and newer.
+#
+# Apply this file together with a deployment values file, for example:
+#
+#   helm upgrade --install basyx charts/basyx \
+#     -n basyx \
+#     -f values/values.minimal.yaml \
+#     -f values/values.observability.example.yaml
+#
+# This overlay expects an OpenTelemetry Collector to be reachable at the
+# configured endpoint. It does not install the Collector, Tempo, Loki, Grafana,
+# or a log collector.
+
+logging:
+  format: json
+  level: info
+
+telemetry:
+  tracesExporter: otlp
+  endpoint: http://opentelemetry-collector.observability.svc.cluster.local:4318
+  protocol: http/protobuf
+  existingSecret: ""
+  resourceAttributes: deployment.environment.name=kubernetes
+  tracesSampler: parentbased_traceidratio
+  tracesSamplerArg: "0.1"
+  propagators:
+    - tracecontext
+    - baggage

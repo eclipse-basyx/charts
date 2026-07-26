@@ -101,6 +101,29 @@ environment:
     OIDC_AUDIENCE: discovery-service
     ABAC_ENABLED: false
 
+# Structured logging for all BaSyx Go services, including the Configuration
+# Service job. JSON is recommended when logs are collected by a cluster agent.
+logging:
+  format: text
+  level: info
+
+# Optional OpenTelemetry tracing for BaSyx Go HTTP services. The chart connects
+# applications to an existing Collector; it does not deploy an observability
+# backend. Explicit keys in environment.common override these values.
+telemetry:
+  tracesExporter: none
+  endpoint: ""
+  protocol: http/protobuf
+  # Optional existing Secret containing additional standard OTEL_* variables,
+  # for example OTEL_EXPORTER_OTLP_HEADERS. Restart pods after changing it.
+  existingSecret: ""
+  resourceAttributes: ""
+  tracesSampler: parentbased_always_on
+  tracesSamplerArg: ""
+  propagators:
+    - tracecontext
+    - baggage
+
 # Shared BaSyx Go runtime configuration rendered into the common environment
 # for backend services. Explicit keys in environment.common override these
 # structured values.

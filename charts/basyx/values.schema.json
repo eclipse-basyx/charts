@@ -231,6 +231,83 @@
         }
       }
     },
+    "logging": {
+      "type": "object",
+      "required": ["format", "level"],
+      "properties": {
+        "format": { "type": "string", "enum": ["text", "json"] },
+        "level": { "type": "string", "enum": ["debug", "info", "warn", "error"] }
+      }
+    },
+    "telemetry": {
+      "type": "object",
+      "required": [
+        "tracesExporter",
+        "endpoint",
+        "protocol",
+        "existingSecret",
+        "resourceAttributes",
+        "tracesSampler",
+        "tracesSamplerArg",
+        "propagators"
+      ],
+      "properties": {
+        "tracesExporter": { "type": "string", "enum": ["none", "otlp", "console"] },
+        "endpoint": { "type": "string" },
+        "protocol": { "type": "string", "enum": ["grpc", "http/protobuf"] },
+        "existingSecret": { "type": "string" },
+        "resourceAttributes": { "type": "string" },
+        "tracesSampler": {
+          "type": "string",
+          "enum": [
+            "always_on",
+            "always_off",
+            "traceidratio",
+            "parentbased_always_on",
+            "parentbased_always_off",
+            "parentbased_traceidratio"
+          ]
+        },
+        "tracesSamplerArg": {
+          "oneOf": [
+            { "type": "string", "pattern": "^$|^(0(\\.[0-9]+)?|1(\\.0+)?)$" },
+            { "type": "number", "minimum": 0, "maximum": 1 }
+          ]
+        },
+        "propagators": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "enum": ["tracecontext", "baggage", "none"] }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "tracesExporter": { "const": "otlp" }
+            },
+            "required": ["tracesExporter"]
+          },
+          "then": {
+            "properties": {
+              "endpoint": { "minLength": 1 }
+            }
+          }
+        },
+        {
+          "not": {
+            "properties": {
+              "propagators": {
+                "minItems": 2,
+                "contains": { "const": "none" }
+              }
+            },
+            "required": ["propagators"]
+          }
+        }
+      ]
+    },
     "keycloak": {
       "type": "object",
       "required": [

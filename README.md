@@ -51,6 +51,7 @@ Custom values files live outside the chart, for example:
 values/values.catena-x.example.yaml
 values/values.example.yaml
 values/values.minimal.yaml
+values/values.observability.example.yaml
 values/values.secured.example.yaml
 ```
 
@@ -129,6 +130,9 @@ cp values/values.secured.example.yaml values/values.my-secured-environment.yaml
 
 # Catena-X oriented deployment with marker-based DTR and Submodel access.
 cp values/values.catena-x.example.yaml values/values.my-catena-x-environment.yaml
+
+# Optional logging and tracing overlay for an existing Collector.
+cp values/values.observability.example.yaml values/values.my-observability.yaml
 ```
 
 The unsecured example enables the core BaSyx Go services and the Web UI:
@@ -195,6 +199,10 @@ For DPP API deployments, enable `dppApi` in your own values file. DPP commonly r
 
 Use `values/values.catena-x.example.yaml` when you want a Catena-X oriented setup. It enables Keycloak, ABAC, Digital Twin Registry and Submodel Repository with BPN-based marker access rules.
 
+Use `values/values.observability.example.yaml` as an overlay when BaSyx logs
+should use JSON and traces should be exported to an existing OpenTelemetry
+Collector. It does not deploy an observability backend.
+
 Do not publish production passwords or client secrets. For public examples, use placeholders and inject real credentials through your deployment pipeline or an external secret management solution.
 
 ## Render Before Installing
@@ -206,6 +214,7 @@ helm lint charts/basyx -f values/values.example.yaml
 helm lint charts/basyx -f values/values.minimal.yaml
 helm lint charts/basyx -f values/values.secured.example.yaml
 helm lint charts/basyx -f values/values.catena-x.example.yaml
+helm lint charts/basyx -f values/values.minimal.yaml -f values/values.observability.example.yaml
 
 helm template basyx charts/basyx \
   -n basyx-custom \
@@ -780,6 +789,80 @@ This applies to:
 - `cdRepository`
 - `companyLookup`
 - `digitalTwinRegistry`
+
+#### Logging, Request Correlation And Tracing
+
+The structured logging and OpenTelemetry values require BaSyx Go `1.0.4` or
+newer.
+
+Logging is configured for every BaSyx Go backend and the Configuration Service:
+
+```yaml
+logging:
+  format: json
+  level: info
+```
+
+BaSyx writes logs to standard error. The chart does not install a log agent or
+send logs directly to Loki. Collect container logs through the cluster logging
+pipeline.
+
+HTTP services automatically return `X-Request-ID` and `X-Correlation-ID` and
+emit one structured access record for each request. No chart value is required
+for request correlation, and these IDs must not be treated as authenticated
+identity data.
+
+Tracing is disabled by default. To send traces to an existing OpenTelemetry
+Collector:
+
+```yaml
+telemetry:
+  tracesExporter: otlp
+  endpoint: http://opentelemetry-collector.observability.svc.cluster.local:4318
+  protocol: http/protobuf
+  existingSecret: ""
+  resourceAttributes: deployment.environment.name=production
+  tracesSampler: parentbased_traceidratio
+  tracesSamplerArg: "0.1"
+  propagators:
+    - tracecontext
+    - baggage
+```
+
+The Configuration Service has no HTTP server and remains logging-only. Advanced
+standard OpenTelemetry settings such as compression, timeouts, batch processor
+limits, and service-specific names can be supplied through
+`environment.common` or a service's `environment` map.
+
+Do not put OTLP authorization headers into a values file. Create a Kubernetes
+Secret containing the standard environment variable and reference it instead:
+
+```bash
+kubectl -n basyx create secret generic basyx-otel-credentials \
+  --from-literal=OTEL_EXPORTER_OTLP_HEADERS='Authorization=Bearer%20<token>'
+```
+
+```yaml
+telemetry:
+  existingSecret: basyx-otel-credentials
+```
+
+Existing Secret changes do not alter the Deployment template automatically.
+Restart the BaSyx backend pods after rotating telemetry credentials.
+
+The example overlay can be combined with another values file:
+
+```bash
+helm upgrade --install basyx charts/basyx \
+  -n basyx \
+  -f values/values.minimal.yaml \
+  -f values/values.observability.example.yaml
+```
+
+This overlay connects BaSyx services to an existing Collector. The chart
+intentionally does not deploy Grafana, Loki, Tempo, Jaeger, Alloy, or the
+Collector because their authentication, storage, retention, tenancy, and
+resource requirements are cluster-specific.
 
 Global runtime defaults:
 
