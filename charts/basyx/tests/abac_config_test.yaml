@@ -25,7 +25,22 @@ tests:
           pattern: '"name": "admin_full"'
       - matchRegex:
           path: data["access-rules.json"]
+          pattern: '"name": "anonymous_attr"'
+      - matchRegex:
+          path: data["access-rules.json"]
+          pattern: '"name": "anonymous_read"'
+      - matchRegex:
+          path: data["access-rules.json"]
+          pattern: '"name": "public_description"'
+      - matchRegex:
+          path: data["access-rules.json"]
           pattern: '"name": "all_api"'
+      - matchRegex:
+          path: data["access-rules.json"]
+          pattern: '"ROUTE": "/description"'
+      - matchRegex:
+          path: data["access-rules.json"]
+          pattern: '"ROUTE": "/aas-registry/description"'
       - matchRegex:
           path: data["access-rules.json"]
           pattern: '"ROUTE": "/concept-descriptions/\*"'
@@ -41,6 +56,9 @@ tests:
       - matchRegex:
           path: data["access-rules.json"]
           pattern: '"USEFORMULA": "is_admin"'
+      - matchRegex:
+          path: data["access-rules.json"]
+          pattern: '"USEOBJECTS": \["public_description"\]'
 
   - it: prefers service-local ABAC overrides over global defaults
     values:
