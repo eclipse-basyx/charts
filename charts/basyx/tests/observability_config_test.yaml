@@ -1,0 +1,146 @@
+suite: observability configuration
+release:
+  name: basyx
+templates:
+  - templates/secret.yaml
+  - templates/configuration-service-job.yaml
+  - templates/aas-environment/deployment.yaml
+tests:
+  - it: renders logging defaults and disabled tracing for backend services
+    template: templates/secret.yaml
+    set:
+      aasEnvironment.enabled: true
+    documentSelector:
+      path: metadata.name
+      value: basyx-common-config
+    asserts:
+      - equal:
+          path: stringData.LOGGING_FORMAT
+          value: text
+      - equal:
+          path: stringData.LOGGING_LEVEL
+          value: info
+      - equal:
+          path: stringData.OTEL_TRACES_EXPORTER
+          value: none
+
+  - it: renders an OTLP tracing configuration for backend services
+    template: templates/secret.yaml
+    set:
+      aasEnvironment.enabled: true
+      logging.format: json
+      logging.level: warn
+      telemetry.tracesExporter: otlp
+      telemetry.endpoint: http://collector.observability.svc:4318
+      telemetry.protocol: http/protobuf
+      telemetry.resourceAttributes: deployment.environment.name=test
+      telemetry.tracesSampler: parentbased_traceidratio
+      telemetry.tracesSamplerArg: "0.25"
+    documentSelector:
+      path: metadata.name
+      value: basyx-common-config
+    asserts:
+      - equal:
+          path: stringData.LOGGING_FORMAT
+          value: json
+      - equal:
+          path: stringData.LOGGING_LEVEL
+          value: warn
+      - equal:
+          path: stringData.OTEL_TRACES_EXPORTER
+          value: otlp
+      - equal:
+          path: stringData.OTEL_EXPORTER_OTLP_ENDPOINT
+          value: http://collector.observability.svc:4318
+      - equal:
+          path: stringData.OTEL_EXPORTER_OTLP_PROTOCOL
+          value: http/protobuf
+      - equal:
+          path: stringData.OTEL_RESOURCE_ATTRIBUTES
+          value: deployment.environment.name=test
+      - equal:
+          path: stringData.OTEL_TRACES_SAMPLER
+          value: parentbased_traceidratio
+      - equal:
+          path: stringData.OTEL_TRACES_SAMPLER_ARG
+          value: "0.25"
+      - equal:
+          path: stringData.OTEL_PROPAGATORS
+          value: tracecontext,baggage
+
+  - it: lets raw common environment values override observability values
+    template: templates/secret.yaml
+    set:
+      aasEnvironment.enabled: true
+      logging.format: json
+      telemetry.tracesExporter: otlp
+      telemetry.endpoint: http://structured-collector:4318
+      environment.common.LOGGING_FORMAT: text
+      environment.common.OTEL_EXPORTER_OTLP_ENDPOINT: http://raw-collector:4318
+    documentSelector:
+      path: metadata.name
+      value: basyx-common-config
+    asserts:
+      - equal:
+          path: stringData.LOGGING_FORMAT
+          value: text
+      - equal:
+          path: stringData.OTEL_EXPORTER_OTLP_ENDPOINT
+          value: http://raw-collector:4318
+
+  - it: configures logging but not tracing for the configuration service
+    template: templates/configuration-service-job.yaml
+    set:
+      logging.format: json
+      logging.level: error
+      telemetry.tracesExporter: otlp
+      telemetry.endpoint: http://collector.observability.svc:4318
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: LOGGING_FORMAT
+            value: json
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: LOGGING_LEVEL
+            value: error
+          count: 1
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OTEL_TRACES_EXPORTER
+            value: otlp
+
+  - it: mounts an existing telemetry environment secret in backend services
+    template: templates/aas-environment/deployment.yaml
+    set:
+      aasEnvironment.enabled: true
+      telemetry.existingSecret: basyx-otel-credentials
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            secretRef:
+              name: basyx-otel-credentials
+          count: 1
+
+  - it: lets the common environment override configuration service logging
+    template: templates/configuration-service-job.yaml
+    set:
+      logging.format: json
+      environment.common.LOGGING_FORMAT: text
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: LOGGING_FORMAT
+            value: text
+          count: 1
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: LOGGING_FORMAT
+            value: json

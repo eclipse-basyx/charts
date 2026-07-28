@@ -83,6 +83,14 @@ spec:
           {{- end }}
           env:
             {{- include "common-database-config" . | nindent 12 }}
+            {{- if not (hasKey (.Values.environment.common | default dict) "LOGGING_FORMAT") }}
+            - name: LOGGING_FORMAT
+              value: {{ .Values.logging.format | quote }}
+            {{- end }}
+            {{- if not (hasKey (.Values.environment.common | default dict) "LOGGING_LEVEL") }}
+            - name: LOGGING_LEVEL
+              value: {{ .Values.logging.level | quote }}
+            {{- end }}
             {{- range $key, $value := .Values.environment.common }}
             - name: {{ $key }}
               value: {{ tpl (print $value) $ | quote }}

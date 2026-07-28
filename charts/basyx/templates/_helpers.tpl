@@ -160,6 +160,8 @@ The environment.common map remains the escape hatch and takes precedence.
 {{- define "basyx.commonConfig.runtimeEnv" -}}
 {{- $root := . -}}
 {{- $common := .Values.environment.common | default dict -}}
+{{- $logging := .Values.logging | default dict -}}
+{{- $telemetry := .Values.telemetry | default dict -}}
 {{- $general := .Values.general | default dict -}}
 {{- $server := .Values.server | default dict -}}
 {{- $history := .Values.history | default dict -}}
@@ -168,6 +170,15 @@ The environment.common map remains the escape hatch and takes precedence.
 {{- $integrityAnchor := dig "integrityAnchor" (dict) $history -}}
 {{- $eventing := .Values.eventing | default dict -}}
 {{- $abac := .Values.abac | default dict -}}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "LOGGING_FORMAT" "value" (dig "format" "text" $logging)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "LOGGING_LEVEL" "value" (dig "level" "info" $logging)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "OTEL_TRACES_EXPORTER" "value" (dig "tracesExporter" "none" $telemetry)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "OTEL_EXPORTER_OTLP_ENDPOINT" "value" (dig "endpoint" "" $telemetry)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "OTEL_EXPORTER_OTLP_PROTOCOL" "value" (dig "protocol" "http/protobuf" $telemetry)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "OTEL_RESOURCE_ATTRIBUTES" "value" (dig "resourceAttributes" "" $telemetry)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "OTEL_TRACES_SAMPLER" "value" (dig "tracesSampler" "parentbased_always_on" $telemetry)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "OTEL_TRACES_SAMPLER_ARG" "value" (dig "tracesSamplerArg" "" $telemetry)) }}
+{{- include "basyx.commonConfig.listEntry" (dict "common" $common "name" "OTEL_PROPAGATORS" "value" (dig "propagators" (list "tracecontext" "baggage") $telemetry)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_ENABLEIMPLICITCASTS" "value" (dig "enableImplicitCasts" true $general)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_ENABLEDESCRIPTORDEBUG" "value" (dig "enableDescriptorDebug" false $general)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_DISCOVERYINTEGRATION" "value" (dig "discoveryIntegration" false $general)) }}
@@ -374,6 +385,10 @@ spec:
                 name: {{ include .fullnameHelper $root }}-config
             - secretRef:
                 name: {{ include "basyx.fullname" $root }}-common-config
+            {{- with $root.Values.telemetry.existingSecret }}
+            - secretRef:
+                name: {{ . }}
+            {{- end }}
           resources:
             {{- toYaml $values.resources | nindent 12 }}
           {{- with $values.livenessProbe }}

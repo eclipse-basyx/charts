@@ -100,6 +100,27 @@ tests:
       - failedTemplate:
           errorPattern: "aasRepository.server.shutdownTimeoutSeconds"
 
+  - it: fails when the logging format is unsupported
+    values:
+      - fixtures/invalid_logging_format.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "logging.format"
+
+  - it: fails when the tracing exporter is unsupported
+    values:
+      - fixtures/invalid_telemetry_exporter.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "telemetry.tracesExporter"
+
+  - it: fails when OTLP tracing has no Collector endpoint
+    values:
+      - fixtures/invalid_telemetry_otlp_endpoint.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "telemetry.endpoint"
+
   - it: fails when external database has no existing secret
     values:
       - fixtures/invalid_external_database_missing_secret.yaml
