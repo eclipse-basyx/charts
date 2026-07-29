@@ -87,3 +87,28 @@ tests:
     asserts:
       - hasDocuments:
           count: 0
+
+  - it: does not render Argo CD hook annotations by default
+    template: templates/configuration-service-job.yaml
+    asserts:
+      - notExists:
+          path: metadata.annotations["argocd.argoproj.io/hook"]
+      - notExists:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+      - notExists:
+          path: metadata.annotations["argocd.argoproj.io/hook-delete-policy"]
+
+  - it: renders Argo CD hook annotations when enabled
+    template: templates/configuration-service-job.yaml
+    set:
+      argocd.enabled: true
+    asserts:
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/hook"]
+          value: Sync
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "10"
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/hook-delete-policy"]
+          value: BeforeHookCreation

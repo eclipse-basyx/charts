@@ -7,6 +7,11 @@ templates:
   - templates/dpp-api/deployment.yaml
   - templates/company-lookup/deployment.yaml
   - templates/keycloak/deployment.yaml
+  - templates/aas-web-gui/deployment.yaml
+  - templates/aas-web-gui/configmap.yaml
+  - templates/aas-web-gui/configmap-infrastructure.yaml
+  - templates/aas-web-gui/configmap-logos.yaml
+  - templates/aas-web-gui/secret.yaml
 tests:
   - it: mounts ABAC config and rollout checksum for aas repository
     template: templates/aas-repository/deployment.yaml
@@ -64,6 +69,36 @@ tests:
       - equal:
           path: spec.template.spec.containers[0].readinessProbe.httpGet.path
           value: /aas-repository/health
+
+  - it: renders Argo CD runtime sync wave for shared backend deployments
+    template: templates/aas-repository/deployment.yaml
+    set:
+      argocd.enabled: true
+      aasRepository.enabled: true
+    asserts:
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "20"
+
+  - it: renders Argo CD runtime sync wave for keycloak
+    template: templates/keycloak/deployment.yaml
+    set:
+      argocd.enabled: true
+      keycloak.enabled: true
+    asserts:
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "20"
+
+  - it: renders Argo CD runtime sync wave for the web UI
+    template: templates/aas-web-gui/deployment.yaml
+    set:
+      argocd.enabled: true
+      aasWebGui.enabled: true
+    asserts:
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "20"
 
   - it: renders service-local runtime overrides for shared backend deployments
     template: templates/aas-repository/deployment.yaml

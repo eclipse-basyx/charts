@@ -631,6 +631,23 @@ configurationService:
 
 `pre-upgrade` runs schema migrations before updated runtime pods are rolled out. `post-install` is used for fresh installs because the PostgreSQL database must exist before the job can connect.
 
+When the chart is deployed by Argo CD, enable the optional Argo CD sync annotations. Argo CD uses `helm template` and maps Helm hooks into its own sync phases, so the chart can explicitly run the Configuration Service as a `Sync` hook in wave `10` and the runtime Deployments in wave `20`. This lets Argo CD recreate prerequisites such as the ServiceAccount, database resources, and generated PostgreSQL Secret before starting the schema job, while still keeping runtime pods behind the migration. These annotations are disabled by default and are not needed for plain Helm installations.
+
+```yaml
+argocd:
+  enabled: true
+  runtimeSyncWave: "20"
+
+configurationService:
+  hook:
+    argocd:
+      enabled: true
+      hook: Sync
+      syncWave: "10"
+      deletePolicy:
+        - BeforeHookCreation
+```
+
 On fresh installs, PostgreSQL may need some time before it accepts connections. The chart therefore adds a `wait-for-database` init container that polls PostgreSQL with `pg_isready` before starting the Configuration Service. This avoids slow Kubernetes Job backoff loops when the database is simply not ready yet.
 
 After deployment, verify the job and logs with:
