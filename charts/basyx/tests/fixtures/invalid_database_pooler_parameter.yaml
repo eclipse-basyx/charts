@@ -1,0 +1,5 @@
+database:
+  pooler:
+    enabled: true
+    parameters:
+      reserve_pool_size: 5

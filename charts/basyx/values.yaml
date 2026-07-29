@@ -1627,6 +1627,26 @@ database:
   # PostgreSQL settings accepted by CloudNativePG. Values must be strings.
   postgresql:
     parameters: {}
+  # Optional CloudNativePG read-write Pooler for BaSyx runtime services.
+  # The Configuration Service always connects directly to the primary because
+  # schema migrations use session-level advisory locks.
+  pooler:
+    enabled: false
+    instances: 2
+    poolMode: transaction
+    maxClientConn: 1000
+    defaultPoolSize: 25
+    preparedStatements:
+      enabled: true
+      maxPreparedStatements: 100
+    # Additional CloudNativePG-supported PgBouncer parameters. Values must be
+    # strings. The three settings above take precedence over duplicate keys.
+    parameters: {}
+    resources: {}
+    nodeSelector: {}
+    affinity: {}
+    tolerations: []
+    topologySpreadConstraints: []
 
 # PodDisruptionBudget: not managed by this chart. For HA deployments, create
 # PDBs separately to guarantee availability during node drains. Example:

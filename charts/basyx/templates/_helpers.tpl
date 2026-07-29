@@ -791,6 +791,14 @@ Create the name of the service account to use
 {{- if or (eq $type "postgres") (eq $type "managed") (eq $type "cnpg") -}}true{{- else -}}false{{- end -}}
 {{- end}}
 
+{{- define "database.poolerEnabled" -}}
+{{- if and (eq (include "database.managed" .) "true") .Values.database.pooler.enabled -}}true{{- else -}}false{{- end -}}
+{{- end}}
+
+{{- define "database.poolerName" -}}
+{{- printf "%s-rw-pooler" .Values.database.clusterName | trunc 63 | trimSuffix "-" -}}
+{{- end}}
+
 {{/*
 Helper to render TLS block if enabled
 */}}
@@ -971,16 +979,23 @@ annotations:
 {{- end -}}
 {{- $secretContext := dict "root" $root "component" $component "nameSuffix" $nameSuffix -}}
 {{- $databaseSecret := include "database.serviceSecret" $secretContext -}}
+{{- $componentValues := get $root.Values $component | default dict -}}
+{{- $serviceDatabase := get $componentValues "database" | default dict -}}
+{{- $usePooler := and $component (not $serviceDatabase) (eq (include "database.poolerEnabled" $root) "true") -}}
 - name: POSTGRES_PORT
   valueFrom:
     secretKeyRef:
       name: {{ $databaseSecret }}
       key: port
 - name: POSTGRES_HOST
+  {{- if $usePooler }}
+  value: {{ include "database.poolerName" $root | quote }}
+  {{- else }}
   valueFrom:
     secretKeyRef:
       name: {{ $databaseSecret }}
       key: host
+  {{- end }}
 - name: POSTGRES_PASSWORD
   valueFrom:
     secretKeyRef:

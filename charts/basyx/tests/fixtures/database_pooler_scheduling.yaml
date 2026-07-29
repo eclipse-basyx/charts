@@ -1,0 +1,28 @@
+database:
+  pooler:
+    enabled: true
+    instances: 3
+    poolMode: session
+    maxClientConn: 500
+    defaultPoolSize: 20
+    parameters:
+      reserve_pool_size: "5"
+    resources:
+      requests:
+        cpu: 250m
+        memory: 256Mi
+    nodeSelector:
+      workload: database
+    tolerations:
+      - key: database
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
+    affinity:
+      podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          - topologyKey: kubernetes.io/hostname
+    topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway

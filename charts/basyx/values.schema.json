@@ -299,6 +299,21 @@
         }
       }
     },
+    "podSpecAffinity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "nodeAffinity": {
+          "$ref": "#/definitions/nodeAffinity"
+        },
+        "podAffinity": {
+          "$ref": "#/definitions/podAffinity"
+        },
+        "podAntiAffinity": {
+          "$ref": "#/definitions/podAffinity"
+        }
+      }
+    },
     "serviceRuntimeOverrides": {
       "type": "object",
       "properties": {
@@ -1200,6 +1215,186 @@
               "type": "object",
               "additionalProperties": {
                 "type": "string"
+              }
+            }
+          }
+        },
+        "pooler": {
+          "type": "object",
+          "required": [
+            "enabled",
+            "instances",
+            "poolMode",
+            "maxClientConn",
+            "defaultPoolSize",
+            "preparedStatements",
+            "parameters",
+            "resources",
+            "nodeSelector",
+            "affinity",
+            "tolerations",
+            "topologySpreadConstraints"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "instances": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "poolMode": {
+              "type": "string",
+              "enum": ["session", "transaction"]
+            },
+            "maxClientConn": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "defaultPoolSize": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "preparedStatements": {
+              "type": "object",
+              "required": ["enabled", "maxPreparedStatements"],
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "maxPreparedStatements": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "parameters": {
+              "type": "object",
+              "propertyNames": {
+                "pattern": "^[a-z][a-z0-9_]*$"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "resources": {
+              "type": "object",
+              "properties": {
+                "requests": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "oneOf": [
+                      { "type": "string", "minLength": 1 },
+                      { "type": "integer", "minimum": 0 }
+                    ]
+                  }
+                },
+                "limits": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "oneOf": [
+                      { "type": "string", "minLength": 1 },
+                      { "type": "integer", "minimum": 0 }
+                    ]
+                  }
+                }
+              }
+            },
+            "nodeSelector": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "affinity": {
+              "$ref": "#/definitions/podSpecAffinity"
+            },
+            "tolerations": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["operator"],
+                "properties": {
+                  "key": { "type": "string" },
+                  "operator": {
+                    "type": "string",
+                    "enum": ["Exists", "Equal"]
+                  },
+                  "value": { "type": "string" },
+                  "effect": {
+                    "type": "string",
+                    "enum": ["", "NoSchedule", "PreferNoSchedule", "NoExecute"]
+                  },
+                  "tolerationSeconds": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              }
+            },
+            "topologySpreadConstraints": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["maxSkew", "topologyKey", "whenUnsatisfiable"],
+                "properties": {
+                  "maxSkew": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "topologyKey": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "whenUnsatisfiable": {
+                    "type": "string",
+                    "enum": ["DoNotSchedule", "ScheduleAnyway"]
+                  },
+                  "labelSelector": {
+                    "$ref": "#/definitions/labelSelector"
+                  },
+                  "minDomains": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "matchLabelKeys": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "nodeAffinityPolicy": {
+                    "type": "string",
+                    "enum": ["Honor", "Ignore"]
+                  },
+                  "nodeTaintsPolicy": {
+                    "type": "string",
+                    "enum": ["Honor", "Ignore"]
+                  }
+                },
+                "allOf": [
+                  {
+                    "if": {
+                      "required": ["minDomains"]
+                    },
+                    "then": {
+                      "properties": {
+                        "whenUnsatisfiable": {
+                          "const": "DoNotSchedule"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "if": {
+                      "required": ["matchLabelKeys"]
+                    },
+                    "then": {
+                      "required": ["labelSelector"]
+                    }
+                  }
+                ]
               }
             }
           }

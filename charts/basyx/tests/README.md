@@ -27,5 +27,6 @@ The suites cover stable chart contracts such as:
 - digest-aware image rendering
 - schema validation for required values and basic formats
 - managed PostgreSQL storage, WAL, resources, scheduling and parameters
+- optional CloudNativePG read-write Pooler rendering and connection routing
 - shared per-pod PostgreSQL pool defaults and Configuration Service propagation
 - keycloak init resources and a runtime `helm test` realm check

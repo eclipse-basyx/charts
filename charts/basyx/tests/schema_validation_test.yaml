@@ -212,6 +212,27 @@ tests:
       - failedTemplate:
           errorPattern: "database.resources.requests.cpu"
 
+  - it: fails when the Pooler mode is unsupported
+    values:
+      - fixtures/invalid_database_pooler_mode.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "database.pooler.poolMode"
+
+  - it: fails when an additional Pooler parameter is not a string
+    values:
+      - fixtures/invalid_database_pooler_parameter.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "database.pooler.parameters.reserve_pool_size"
+
+  - it: fails when Pooler minDomains is used with ScheduleAnyway
+    values:
+      - fixtures/invalid_database_pooler_topology.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "database.pooler.topologySpreadConstraints"
+
   - it: fails when minDomains is used with ScheduleAnyway
     values:
       - fixtures/invalid_database_min_domains.yaml
