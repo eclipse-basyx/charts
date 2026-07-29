@@ -1020,10 +1020,10 @@ This applies to:
 - `companyLookup`
 - `digitalTwinRegistry`
 
-#### Logging, Request Correlation And Tracing
+#### Logging, Request Correlation And Telemetry
 
-The structured logging and OpenTelemetry values require BaSyx Go `1.0.4` or
-newer.
+Structured logging and tracing require BaSyx Go `1.0.4` or newer. PostgreSQL
+pool metrics require BaSyx Go `1.0.6` or newer.
 
 Logging is configured for every BaSyx Go backend and the Configuration Service:
 
@@ -1042,14 +1042,17 @@ emit one structured access record for each request. No chart value is required
 for request correlation, and these IDs must not be treated as authenticated
 identity data.
 
-Tracing is disabled by default. To send traces to an existing OpenTelemetry
-Collector:
+Tracing and metrics are independently disabled by default. To send both signals
+to an existing OpenTelemetry Collector:
 
 ```yaml
 telemetry:
   tracesExporter: otlp
+  metricsExporter: otlp
   endpoint: http://opentelemetry-collector.observability.svc.cluster.local:4318
   protocol: http/protobuf
+  metricsExportInterval: "60000"
+  metricsExportTimeout: "30000"
   existingSecret: ""
   resourceAttributes: deployment.environment.name=production
   tracesSampler: parentbased_traceidratio
@@ -1059,10 +1062,31 @@ telemetry:
     - baggage
 ```
 
-The Configuration Service has no HTTP server and remains logging-only. Advanced
-standard OpenTelemetry settings such as compression, timeouts, batch processor
-limits, and service-specific names can be supplied through
-`environment.common` or a service's `environment` map.
+`metricsExportInterval` and `metricsExportTimeout` are optional positive
+millisecond values. Leave them empty to use the OpenTelemetry SDK defaults.
+The shared endpoint and protocol apply to traces and metrics. Advanced standard
+settings, including signal-specific endpoints, headers, compression and
+timeouts, can be supplied through `environment.common`,
+`telemetry.existingSecret`, or a service's `environment` map.
+
+BaSyx Go exports the following PostgreSQL writer-pool metrics without executing
+additional database queries:
+
+| Metric | Meaning |
+| --- | --- |
+| `db.client.connection.max` | Configured maximum open connections |
+| `db.client.connection.count` with `state=used` or `state=idle` | Current pool use |
+| `basyx.db.client.connection.waits` | Cumulative waits for a connection |
+| `basyx.db.client.connection.wait_time` | Cumulative wait duration in seconds |
+| `basyx.db.client.connection.closed` with a bounded `reason` | Cumulative closures caused by pool limits |
+
+Use rates for cumulative counters. A rising wait rate while used connections
+approach the maximum points to the BaSyx application pool. When the optional
+CloudNativePG Pooler is enabled, compare these metrics with
+`cnpg_pgbouncer_*` metrics to distinguish waits inside the application from
+PgBouncer queueing.
+
+The Configuration Service has no HTTP server and remains logging-only.
 
 Do not put OTLP authorization headers into a values file. Create a Kubernetes
 Secret containing the standard environment variable and reference it instead:

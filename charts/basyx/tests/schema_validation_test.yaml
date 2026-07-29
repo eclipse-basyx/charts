@@ -114,9 +114,30 @@ tests:
       - failedTemplate:
           errorPattern: "telemetry.tracesExporter"
 
+  - it: fails when the metrics exporter is unsupported
+    values:
+      - fixtures/invalid_telemetry_metrics_exporter.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "telemetry.metricsExporter"
+
+  - it: fails when the metrics export interval is not positive
+    values:
+      - fixtures/invalid_telemetry_metrics_interval.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "telemetry.metricsExportInterval"
+
   - it: fails when OTLP tracing has no Collector endpoint
     values:
       - fixtures/invalid_telemetry_otlp_endpoint.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "telemetry.endpoint"
+
+  - it: fails when OTLP metrics have no Collector endpoint
+    values:
+      - fixtures/invalid_telemetry_metrics_otlp_endpoint.yaml
     asserts:
       - failedTemplate:
           errorPattern: "telemetry.endpoint"

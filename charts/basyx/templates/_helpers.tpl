@@ -173,8 +173,11 @@ The environment.common map remains the escape hatch and takes precedence.
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "LOGGING_FORMAT" "value" (dig "format" "text" $logging)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "LOGGING_LEVEL" "value" (dig "level" "info" $logging)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "OTEL_TRACES_EXPORTER" "value" (dig "tracesExporter" "none" $telemetry)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "OTEL_METRICS_EXPORTER" "value" (dig "metricsExporter" "none" $telemetry)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "OTEL_EXPORTER_OTLP_ENDPOINT" "value" (dig "endpoint" "" $telemetry)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "OTEL_EXPORTER_OTLP_PROTOCOL" "value" (dig "protocol" "http/protobuf" $telemetry)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "OTEL_METRIC_EXPORT_INTERVAL" "value" (dig "metricsExportInterval" "" $telemetry)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "OTEL_METRIC_EXPORT_TIMEOUT" "value" (dig "metricsExportTimeout" "" $telemetry)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "OTEL_RESOURCE_ATTRIBUTES" "value" (dig "resourceAttributes" "" $telemetry)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "OTEL_TRACES_SAMPLER" "value" (dig "tracesSampler" "parentbased_always_on" $telemetry)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "OTEL_TRACES_SAMPLER_ARG" "value" (dig "tracesSamplerArg" "" $telemetry)) }}
@@ -965,7 +968,7 @@ annotations:
 {{- end }}
 
 {{- define "common.config.checksum" -}}
-{{- printf "%s\n%s\n%s\n%s\n%s\n%s\n%s\n" (printf "https://%s%s/realms/%s" .Values.host .Values.paths.keycloak .Values.keycloak.realm) (include "common.certs.sslCertDir" .) (toYaml .Values.environment.common) (toYaml .Values.general) (toYaml .Values.history) (toYaml .Values.eventing) (toYaml .Values.abac) | sha256sum -}}
+{{- printf "%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n" (printf "https://%s%s/realms/%s" .Values.host .Values.paths.keycloak .Values.keycloak.realm) (include "common.certs.sslCertDir" .) (toYaml .Values.environment.common) (toYaml .Values.logging) (toYaml .Values.telemetry) (toYaml .Values.general) (toYaml .Values.server) (toYaml .Values.history) (toYaml .Values.eventing) (toYaml .Values.abac) | sha256sum -}}
 {{- end }}
 
 {{- define "common-database-config" -}}

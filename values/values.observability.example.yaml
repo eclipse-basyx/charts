@@ -1,4 +1,4 @@
-# Observability overlay for BaSyx Go 1.0.4 and newer.
+# Observability overlay for BaSyx Go 1.0.6 and newer.
 #
 # Apply this file together with a deployment values file, for example:
 #
@@ -17,8 +17,11 @@ logging:
 
 telemetry:
   tracesExporter: otlp
+  metricsExporter: otlp
   endpoint: http://opentelemetry-collector.observability.svc.cluster.local:4318
   protocol: http/protobuf
+  metricsExportInterval: "60000"
+  metricsExportTimeout: "30000"
   existingSecret: ""
   resourceAttributes: deployment.environment.name=kubernetes
   tracesSampler: parentbased_traceidratio

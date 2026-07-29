@@ -111,13 +111,19 @@ logging:
   format: text
   level: info
 
-# Optional OpenTelemetry tracing for BaSyx Go HTTP services. The chart connects
-# applications to an existing Collector; it does not deploy an observability
-# backend. Explicit keys in environment.common override these values.
+# Optional OpenTelemetry traces and metrics for BaSyx Go HTTP services. The
+# chart connects applications to an existing Collector; it does not deploy an
+# observability backend. Explicit keys in environment.common override these
+# values.
 telemetry:
   tracesExporter: none
+  metricsExporter: none
   endpoint: ""
   protocol: http/protobuf
+  # Optional positive millisecond values. Empty uses the OpenTelemetry SDK
+  # defaults.
+  metricsExportInterval: ""
+  metricsExportTimeout: ""
   # Optional existing Secret containing additional standard OTEL_* variables,
   # for example OTEL_EXPORTER_OTLP_HEADERS. Restart pods after changing it.
   existingSecret: ""

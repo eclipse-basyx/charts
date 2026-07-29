@@ -555,8 +555,11 @@
       "type": "object",
       "required": [
         "tracesExporter",
+        "metricsExporter",
         "endpoint",
         "protocol",
+        "metricsExportInterval",
+        "metricsExportTimeout",
         "existingSecret",
         "resourceAttributes",
         "tracesSampler",
@@ -565,8 +568,21 @@
       ],
       "properties": {
         "tracesExporter": { "type": "string", "enum": ["none", "otlp", "console"] },
+        "metricsExporter": { "type": "string", "enum": ["none", "otlp", "console"] },
         "endpoint": { "type": "string" },
         "protocol": { "type": "string", "enum": ["grpc", "http/protobuf"] },
+        "metricsExportInterval": {
+          "oneOf": [
+            { "type": "integer", "minimum": 1 },
+            { "type": "string", "pattern": "^$|^[1-9][0-9]*$" }
+          ]
+        },
+        "metricsExportTimeout": {
+          "oneOf": [
+            { "type": "integer", "minimum": 1 },
+            { "type": "string", "pattern": "^$|^[1-9][0-9]*$" }
+          ]
+        },
         "existingSecret": { "type": "string" },
         "resourceAttributes": { "type": "string" },
         "tracesSampler": {
@@ -596,10 +612,20 @@
       "allOf": [
         {
           "if": {
-            "properties": {
-              "tracesExporter": { "const": "otlp" }
-            },
-            "required": ["tracesExporter"]
+            "anyOf": [
+              {
+                "properties": {
+                  "tracesExporter": { "const": "otlp" }
+                },
+                "required": ["tracesExporter"]
+              },
+              {
+                "properties": {
+                  "metricsExporter": { "const": "otlp" }
+                },
+                "required": ["metricsExporter"]
+              }
+            ]
           },
           "then": {
             "properties": {
