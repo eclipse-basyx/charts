@@ -16,7 +16,6 @@ tests:
   - it: mounts ABAC config and rollout checksum for aas repository
     template: templates/aas-repository/deployment.yaml
     set:
-      argocd.enabled: true
       aasRepository.enabled: true
       abac.enabled: true
     asserts:
