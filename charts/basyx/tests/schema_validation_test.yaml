@@ -156,6 +156,76 @@ tests:
       - failedTemplate:
           errorPattern: "database.type"
 
+  - it: fails when enabled WAL storage has no size
+    values:
+      - fixtures/invalid_database_wal_storage.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "database.walStorage.size"
+
+  - it: fails when database pod anti-affinity type is unsupported
+    values:
+      - fixtures/invalid_database_affinity.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "database.affinity.podAntiAffinityType"
+
+  - it: fails when database node affinity has an invalid structure
+    values:
+      - fixtures/invalid_database_node_affinity.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "database.affinity.nodeAffinity"
+
+  - it: fails when additional database pod affinity has an invalid structure
+    values:
+      - fixtures/invalid_database_pod_affinity.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "database.affinity.additionalPodAffinity"
+
+  - it: fails when additional database pod anti-affinity has an invalid weight
+    values:
+      - fixtures/invalid_database_pod_anti_affinity.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "database.affinity.additionalPodAntiAffinity"
+
+  - it: fails when database topology selector labels are not strings
+    values:
+      - fixtures/invalid_database_topology_selector.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "database.topologySpreadConstraints"
+
+  - it: fails when a PostgreSQL parameter is not a string
+    values:
+      - fixtures/invalid_database_parameter.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "database.postgresql.parameters.max_connections"
+
+  - it: fails when a database resource quantity is a decimal number
+    values:
+      - fixtures/invalid_database_resource_quantity.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "database.resources.requests.cpu"
+
+  - it: fails when minDomains is used with ScheduleAnyway
+    values:
+      - fixtures/invalid_database_min_domains.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "database.topologySpreadConstraints"
+
+  - it: fails when matchLabelKeys has no label selector
+    values:
+      - fixtures/invalid_database_match_label_keys.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "database.topologySpreadConstraints"
+
   - it: fails when ABAC policy scope contains unsupported characters
     values:
       - fixtures/invalid_abac_policy_scope.yaml

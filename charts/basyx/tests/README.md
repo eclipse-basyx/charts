@@ -26,4 +26,6 @@ The suites cover stable chart contracts such as:
 - service account helper behavior
 - digest-aware image rendering
 - schema validation for required values and basic formats
+- managed PostgreSQL storage, WAL, resources, scheduling and parameters
+- shared per-pod PostgreSQL pool defaults and Configuration Service propagation
 - keycloak init resources and a runtime `helm test` realm check

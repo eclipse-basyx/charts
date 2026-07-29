@@ -1,0 +1,33 @@
+database:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: workload
+                operator: In
+                values:
+                  - database
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 50
+          preference:
+            matchExpressions:
+              - key: storage
+                operator: Exists
+    additionalPodAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 25
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/part-of: basyx
+            topologyKey: topology.kubernetes.io/zone
+    additionalPodAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/component
+                operator: In
+                values:
+                  - database
+          topologyKey: kubernetes.io/hostname

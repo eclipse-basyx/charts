@@ -10,6 +10,33 @@ spec:
   primaryUpdateStrategy: unsupervised
   storage:
     size: {{ .Values.database.storage.size }}
+    {{- with .Values.database.storage.storageClass }}
+    storageClass: {{ . | quote }}
+    {{- end }}
+  {{- if .Values.database.walStorage.enabled }}
+  walStorage:
+    size: {{ .Values.database.walStorage.size }}
+    {{- with .Values.database.walStorage.storageClass }}
+    storageClass: {{ . | quote }}
+    {{- end }}
+  {{- end }}
+  {{- with .Values.database.resources }}
+  resources:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.database.affinity }}
+  affinity:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.database.topologySpreadConstraints }}
+  topologySpreadConstraints:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.database.postgresql.parameters }}
+  postgresql:
+    parameters:
+      {{- toYaml . | nindent 6 }}
+  {{- end }}
   bootstrap:
     initdb:
       database: {{.Values.database.database | default "basyx" }}

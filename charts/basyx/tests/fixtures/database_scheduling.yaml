@@ -1,0 +1,16 @@
+database:
+  affinity:
+    enablePodAntiAffinity: true
+    podAntiAffinityType: preferred
+    topologyKey: topology.kubernetes.io/zone
+    nodeSelector:
+      workload: database
+    tolerations:
+      - key: workload
+        operator: Equal
+        value: database
+        effect: NoSchedule
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: ScheduleAnyway
