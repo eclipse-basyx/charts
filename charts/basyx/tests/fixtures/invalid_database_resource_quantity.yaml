@@ -1,0 +1,4 @@
+database:
+  resources:
+    requests:
+      cpu: 0.5

@@ -1602,6 +1602,27 @@ database:
   storage:
     # Volume size per instance
     size: 10Gi
+    # Empty uses the cluster's default StorageClass.
+    storageClass: ""
+  # A separate WAL volume is optional. Once enabled on an existing CloudNativePG
+  # cluster, walStorage cannot be removed again.
+  walStorage:
+    enabled: false
+    size: ""
+    # Empty uses the cluster's default StorageClass.
+    storageClass: ""
+  # PostgreSQL container requests and limits.
+  resources: {}
+  # CloudNativePG affinity configuration. Supported fields include
+  # enablePodAntiAffinity, podAntiAffinityType, topologyKey, nodeSelector,
+  # nodeAffinity, tolerations, additionalPodAffinity and
+  # additionalPodAntiAffinity.
+  affinity: {}
+  # Kubernetes topology spread constraints applied to PostgreSQL pods.
+  topologySpreadConstraints: []
+  # PostgreSQL settings accepted by CloudNativePG. Values must be strings.
+  postgresql:
+    parameters: {}
 
 # PodDisruptionBudget: not managed by this chart. For HA deployments, create
 # PDBs separately to guarantee availability during node drains. Example:

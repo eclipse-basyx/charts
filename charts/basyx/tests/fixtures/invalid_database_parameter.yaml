@@ -1,0 +1,4 @@
+database:
+  postgresql:
+    parameters:
+      max_connections: 300

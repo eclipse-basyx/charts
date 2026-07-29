@@ -1,0 +1,34 @@
+database:
+  instances: 3
+  storage:
+    size: 100Gi
+    storageClass: low-latency-block
+  walStorage:
+    enabled: true
+    size: 20Gi
+    storageClass: low-latency-block
+  resources:
+    requests:
+      cpu: "2"
+      memory: 8Gi
+    limits:
+      cpu: "2"
+      memory: 8Gi
+  affinity:
+    enablePodAntiAffinity: true
+    podAntiAffinityType: preferred
+    topologyKey: topology.kubernetes.io/zone
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          cnpg.io/cluster: basyx-database
+  postgresql:
+    parameters:
+      max_connections: "300"
+      shared_buffers: 2GB
+      effective_cache_size: 6GB
+      maintenance_work_mem: 512MB
+      work_mem: 8MB

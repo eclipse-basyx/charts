@@ -459,6 +459,73 @@ database:
 
 The values `postgres`, `managed` and `cnpg` all keep this managed database behavior for backwards compatibility.
 
+#### Production CloudNativePG configuration
+
+The chart can select storage classes independently for `PGDATA` and WAL, set PostgreSQL resources and parameters, and pass CloudNativePG scheduling rules through to the managed cluster. Start from [`values/values.postgres-production.example.yaml`](values/values.postgres-production.example.yaml):
+
+```yaml
+database:
+  instances: 3
+  storage:
+    size: 100Gi
+    storageClass: low-latency-block
+  walStorage:
+    enabled: true
+    size: 20Gi
+    storageClass: low-latency-block
+  resources:
+    requests:
+      cpu: "2"
+      memory: 8Gi
+    limits:
+      cpu: "2"
+      memory: 8Gi
+  affinity:
+    enablePodAntiAffinity: true
+    podAntiAffinityType: preferred
+    topologyKey: topology.kubernetes.io/zone
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          cnpg.io/cluster: basyx-database
+  postgresql:
+    parameters:
+      max_connections: "300"
+      shared_buffers: 2GB
+      effective_cache_size: 6GB
+```
+
+Treat these values as a starting point, not universal production settings. Resource limits, PostgreSQL parameters, volume sizes, and topology rules must match the workload and the available nodes. The example uses equal CPU and memory requests and limits to give the PostgreSQL pods Guaranteed Kubernetes QoS. It uses preferred zone anti-affinity and `ScheduleAnyway` topology spreading so a single-zone or capacity-constrained cluster can still schedule the database. Change either rule to a hard requirement only after verifying that enough eligible zones and nodes always exist.
+
+Benchmark every candidate StorageClass on the target infrastructure before selecting it. CloudNativePG provides an `fio` command for its `kubectl cnpg` plugin. Run destructive storage benchmarks only in staging or pre-production:
+
+```bash
+kubectl cnpg fio basyx-storage-test \
+  --namespace basyx-storage-test \
+  --storageClass low-latency-block \
+  --pvcSize 20Gi
+```
+
+Compare latency, IOPS, throughput, and sustained write behavior with a PostgreSQL-like block size. Also run workload-level tests such as `pgbench` or the BaSyx load test before changing production. See the [CloudNativePG benchmarking guide](https://cloudnative-pg.io/docs/1.30/benchmarking/).
+
+Enabling `database.walStorage.enabled` creates a dedicated WAL PVC for every instance. CloudNativePG does not support removing `walStorage` from an existing cluster after it has been enabled. Decide on the WAL layout before production rollout, include both PGDATA and WAL in capacity monitoring, backup, recovery, and instance-recreation procedures, and always treat an instance's PGDATA and WAL volumes as a pair.
+
+Increasing `storage.size` or `walStorage.size` requires a StorageClass that supports volume expansion. Kubernetes PVCs cannot be shrunk. Changing `storageClass` in values does not migrate existing PVCs to new storage; moving a cluster requires a planned CloudNativePG migration or volume-recreation procedure. Follow the [CloudNativePG 1.30 storage guidance](https://cloudnative-pg.io/docs/1.30/storage/) before changing an existing cluster.
+
+The chart fields in this section are validated against the stable `postgresql.cnpg.io/v1` API documented for CloudNativePG 1.30. Confirm compatibility with the operator version installed in the target cluster during upgrades.
+
+Render and review the production example before installing:
+
+```bash
+helm lint charts/basyx -f values/values.postgres-production.example.yaml
+helm template basyx charts/basyx \
+  -f values/values.postgres-production.example.yaml \
+  > rendered-postgres-production.yaml
+```
+
 #### Existing PostgreSQL Database
 
 To use an existing PostgreSQL database instead of deploying CloudNativePG, set `database.type` to `external`.

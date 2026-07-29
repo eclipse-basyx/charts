@@ -734,6 +734,176 @@
             "size": {
               "type": "string",
               "minLength": 1
+            },
+            "storageClass": {
+              "type": "string"
+            }
+          }
+        },
+        "walStorage": {
+          "type": "object",
+          "required": ["enabled"],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "size": {
+              "type": "string"
+            },
+            "storageClass": {
+              "type": "string"
+            }
+          }
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "requests": {
+              "type": "object",
+              "additionalProperties": {
+                "oneOf": [
+                  { "type": "string", "minLength": 1 },
+                  { "type": "integer", "minimum": 0 }
+                ]
+              }
+            },
+            "limits": {
+              "type": "object",
+              "additionalProperties": {
+                "oneOf": [
+                  { "type": "string", "minLength": 1 },
+                  { "type": "integer", "minimum": 0 }
+                ]
+              }
+            }
+          }
+        },
+        "affinity": {
+          "type": "object",
+          "properties": {
+            "enablePodAntiAffinity": {
+              "type": "boolean"
+            },
+            "podAntiAffinityType": {
+              "type": "string",
+              "enum": ["preferred", "required"]
+            },
+            "topologyKey": {
+              "type": "string",
+              "minLength": 1
+            },
+            "nodeSelector": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "nodeAffinity": {
+              "type": "object"
+            },
+            "tolerations": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "key": { "type": "string" },
+                  "operator": {
+                    "type": "string",
+                    "enum": ["Exists", "Equal"]
+                  },
+                  "value": { "type": "string" },
+                  "effect": {
+                    "type": "string",
+                    "enum": ["", "NoSchedule", "PreferNoSchedule", "NoExecute"]
+                  },
+                  "tolerationSeconds": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              }
+            },
+            "additionalPodAffinity": {
+              "type": "object"
+            },
+            "additionalPodAntiAffinity": {
+              "type": "object"
+            }
+          }
+        },
+        "topologySpreadConstraints": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["maxSkew", "topologyKey", "whenUnsatisfiable"],
+            "properties": {
+              "maxSkew": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "topologyKey": {
+                "type": "string",
+                "minLength": 1
+              },
+              "whenUnsatisfiable": {
+                "type": "string",
+                "enum": ["DoNotSchedule", "ScheduleAnyway"]
+              },
+              "labelSelector": {
+                "type": "object"
+              },
+              "minDomains": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "matchLabelKeys": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "nodeAffinityPolicy": {
+                "type": "string",
+                "enum": ["Honor", "Ignore"]
+              },
+              "nodeTaintsPolicy": {
+                "type": "string",
+                "enum": ["Honor", "Ignore"]
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "required": ["minDomains"]
+                },
+                "then": {
+                  "properties": {
+                    "whenUnsatisfiable": {
+                      "const": "DoNotSchedule"
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "required": ["matchLabelKeys"]
+                },
+                "then": {
+                  "required": ["labelSelector"]
+                }
+              }
+            ]
+          }
+        },
+        "postgresql": {
+          "type": "object",
+          "properties": {
+            "parameters": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
             }
           }
         }
@@ -775,6 +945,33 @@
                 "required": ["external"]
               }
             ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "walStorage": {
+                "type": "object",
+                "properties": {
+                  "enabled": { "const": true }
+                },
+                "required": ["enabled"]
+              }
+            },
+            "required": ["walStorage"]
+          },
+          "then": {
+            "properties": {
+              "walStorage": {
+                "required": ["size"],
+                "properties": {
+                  "size": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
           }
         }
       ]
