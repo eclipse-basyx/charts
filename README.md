@@ -328,6 +328,21 @@ helm diff upgrade basyx charts/basyx \
   -f values/values.example.yaml
 ```
 
+### Upgrading to chart 3.6.0
+
+Chart 3.6.0 changes the BaSyx Go per-pod PostgreSQL pool defaults from 500 open and idle connections to 50 open and 25 idle connections. This prevents a small number of replicas from exhausting a typical PostgreSQL connection budget, but workloads that relied on the previous limits can see more request queuing after the upgrade.
+
+Review the aggregate connection budget and load-test the new limits before upgrading. To preserve the previous limits temporarily, set them explicitly:
+
+```yaml
+environment:
+  common:
+    POSTGRES_MAXOPENCONNECTIONS: 500
+    POSTGRES_MAXIDLECONNECTIONS: 500
+```
+
+Only retain those values when PostgreSQL has enough memory and connection capacity for every replica, migration job, identity service, and operational client. Chart 3.6.0 uses BaSyx Go 1.0.5 by default because the idle-time setting and the documented zero-value and validation behavior require that release.
+
 ## Uninstall
 
 Uninstall the Helm release:
@@ -488,9 +503,9 @@ database:
     - maxSkew: 1
       topologyKey: topology.kubernetes.io/zone
       whenUnsatisfiable: ScheduleAnyway
-      labelSelector:
-        matchLabels:
-          cnpg.io/cluster: basyx-database
+      labelSelector: {}
+      matchLabelKeys:
+        - cnpg.io/cluster
   postgresql:
     parameters:
       max_connections: "300"
@@ -498,7 +513,15 @@ database:
       effective_cache_size: 6GB
 ```
 
-Treat these values as a starting point, not universal production settings. Resource limits, PostgreSQL parameters, volume sizes, and topology rules must match the workload and the available nodes. The example uses equal CPU and memory requests and limits to give the PostgreSQL pods Guaranteed Kubernetes QoS. It uses preferred zone anti-affinity and `ScheduleAnyway` topology spreading so a single-zone or capacity-constrained cluster can still schedule the database. Change either rule to a hard requirement only after verifying that enough eligible zones and nodes always exist.
+Treat these values as a starting point, not universal production settings. Resource limits, PostgreSQL parameters, volume sizes, and topology rules must match the workload and the available nodes. The example uses equal CPU and memory requests and limits to give the PostgreSQL pods Guaranteed Kubernetes QoS. It uses preferred zone anti-affinity and `ScheduleAnyway` topology spreading so a labeled single-zone or capacity-constrained cluster can still schedule the database. `matchLabelKeys` derives the cluster label value from each incoming CloudNativePG pod instead of duplicating `database.clusterName`.
+
+Before using the zone rules, verify that every eligible database node has a zone label:
+
+```bash
+kubectl get nodes -L topology.kubernetes.io/zone
+```
+
+Nodes without the configured topology key are not eligible for these pods. If the cluster does not use zone labels, change both `database.affinity.topologyKey` and `database.topologySpreadConstraints[].topologyKey` to `kubernetes.io/hostname`, or add consistent zone labels before deployment. Change either scheduling rule to a hard requirement only after verifying that enough eligible zones and nodes always exist.
 
 Benchmark every candidate StorageClass on the target infrastructure before selecting it. CloudNativePG provides an `fio` command for its `kubectl cnpg` plugin. Run destructive storage benchmarks only in staging or pre-production:
 
@@ -511,11 +534,13 @@ kubectl cnpg fio basyx-storage-test \
 
 Compare latency, IOPS, throughput, and sustained write behavior with a PostgreSQL-like block size. Also run workload-level tests such as `pgbench` or the BaSyx load test before changing production. See the [CloudNativePG benchmarking guide](https://cloudnative-pg.io/docs/1.30/benchmarking/).
 
+The example intentionally leaves workload-dependent memory settings such as `work_mem` and `maintenance_work_mem` at their PostgreSQL defaults. `work_mem` can be allocated by several operations in one query and across concurrent connections. Set these parameters only after budgeting shared memory, connection overhead, autovacuum and maintenance memory, per-query memory, and operating-system headroom below the pod memory limit.
+
 Enabling `database.walStorage.enabled` creates a dedicated WAL PVC for every instance. CloudNativePG does not support removing `walStorage` from an existing cluster after it has been enabled. Decide on the WAL layout before production rollout, include both PGDATA and WAL in capacity monitoring, backup, recovery, and instance-recreation procedures, and always treat an instance's PGDATA and WAL volumes as a pair.
 
 Increasing `storage.size` or `walStorage.size` requires a StorageClass that supports volume expansion. Kubernetes PVCs cannot be shrunk. Changing `storageClass` in values does not migrate existing PVCs to new storage; moving a cluster requires a planned CloudNativePG migration or volume-recreation procedure. Follow the [CloudNativePG 1.30 storage guidance](https://cloudnative-pg.io/docs/1.30/storage/) before changing an existing cluster.
 
-The chart fields in this section are validated against the stable `postgresql.cnpg.io/v1` API documented for CloudNativePG 1.30. Confirm compatibility with the operator version installed in the target cluster during upgrades.
+The chart fields in this section, including the nested affinity and label-selector structures, are validated against the stable `postgresql.cnpg.io/v1` API documented for CloudNativePG 1.30. Confirm compatibility with the operator version installed in the target cluster during upgrades.
 
 Render and review the production example before installing:
 
@@ -690,15 +715,25 @@ environment:
 Budget connections before increasing a service's `replicaCount`. For all pods that connect to the same PostgreSQL primary, keep:
 
 ```text
-sum(service replicaCount × POSTGRES_MAXOPENCONNECTIONS)
+sum(BaSyx replicaCount × POSTGRES_MAXOPENCONNECTIONS)
++ Keycloak and other application pools
++ temporary rolling-update pods
 + migration jobs
 + operational connections
 < PostgreSQL max_connections
 ```
 
-Leave capacity for CloudNativePG management, monitoring, migrations, administrators, and failover. For example, six backend pods at the default maximum can request up to 300 connections. If PostgreSQL is configured for 300 connections, the per-pod pool must be reduced because no reserve remains. Set `postgresql.parameters.max_connections` only after checking database memory consumption and workload behavior; raising it is not a substitute for connection budgeting or a pooler.
+Calculate this separately for each PostgreSQL primary. Leave capacity for CloudNativePG management, monitoring, migrations, administrators, failover, and the maximum pod overlap allowed during rolling updates. Keycloak's database pool defaults to 100 connections per pod; when Keycloak shares the database, set an explicit limit under `keycloak.environment.KC_DB_POOL_MAX_SIZE` and include it in the calculation. For example:
 
-`POSTGRES_MAXIDLECONNECTIONS` must not exceed the open limit. With the BaSyx Go pool configuration tracked in [basyx-go-components#535](https://github.com/eclipse-basyx/basyx-go-components/issues/535) and implemented by [PR #537](https://github.com/eclipse-basyx/basyx-go-components/pull/537), zero for max open, max idle, or maximum lifetime selects the application default of 50, 25, or 5 minutes respectively. Zero for `POSTGRES_CONNMAXIDLETIMEMINUTES` has different semantics: it disables recycling based on idle time. Use a BaSyx Go release containing that change before relying on the idle-time setting or these validation rules.
+```yaml
+keycloak:
+  environment:
+    KC_DB_POOL_MAX_SIZE: 20
+```
+
+Six BaSyx backend pods at the default maximum can request up to 300 connections before Keycloak or reserves are included. If PostgreSQL is configured for 300 connections, the per-pod pools must be reduced because no reserve remains. Set `postgresql.parameters.max_connections` only after checking database memory consumption and workload behavior; raising it is not a substitute for connection budgeting or a pooler.
+
+`POSTGRES_MAXIDLECONNECTIONS` must not exceed the open limit. With the BaSyx Go pool configuration tracked in [basyx-go-components#535](https://github.com/eclipse-basyx/basyx-go-components/issues/535) and implemented by [PR #537](https://github.com/eclipse-basyx/basyx-go-components/pull/537), zero for max open, max idle, or maximum lifetime selects the application default of 50, 25, or 5 minutes respectively. When the explicit open limit is below 25 and idle is zero, the effective idle limit is capped to the open limit. Zero for `POSTGRES_CONNMAXIDLETIMEMINUTES` has different semantics: it disables recycling based on idle time. These settings and validation rules require BaSyx Go 1.0.5 or later.
 
 ### BaSyx Configuration Service
 

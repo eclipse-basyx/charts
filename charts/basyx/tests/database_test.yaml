@@ -101,6 +101,24 @@ tests:
           path: spec.topologySpreadConstraints[0].whenUnsatisfiable
           value: ScheduleAnyway
 
+  - it: renders nested CloudNativePG affinity structures
+    template: templates/postgres.yaml
+    values:
+      - fixtures/database_advanced_scheduling.yaml
+    asserts:
+      - equal:
+          path: spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].operator
+          value: In
+      - equal:
+          path: spec.affinity.nodeAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].weight
+          value: 50
+      - equal:
+          path: spec.affinity.additionalPodAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.topologyKey
+          value: topology.kubernetes.io/zone
+      - equal:
+          path: spec.affinity.additionalPodAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution[0].labelSelector.matchExpressions[0].values[0]
+          value: database
+
   - it: renders PostgreSQL parameters as strings
     template: templates/postgres.yaml
     set:
@@ -156,6 +174,13 @@ tests:
       - equal:
           path: spec.topologySpreadConstraints[0].whenUnsatisfiable
           value: ScheduleAnyway
+      - equal:
+          path: spec.topologySpreadConstraints[0].labelSelector
+          value: {}
+      - equal:
+          path: spec.topologySpreadConstraints[0].matchLabelKeys
+          value:
+            - cnpg.io/cluster
       - equal:
           path: spec.postgresql.parameters.max_connections
           value: "300"
