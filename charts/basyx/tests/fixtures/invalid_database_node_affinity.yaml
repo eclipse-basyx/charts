@@ -1,0 +1,4 @@
+database:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution: invalid

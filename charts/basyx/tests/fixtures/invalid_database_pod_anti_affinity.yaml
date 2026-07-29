@@ -1,0 +1,7 @@
+database:
+  affinity:
+    additionalPodAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 101
+          podAffinityTerm:
+            topologyKey: kubernetes.io/hostname

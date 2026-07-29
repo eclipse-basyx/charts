@@ -170,6 +170,34 @@ tests:
       - failedTemplate:
           errorPattern: "database.affinity.podAntiAffinityType"
 
+  - it: fails when database node affinity has an invalid structure
+    values:
+      - fixtures/invalid_database_node_affinity.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "database.affinity.nodeAffinity"
+
+  - it: fails when additional database pod affinity has an invalid structure
+    values:
+      - fixtures/invalid_database_pod_affinity.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "database.affinity.additionalPodAffinity"
+
+  - it: fails when additional database pod anti-affinity has an invalid weight
+    values:
+      - fixtures/invalid_database_pod_anti_affinity.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "database.affinity.additionalPodAntiAffinity"
+
+  - it: fails when database topology selector labels are not strings
+    values:
+      - fixtures/invalid_database_topology_selector.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "database.topologySpreadConstraints"
+
   - it: fails when a PostgreSQL parameter is not a string
     values:
       - fixtures/invalid_database_parameter.yaml
