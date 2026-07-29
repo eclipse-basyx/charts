@@ -674,6 +674,32 @@ helm upgrade --install basyx charts/basyx \
 
 When global `database.type: external` is used, the chart does not render a CloudNativePG `Cluster`. The configured external database user must be allowed to create and migrate the BaSyx schema. The `configurationService` still runs by default and initializes or migrates the schema in the existing database. `configurationService.waitForDatabase.enabled: false` only disables the Configuration Service wait initContainer.
 
+#### PostgreSQL connection pool budget
+
+Every BaSyx Go pod owns an independent `database/sql` connection pool. Horizontal scaling therefore multiplies the possible database connections; replicas do not share a pool. The chart uses these common per-pod defaults:
+
+```yaml
+environment:
+  common:
+    POSTGRES_MAXOPENCONNECTIONS: 50
+    POSTGRES_MAXIDLECONNECTIONS: 25
+    POSTGRES_CONNMAXLIFETIMEMINUTES: 5
+    POSTGRES_CONNMAXIDLETIMEMINUTES: 0
+```
+
+Budget connections before increasing a service's `replicaCount`. For all pods that connect to the same PostgreSQL primary, keep:
+
+```text
+sum(service replicaCount × POSTGRES_MAXOPENCONNECTIONS)
++ migration jobs
++ operational connections
+< PostgreSQL max_connections
+```
+
+Leave capacity for CloudNativePG management, monitoring, migrations, administrators, and failover. For example, six backend pods at the default maximum can request up to 300 connections. If PostgreSQL is configured for 300 connections, the per-pod pool must be reduced because no reserve remains. Set `postgresql.parameters.max_connections` only after checking database memory consumption and workload behavior; raising it is not a substitute for connection budgeting or a pooler.
+
+`POSTGRES_MAXIDLECONNECTIONS` must not exceed the open limit. With the BaSyx Go pool configuration tracked in [basyx-go-components#535](https://github.com/eclipse-basyx/basyx-go-components/issues/535) and implemented by [PR #537](https://github.com/eclipse-basyx/basyx-go-components/pull/537), zero for max open, max idle, or maximum lifetime selects the application default of 50, 25, or 5 minutes respectively. Zero for `POSTGRES_CONNMAXIDLETIMEMINUTES` has different semantics: it disables recycling based on idle time. Use a BaSyx Go release containing that change before relying on the idle-time setting or these validation rules.
+
 ### BaSyx Configuration Service
 
 BaSyx Go requires the database schema to be prepared before DB-backed services start. The chart enables `configurationService` by default for this. It renders a Kubernetes `Job` using `eclipsebasyx/basyxconfigurationservice-go` and the same PostgreSQL Secret as the runtime services.

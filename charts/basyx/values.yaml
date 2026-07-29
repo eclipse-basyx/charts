@@ -94,9 +94,13 @@ environment:
     CORS_ALLOWEDHEADERS: "*"
     CORS_ALLOWEDCREDENTIALS: false
     CORS_ALLOWEDMETHODS: GET,POST,PUT,PATCH,DELETE,OPTIONS
-    POSTGRES_MAXOPENCONNECTIONS: 500
-    POSTGRES_MAXIDLECONNECTIONS: 500
+    # PostgreSQL pool limits are per pod and multiply with replicaCount.
+    # Zero for open, idle or lifetime uses the BaSyx Go default. Zero idle time
+    # disables recycling based on idle duration.
+    POSTGRES_MAXOPENCONNECTIONS: 50
+    POSTGRES_MAXIDLECONNECTIONS: 25
     POSTGRES_CONNMAXLIFETIMEMINUTES: 5
+    POSTGRES_CONNMAXIDLETIMEMINUTES: 0
     SERVER_STRICTVERIFICATION: permissive
     OIDC_AUDIENCE: discovery-service
     ABAC_ENABLED: false

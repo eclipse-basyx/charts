@@ -1,0 +1,101 @@
+suite: PostgreSQL pool configuration
+release:
+  name: basyx
+templates:
+  - templates/secret.yaml
+  - templates/configuration-service-job.yaml
+tests:
+  - it: renders the common per-pod pool defaults
+    template: templates/secret.yaml
+    set:
+      aasEnvironment.enabled: true
+    documentSelector:
+      path: metadata.name
+      value: basyx-common-config
+    asserts:
+      - equal:
+          path: stringData.POSTGRES_MAXOPENCONNECTIONS
+          value: "50"
+      - equal:
+          path: stringData.POSTGRES_MAXIDLECONNECTIONS
+          value: "25"
+      - equal:
+          path: stringData.POSTGRES_CONNMAXLIFETIMEMINUTES
+          value: "5"
+      - equal:
+          path: stringData.POSTGRES_CONNMAXIDLETIMEMINUTES
+          value: "0"
+
+  - it: passes the common pool defaults to the configuration service
+    template: templates/configuration-service-job.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_MAXOPENCONNECTIONS
+            value: "50"
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_MAXIDLECONNECTIONS
+            value: "25"
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_CONNMAXLIFETIMEMINUTES
+            value: "5"
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_CONNMAXIDLETIMEMINUTES
+            value: "0"
+          count: 1
+
+  - it: propagates pool overrides to both consumers
+    template: templates/secret.yaml
+    set:
+      aasEnvironment.enabled: true
+      environment.common.POSTGRES_MAXOPENCONNECTIONS: 20
+      environment.common.POSTGRES_MAXIDLECONNECTIONS: 10
+      environment.common.POSTGRES_CONNMAXLIFETIMEMINUTES: 30
+      environment.common.POSTGRES_CONNMAXIDLETIMEMINUTES: 10
+    documentSelector:
+      path: metadata.name
+      value: basyx-common-config
+    asserts:
+      - equal:
+          path: stringData.POSTGRES_MAXOPENCONNECTIONS
+          value: "20"
+      - equal:
+          path: stringData.POSTGRES_MAXIDLECONNECTIONS
+          value: "10"
+      - equal:
+          path: stringData.POSTGRES_CONNMAXLIFETIMEMINUTES
+          value: "30"
+      - equal:
+          path: stringData.POSTGRES_CONNMAXIDLETIMEMINUTES
+          value: "10"
+
+  - it: propagates pool overrides to the configuration service
+    template: templates/configuration-service-job.yaml
+    set:
+      environment.common.POSTGRES_MAXOPENCONNECTIONS: 20
+      environment.common.POSTGRES_MAXIDLECONNECTIONS: 10
+      environment.common.POSTGRES_CONNMAXLIFETIMEMINUTES: 30
+      environment.common.POSTGRES_CONNMAXIDLETIMEMINUTES: 10
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_MAXOPENCONNECTIONS
+            value: "20"
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_CONNMAXIDLETIMEMINUTES
+            value: "10"
+          count: 1
