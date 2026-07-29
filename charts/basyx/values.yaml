@@ -204,6 +204,13 @@ proxy:
   https: ""
   noProxy: "localhost,127.0.0.1,.svc.cluster.local"
 
+# Argo CD applies Helm charts with `helm template` and maps Helm hook
+# annotations into its own sync lifecycle. These annotations keep the
+# Configuration Service job after chart prerequisites and before runtime pods.
+argocd:
+  enabled: false
+  runtimeSyncWave: "20"
+
 configurationService:
   # The BaSyx Go Configuration Service initializes and migrates the shared
   # PostgreSQL schema before DB-backed runtime services use it.
@@ -236,6 +243,12 @@ configurationService:
     weight: "-10"
     deletePolicy:
       - before-hook-creation
+    argocd:
+      enabled: true
+      hook: Sync
+      syncWave: "10"
+      deletePolicy:
+        - BeforeHookCreation
     annotations: {}
   backoffLimit: 12
   activeDeadlineSeconds: 900

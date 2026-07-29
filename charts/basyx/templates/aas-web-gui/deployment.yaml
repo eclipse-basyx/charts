@@ -3,6 +3,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "basyx-aasWebGui.fullname" . }}
+  {{- if .Values.argocd.enabled }}
+  annotations:
+    argocd.argoproj.io/sync-wave: {{ .Values.argocd.runtimeSyncWave | quote }}
+  {{- end }}
   labels:
     {{- include "basyx-aasWebGui.labels" . | nindent 4 }}
 spec:

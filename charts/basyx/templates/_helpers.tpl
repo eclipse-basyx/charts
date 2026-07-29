@@ -314,6 +314,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include .fullnameHelper $root }}
+  {{- if $root.Values.argocd.enabled }}
+  annotations:
+    argocd.argoproj.io/sync-wave: {{ $root.Values.argocd.runtimeSyncWave | quote }}
+  {{- end }}
   labels:
     {{- include .labelsHelper $root | nindent 4 }}
 spec:

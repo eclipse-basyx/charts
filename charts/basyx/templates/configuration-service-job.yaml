@@ -1,4 +1,5 @@
 {{- if .Values.configurationService.enabled -}}
+{{- $hookAnnotations := .Values.configurationService.hook.annotations | default dict -}}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -11,7 +12,16 @@ metadata:
     helm.sh/hook: {{ join "," .Values.configurationService.hook.events | quote }}
     helm.sh/hook-weight: {{ .Values.configurationService.hook.weight | quote }}
     helm.sh/hook-delete-policy: {{ join "," .Values.configurationService.hook.deletePolicy | quote }}
-    {{- with .Values.configurationService.hook.annotations }}
+    {{- if and .Values.argocd.enabled .Values.configurationService.hook.argocd.enabled (not (hasKey $hookAnnotations "argocd.argoproj.io/hook")) }}
+    argocd.argoproj.io/hook: {{ .Values.configurationService.hook.argocd.hook | quote }}
+    {{- end }}
+    {{- if and .Values.argocd.enabled .Values.configurationService.hook.argocd.enabled (not (hasKey $hookAnnotations "argocd.argoproj.io/sync-wave")) }}
+    argocd.argoproj.io/sync-wave: {{ .Values.configurationService.hook.argocd.syncWave | quote }}
+    {{- end }}
+    {{- if and .Values.argocd.enabled .Values.configurationService.hook.argocd.enabled (not (hasKey $hookAnnotations "argocd.argoproj.io/hook-delete-policy")) }}
+    argocd.argoproj.io/hook-delete-policy: {{ join "," .Values.configurationService.hook.argocd.deletePolicy | quote }}
+    {{- end }}
+    {{- with $hookAnnotations }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
   {{- end }}
