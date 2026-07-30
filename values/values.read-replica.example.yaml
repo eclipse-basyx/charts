@@ -1,0 +1,27 @@
+# Example overlay for routing eligible BaSyx Go reads to CloudNativePG standbys.
+#
+# Apply this together with a deployment values file. The managed database must
+# have at least two instances. Both Poolers and their PodMonitors are optional.
+
+database:
+  instances: 3
+
+  # Writer traffic can use the existing read-write Pooler independently.
+  pooler:
+    enabled: true
+    instances: 2
+
+  reader:
+    enabled: true
+    maxOpenConnections: 50
+    maxIdleConnections: 25
+    connMaxLifetimeMinutes: 5
+    connMaxIdleTimeMinutes: 0
+    pooler:
+      enabled: true
+      instances: 2
+      monitoring:
+        enabled: false
+        # Add labels required by your Prometheus podMonitorSelector:
+        # labels:
+        #   release: kube-prometheus-stack

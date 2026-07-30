@@ -309,3 +309,38 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "abac.policyScope"
+
+  - it: fails when a reader pool limit is negative
+    values:
+      - fixtures/invalid_database_reader_pool.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "database.reader.maxOpenConnections"
+
+  - it: fails when a managed reader has no standby
+    values:
+      - fixtures/invalid_database_reader_single_instance.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "database.instances"
+
+  - it: fails when a read-only Pooler is enabled without the reader
+    values:
+      - fixtures/invalid_database_reader_pooler_disabled.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "database.reader.pooler.enabled"
+
+  - it: fails when a read-only Pooler is enabled for an external database
+    values:
+      - fixtures/invalid_database_reader_pooler_external.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "database.reader.pooler.enabled"
+
+  - it: fails when read-only Pooler monitoring is enabled without the Pooler
+    values:
+      - fixtures/invalid_database_reader_monitoring_without_pooler.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "database.reader.pooler.enabled"

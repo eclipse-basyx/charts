@@ -1,0 +1,7 @@
+database:
+  type: external
+  existingSecret: basyx-writer
+  reader:
+    enabled: true
+    pooler:
+      enabled: true

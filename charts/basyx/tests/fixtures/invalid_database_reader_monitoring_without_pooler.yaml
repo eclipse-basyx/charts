@@ -1,0 +1,7 @@
+database:
+  reader:
+    enabled: true
+    pooler:
+      enabled: false
+      monitoring:
+        enabled: true

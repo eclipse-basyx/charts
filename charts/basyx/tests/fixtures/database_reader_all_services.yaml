@@ -1,0 +1,24 @@
+database:
+  reader:
+    enabled: true
+
+aasDiscovery:
+  enabled: true
+aasRegistry:
+  enabled: true
+aasRepository:
+  enabled: true
+aasEnvironment:
+  enabled: true
+dppApi:
+  enabled: true
+submodelRegistry:
+  enabled: true
+submodelRepository:
+  enabled: true
+cdRepository:
+  enabled: true
+companyLookup:
+  enabled: true
+digitalTwinRegistry:
+  enabled: true

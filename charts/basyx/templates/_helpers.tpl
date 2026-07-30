@@ -758,7 +758,8 @@ Create the name of the service account to use
 {{- $componentValues = get $root.Values $component | default dict -}}
 {{- end -}}
 {{- $serviceDatabase := get $componentValues "database" | default dict -}}
-{{- if and $component $serviceDatabase -}}
+{{- $serviceWriterDatabase := omit $serviceDatabase "reader" -}}
+{{- if and $component $serviceWriterDatabase -}}
 {{- if $serviceDatabase.existingSecret -}}
 {{- $serviceDatabase.existingSecret | trunc 63 | trimSuffix "-" -}}
 {{- else -}}
@@ -780,6 +781,94 @@ Create the name of the service account to use
 {{- printf "%s\n%s\n%s\n" (include "database.serviceSecret" .) (toYaml $root.Values.database) (toYaml $serviceDatabase) | sha256sum -}}
 {{- end}}
 
+{{- define "database.serviceWriterOverride" -}}
+{{- $componentValues := get .root.Values (.component | default "") | default dict -}}
+{{- $serviceDatabase := get $componentValues "database" | default dict -}}
+{{- if gt (len (omit $serviceDatabase "reader")) 0 -}}true{{- else -}}false{{- end -}}
+{{- end}}
+
+{{- define "database.readerConfig" -}}
+{{- $root := .root -}}
+{{- $componentValues := get $root.Values (.component | default "") | default dict -}}
+{{- $serviceDatabase := get $componentValues "database" | default dict -}}
+{{- if hasKey $serviceDatabase "reader" -}}
+{{- toYaml (get $serviceDatabase "reader") -}}
+{{- else if eq (include "database.serviceWriterOverride" .) "true" -}}
+enabled: false
+{{- else -}}
+{{- toYaml $root.Values.database.reader -}}
+{{- end -}}
+{{- end}}
+
+{{- define "database.readerEnabled" -}}
+{{- $reader := include "database.readerConfig" . | fromYaml | default dict -}}
+{{- if $reader.enabled -}}true{{- else -}}false{{- end -}}
+{{- end}}
+
+{{- define "database.readerManaged" -}}
+{{- $reader := include "database.readerConfig" . | fromYaml | default dict -}}
+{{- if and
+  (eq (include "database.managed" .root) "true")
+  (eq (include "database.serviceWriterOverride" .) "false")
+  (not ($reader.existingSecret | default ""))
+  (not ($reader.host | default ""))
+-}}true{{- else -}}false{{- end -}}
+{{- end}}
+
+{{- define "database.readerGeneratedSecretName" -}}
+{{- printf "%s-reader-database" (include "basyx.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end}}
+
+{{- define "database.serviceReaderGeneratedSecretName" -}}
+{{- $root := .root -}}
+{{- $name := .nameSuffix | default .component | toString | kebabcase -}}
+{{- printf "%s-%s-reader-database" (include "basyx.fullname" $root) $name | trunc 63 | trimSuffix "-" -}}
+{{- end}}
+
+{{- define "database.readerSecret" -}}
+{{- $reader := include "database.readerConfig" . | fromYaml | default dict -}}
+{{- if $reader.existingSecret -}}
+{{- $reader.existingSecret | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- $componentValues := get .root.Values (.component | default "") | default dict -}}
+{{- $serviceDatabase := get $componentValues "database" | default dict -}}
+{{- if hasKey $serviceDatabase "reader" -}}
+{{- include "database.serviceReaderGeneratedSecretName" . -}}
+{{- else -}}
+{{- include "database.readerGeneratedSecretName" .root -}}
+{{- end -}}
+{{- end -}}
+{{- end}}
+
+{{- define "database.readerHasInlineValues" -}}
+{{- $hasInlineValues := false -}}
+{{- range $key := list "host" "port" "dbname" "user" "password" "sslmode" "sslcert" "sslkey" "sslrootcert" "connectTimeoutSeconds" "applicationName" "fallbackApplicationName" "searchPath" "options" "timezone" -}}
+{{- if get $.reader $key -}}
+{{- $hasInlineValues = true -}}
+{{- end -}}
+{{- end -}}
+{{- if $hasInlineValues -}}true{{- else -}}false{{- end -}}
+{{- end}}
+
+{{- define "database.readerSecretResource" -}}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .name }}
+  labels:
+    {{- include "basyx.labels" .root | nindent 4 }}
+    {{- with .component }}
+    app.kubernetes.io/component: {{ . | quote }}
+    {{- end }}
+type: Opaque
+stringData:
+  {{- range $key := list "host" "port" "dbname" "user" "password" "sslmode" "sslcert" "sslkey" "sslrootcert" "connectTimeoutSeconds" "applicationName" "fallbackApplicationName" "searchPath" "options" "timezone" }}
+  {{- with get $.reader $key }}
+  {{ $key }}: {{ . | toString | quote }}
+  {{- end }}
+  {{- end }}
+{{- end}}
+
 {{- define "database.optionalEnv" -}}
 - name: {{ .name }}
   valueFrom:
@@ -787,6 +876,17 @@ Create the name of the service account to use
       name: {{ .secret }}
       key: {{ .key }}
       optional: true
+{{- end }}
+
+{{- define "database.readerSecretEnv" -}}
+- name: {{ .name }}
+  valueFrom:
+    secretKeyRef:
+      name: {{- if or .complete (get .reader .key) }} {{ .readerSecret }}{{- else }} {{ .writerSecret }}{{- end }}
+      key: {{ .key }}
+      {{- if .optional }}
+      optional: true
+      {{- end }}
 {{- end }}
 
 {{- define "database.managed" -}}
@@ -798,6 +898,10 @@ Create the name of the service account to use
 {{- if and (eq (include "database.managed" .) "true") .Values.database.pooler.enabled -}}true{{- else -}}false{{- end -}}
 {{- end}}
 
+{{- define "database.readOnlyPoolerEnabled" -}}
+{{- if and (eq (include "database.managed" .) "true") .Values.database.reader.enabled .Values.database.reader.pooler.enabled -}}true{{- else -}}false{{- end -}}
+{{- end}}
+
 {{- define "database.poolerName" -}}
 {{- $clusterName := .Values.database.clusterName -}}
 {{- $poolerName := printf "%s-rw-pooler" ($clusterName | trunc 53 | trimSuffix "-") -}}
@@ -805,6 +909,75 @@ Create the name of the service account to use
 {{- $poolerName = printf "%s-rw-pooler" ($clusterName | trunc 52 | trimSuffix "-") -}}
 {{- end -}}
 {{- $poolerName -}}
+{{- end}}
+
+{{- define "database.readOnlyPoolerName" -}}
+{{- $clusterName := .Values.database.clusterName -}}
+{{- $poolerName := printf "%s-ro-pooler" ($clusterName | trunc 53 | trimSuffix "-") -}}
+{{- if eq $poolerName $clusterName -}}
+{{- $poolerName = printf "%s-ro-pooler" ($clusterName | trunc 52 | trimSuffix "-") -}}
+{{- end -}}
+{{- $poolerName -}}
+{{- end}}
+
+{{- define "database.readOnlyServiceName" -}}
+{{- printf "%s-ro" .Values.database.clusterName -}}
+{{- end}}
+
+{{- define "database.poolerResource" -}}
+{{- $root := .root -}}
+{{- $pooler := .pooler -}}
+{{- $parameters := deepCopy ($pooler.parameters | default dict) -}}
+{{- $_ := set $parameters "max_client_conn" ($pooler.maxClientConn | toString) -}}
+{{- $_ := set $parameters "default_pool_size" ($pooler.defaultPoolSize | toString) -}}
+{{- $maxPreparedStatements := "0" -}}
+{{- if $pooler.preparedStatements.enabled -}}
+{{- $maxPreparedStatements = $pooler.preparedStatements.maxPreparedStatements | toString -}}
+{{- end -}}
+{{- $_ := set $parameters "max_prepared_statements" $maxPreparedStatements -}}
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: {{ .name }}
+  labels:
+    {{- include "basyx.labels" $root | nindent 4 }}
+spec:
+  cluster:
+    name: {{ $root.Values.database.clusterName }}
+  instances: {{ $pooler.instances }}
+  type: {{ .type }}
+  pgbouncer:
+    poolMode: {{ $pooler.poolMode }}
+    parameters:
+      {{- toYaml $parameters | nindent 6 }}
+  {{- if or $pooler.resources $pooler.nodeSelector $pooler.affinity $pooler.tolerations $pooler.topologySpreadConstraints }}
+  template:
+    spec:
+      {{- if $pooler.resources }}
+      containers:
+        - name: pgbouncer
+          resources:
+            {{- toYaml $pooler.resources | nindent 12 }}
+      {{- else }}
+      containers: []
+      {{- end }}
+      {{- with $pooler.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $pooler.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $pooler.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $pooler.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  {{- end }}
 {{- end}}
 
 {{- define "database.podMonitor" -}}
@@ -1026,7 +1199,8 @@ annotations:
 {{- $databaseSecret := include "database.serviceSecret" $secretContext -}}
 {{- $componentValues := get $root.Values $component | default dict -}}
 {{- $serviceDatabase := get $componentValues "database" | default dict -}}
-{{- $usePooler := and $component (not $serviceDatabase) (eq (include "database.poolerEnabled" $root) "true") -}}
+{{- $serviceWriterDatabase := omit $serviceDatabase "reader" -}}
+{{- $usePooler := and $component (not $serviceWriterDatabase) (eq (include "database.poolerEnabled" $root) "true") -}}
 - name: POSTGRES_PORT
   valueFrom:
     secretKeyRef:
@@ -1066,6 +1240,58 @@ annotations:
 {{ include "database.optionalEnv" (dict "secret" $databaseSecret "name" "POSTGRES_SEARCHPATH" "key" "searchPath") }}
 {{ include "database.optionalEnv" (dict "secret" $databaseSecret "name" "POSTGRES_OPTIONS" "key" "options") }}
 {{ include "database.optionalEnv" (dict "secret" $databaseSecret "name" "POSTGRES_TIMEZONE" "key" "timezone") }}
+{{ if $component }}
+{{- $readerContext := dict "root" $root "component" $component "nameSuffix" $nameSuffix -}}
+{{- if eq (include "database.readerEnabled" $readerContext) "true" }}
+{{- $reader := include "database.readerConfig" $readerContext | fromYaml | default dict -}}
+{{- $readerSecret := include "database.readerSecret" $readerContext -}}
+{{- $completeReaderSecret := ne ($reader.existingSecret | default "") "" -}}
+{{- $readerManaged := eq (include "database.readerManaged" $readerContext) "true" -}}
+- name: POSTGRES_READER_HOST
+  {{- if $readerManaged }}
+  value: {{- if eq (include "database.readOnlyPoolerEnabled" $root) "true" }} {{ include "database.readOnlyPoolerName" $root | quote }}{{- else }} {{ include "database.readOnlyServiceName" $root | quote }}{{- end }}
+  {{- else }}
+  valueFrom:
+    secretKeyRef:
+      name: {{- if or $completeReaderSecret ($reader.host | default "") }} {{ $readerSecret }}{{- else }} {{ $databaseSecret }}{{- end }}
+      key: host
+  {{- end }}
+{{ include "database.readerSecretEnv" (dict "reader" $reader "readerSecret" $readerSecret "writerSecret" $databaseSecret "complete" $completeReaderSecret "name" "POSTGRES_READER_PORT" "key" "port" "optional" false) }}
+{{ include "database.readerSecretEnv" (dict "reader" $reader "readerSecret" $readerSecret "writerSecret" $databaseSecret "complete" $completeReaderSecret "name" "POSTGRES_READER_PASSWORD" "key" "password" "optional" false) }}
+{{ include "database.readerSecretEnv" (dict "reader" $reader "readerSecret" $readerSecret "writerSecret" $databaseSecret "complete" $completeReaderSecret "name" "POSTGRES_READER_DBNAME" "key" "dbname" "optional" false) }}
+{{ include "database.readerSecretEnv" (dict "reader" $reader "readerSecret" $readerSecret "writerSecret" $databaseSecret "complete" $completeReaderSecret "name" "POSTGRES_READER_USER" "key" "user" "optional" false) }}
+{{ include "database.readerSecretEnv" (dict "reader" $reader "readerSecret" $readerSecret "writerSecret" $databaseSecret "complete" $completeReaderSecret "name" "POSTGRES_READER_SSLMODE" "key" "sslmode" "optional" true) }}
+{{ include "database.readerSecretEnv" (dict "reader" $reader "readerSecret" $readerSecret "writerSecret" $databaseSecret "complete" $completeReaderSecret "name" "POSTGRES_READER_SSLCERT" "key" "sslcert" "optional" true) }}
+{{ include "database.readerSecretEnv" (dict "reader" $reader "readerSecret" $readerSecret "writerSecret" $databaseSecret "complete" $completeReaderSecret "name" "POSTGRES_READER_SSLKEY" "key" "sslkey" "optional" true) }}
+{{ include "database.readerSecretEnv" (dict "reader" $reader "readerSecret" $readerSecret "writerSecret" $databaseSecret "complete" $completeReaderSecret "name" "POSTGRES_READER_SSLROOTCERT" "key" "sslrootcert" "optional" true) }}
+{{ include "database.readerSecretEnv" (dict "reader" $reader "readerSecret" $readerSecret "writerSecret" $databaseSecret "complete" $completeReaderSecret "name" "POSTGRES_READER_CONNECTTIMEOUTSECONDS" "key" "connectTimeoutSeconds" "optional" true) }}
+{{ if or $completeReaderSecret ($reader.applicationName | default "") }}
+{{ include "database.readerSecretEnv" (dict "reader" $reader "readerSecret" $readerSecret "writerSecret" $databaseSecret "complete" $completeReaderSecret "name" "POSTGRES_READER_APPLICATIONNAME" "key" "applicationName" "optional" true) }}
+{{ end }}
+{{ if or $completeReaderSecret ($reader.fallbackApplicationName | default "") }}
+{{ include "database.readerSecretEnv" (dict "reader" $reader "readerSecret" $readerSecret "writerSecret" $databaseSecret "complete" $completeReaderSecret "name" "POSTGRES_READER_FALLBACKAPPLICATIONNAME" "key" "fallbackApplicationName" "optional" true) }}
+{{ end }}
+{{ include "database.readerSecretEnv" (dict "reader" $reader "readerSecret" $readerSecret "writerSecret" $databaseSecret "complete" $completeReaderSecret "name" "POSTGRES_READER_SEARCHPATH" "key" "searchPath" "optional" true) }}
+{{ include "database.readerSecretEnv" (dict "reader" $reader "readerSecret" $readerSecret "writerSecret" $databaseSecret "complete" $completeReaderSecret "name" "POSTGRES_READER_OPTIONS" "key" "options" "optional" true) }}
+{{ include "database.readerSecretEnv" (dict "reader" $reader "readerSecret" $readerSecret "writerSecret" $databaseSecret "complete" $completeReaderSecret "name" "POSTGRES_READER_TIMEZONE" "key" "timezone" "optional" true) }}
+{{ $maxOpenConnections := 50 -}}
+{{- if hasKey $reader "maxOpenConnections" }}{{- $maxOpenConnections = $reader.maxOpenConnections -}}{{- end }}
+{{- $maxIdleConnections := 25 -}}
+{{- if hasKey $reader "maxIdleConnections" }}{{- $maxIdleConnections = $reader.maxIdleConnections -}}{{- end }}
+{{- $connMaxLifetimeMinutes := 5 -}}
+{{- if hasKey $reader "connMaxLifetimeMinutes" }}{{- $connMaxLifetimeMinutes = $reader.connMaxLifetimeMinutes -}}{{- end }}
+{{- $connMaxIdleTimeMinutes := 0 -}}
+{{- if hasKey $reader "connMaxIdleTimeMinutes" }}{{- $connMaxIdleTimeMinutes = $reader.connMaxIdleTimeMinutes -}}{{- end }}
+- name: POSTGRES_READER_MAXOPENCONNECTIONS
+  value: {{ $maxOpenConnections | quote }}
+- name: POSTGRES_READER_MAXIDLECONNECTIONS
+  value: {{ $maxIdleConnections | quote }}
+- name: POSTGRES_READER_CONNMAXLIFETIMEMINUTES
+  value: {{ $connMaxLifetimeMinutes | quote }}
+- name: POSTGRES_READER_CONNMAXIDLETIMEMINUTES
+  value: {{ $connMaxIdleTimeMinutes | quote }}
+{{- end }}
+{{- end }}
 {{- end }}
 
 {{- define "basyx.abac.enabled" -}}

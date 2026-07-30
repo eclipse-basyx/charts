@@ -17,3 +17,13 @@
   "selectorValue" (include "database.poolerName" .)
 ) -}}
 {{- end }}
+{{- if and (eq (include "database.readOnlyPoolerEnabled" .) "true") .Values.database.reader.pooler.monitoring.enabled }}
+---
+{{ include "database.podMonitor" (dict
+  "root" .
+  "monitor" .Values.database.reader.pooler.monitoring
+  "name" (include "database.readOnlyPoolerName" .)
+  "selectorKey" "cnpg.io/poolerName"
+  "selectorValue" (include "database.readOnlyPoolerName" .)
+) -}}
+{{- end }}

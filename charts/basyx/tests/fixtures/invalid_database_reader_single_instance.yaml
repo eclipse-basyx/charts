@@ -1,0 +1,4 @@
+database:
+  instances: 1
+  reader:
+    enabled: true

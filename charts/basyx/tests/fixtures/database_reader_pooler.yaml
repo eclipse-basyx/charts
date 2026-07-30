@@ -1,0 +1,47 @@
+database:
+  reader:
+    enabled: true
+    pooler:
+      enabled: true
+      instances: 3
+      poolMode: session
+      maxClientConn: 600
+      defaultPoolSize: 30
+      preparedStatements:
+        enabled: true
+        maxPreparedStatements: 150
+      parameters:
+        max_client_conn: "10"
+        default_pool_size: "5"
+        max_prepared_statements: "1"
+        reserve_pool_size: "4"
+      resources:
+        requests:
+          cpu: 250m
+      nodeSelector:
+        workload: database
+      affinity: {}
+      tolerations:
+        - operator: Exists
+          effect: NoSchedule
+      topologySpreadConstraints: []
+      monitoring:
+        enabled: true
+        labels:
+          release: kube-prometheus-stack
+        annotations:
+          monitoring.example.com/owner: platform
+        interval: 15s
+        scrapeTimeout: 5s
+        namespaceSelector:
+          matchNames:
+            - basyx-system
+        relabelings:
+          - sourceLabels:
+              - __meta_kubernetes_pod_node_name
+            targetLabel: kubernetes_node
+        metricRelabelings:
+          - sourceLabels:
+              - __name__
+            regex: go_.*
+            action: drop

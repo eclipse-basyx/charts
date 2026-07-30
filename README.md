@@ -822,11 +822,121 @@ rolling updates, primary switchovers and connection saturation. Watch
 distinguish application-pool waits from PgBouncer queueing and PostgreSQL
 execution time.
 
+#### PostgreSQL reader routing and read-only Pooler
+
+BaSyx Go 1.0.7 can route eligible reads through a separate PostgreSQL
+connection. Chart 3.9.0 exposes this as `database.reader` and keeps it disabled
+by default. Without reader configuration, no `POSTGRES_READER_*` variables are
+rendered and every service continues to reuse its writer pool.
+
+For a managed CloudNativePG database, enabling the reader routes reads to the
+native `<database.clusterName>-ro` Service. When using this native endpoint,
+the cluster must have at least two instances:
+
+```yaml
+database:
+  instances: 3
+  reader:
+    enabled: true
+    maxOpenConnections: 50
+    maxIdleConnections: 25
+    connMaxLifetimeMinutes: 5
+    connMaxIdleTimeMinutes: 0
+```
+
+The optional read-only Pooler uses the same PgBouncer, resource and scheduling
+settings as the read-write Pooler:
+
+```yaml
+database:
+  instances: 3
+  reader:
+    enabled: true
+    pooler:
+      enabled: true
+      instances: 2
+      poolMode: transaction
+      maxClientConn: 1000
+      defaultPoolSize: 25
+      preparedStatements:
+        enabled: true
+        maxPreparedStatements: 100
+```
+
+This creates a CloudNativePG `Pooler` of type `ro` named
+`<database.clusterName>-ro-pooler` and uses its Service as the reader host.
+Writer traffic remains on the direct read-write Service or the separately
+configured `database.pooler`.
+
+For an external PostgreSQL deployment, reference a complete reader Secret:
+
+```yaml
+database:
+  type: external
+  existingSecret: basyx-postgres-writer
+  reader:
+    enabled: true
+    existingSecret: basyx-postgres-reader
+```
+
+The reader Secret must contain `host`, `port`, `dbname`, `user` and `password`.
+It can also contain the optional PostgreSQL keys accepted by the writer Secret.
+Alternatively, configure only a separate endpoint and reuse the effective
+writer Secret for omitted fields:
+
+```yaml
+database:
+  type: external
+  existingSecret: basyx-postgres-writer
+  reader:
+    enabled: true
+    host: postgres-reader.example.internal
+    sslmode: verify-full
+```
+
+Inline reader connection values are stored in a generated Secret. Prefer
+existing Secrets, TLS with server verification and a least-privilege read-only
+user in production. For endpoints that do not enforce read-only transactions,
+consider `options: "-c default_transaction_read_only=on"` as an additional
+safeguard after verifying provider compatibility. A managed writer with one
+instance can use an explicit external reader `host` or `existingSecret`.
+Setting only `reader.enabled: true` for an external database deliberately
+reuses the complete writer endpoint; it is compatible with the reader routing
+feature but does not add database capacity.
+
+Each charted BaSyx Go HTTP service supports a complete local reader replacement
+at `<component>.database.reader`: AAS and Submodel Registry, Discovery Service,
+Digital Twin Registry, AAS and Submodel Repository, Concept Description
+Repository, AAS Environment, Company Lookup Service and DPP API. A reader-only
+local override retains the global writer. A service-local writer override
+without a local reader disables global reader inheritance so that the service
+cannot accidentally query another database. The Configuration Service and
+Keycloak remain writer-only. BaSyx Go also supports reader routing in the AASX
+File Server, but that service is not currently deployed by this chart.
+
+Reader results are eventually consistent. Replication lag can briefly expose
+the preceding state after writes, deletions and authorization-relevant
+attribute changes. Mutation, transaction, guard and read-after-write work
+continues to use the writer. Deployments requiring immediate revocation or
+read-after-write consistency must leave the affected service on the writer or
+use replication guarantees that meet their consistency window. Reader startup
+fails if the configured endpoint is unavailable; requests are not silently
+routed back to the writer.
+
+Budget the four reader pool values independently for every BaSyx pod and
+destination standby. Aggregate BaSyx clients must fit the capacity of the
+surviving read-only Pooler pods. PostgreSQL server-connection budgeting must
+include every active read-only Pooler pod, every user/database pool, and
+distribution or failover across the standbys. Monitor replication lag together
+with BaSyx `db.client.connections.*` and CloudNativePG `cnpg_pgbouncer_*`
+metrics before increasing limits. Start from
+[`values/values.read-replica.example.yaml`](values/values.read-replica.example.yaml).
+
 #### Database and Pooler PodMonitors
 
 The chart can create Prometheus Operator `PodMonitor` resources for the managed
-CloudNativePG instances and the read-write Pooler. Both are disabled by default,
-and the chart does not install Prometheus Operator or the
+CloudNativePG instances, the read-write Pooler and the read-only Pooler. All are
+disabled by default, and the chart does not install Prometheus Operator or the
 `monitoring.coreos.com` CRDs.
 
 ```yaml
@@ -859,13 +969,27 @@ database:
       namespaceSelector: {}
       relabelings: []
       metricRelabelings: []
+  reader:
+    enabled: true
+    pooler:
+      enabled: true
+      monitoring:
+        enabled: true
+        labels:
+          release: kube-prometheus-stack
+        annotations: {}
+        interval: 30s
+        scrapeTimeout: 10s
+        namespaceSelector: {}
+        relabelings: []
+        metricRelabelings: []
 ```
 
 PostgreSQL and Pooler monitoring can be enabled independently. The PostgreSQL
-monitor is rendered only for a managed database. The Pooler monitor is rendered
-only when the managed read-write Pooler is also enabled. Neither monitor is
-rendered for `database.type: external`; monitoring an external database remains
-the responsibility of that database's platform.
+monitor is rendered only for a managed database. Each Pooler monitor is
+rendered only when its corresponding managed Pooler is enabled. None of these
+monitors is rendered for `database.type: external`; monitoring an external
+database remains the responsibility of that database's platform.
 
 The chart selects PostgreSQL pods through `cnpg.io/cluster` and Pooler pods
 through `cnpg.io/poolerName`. Both exporters are scraped through the named
