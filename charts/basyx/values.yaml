@@ -69,6 +69,18 @@ ingress:
     name: ingress-issuer
     spec: {}
 
+# Gateway API HTTPRoute - alternative to Ingress for exposing services.
+# Requires Gateway API CRDs and a Gateway resource already installed in the
+# cluster (see: https://gateway-api.sigs.k8s.io/guides/). Disabled per
+# component via <component>.httpRoute.enabled; a component's own
+# httpRoute.parentRefs takes precedence, otherwise the list below is used.
+gatewayApi:
+  parentRefs: []
+  # parentRefs:
+  #   - name: my-gateway
+  #     namespace: gateway-system
+  #     sectionName: https
+
 paths:
   dashboard: /aas-dataspace-dashboard
   aasDiscovery: /aas-discovery
@@ -451,6 +463,16 @@ keycloak:
           - path: "{{ .Values.paths.keycloak }}"
             pathType: Prefix
 
+  httpRoute:
+    enabled: false
+    parentRefs: []
+    annotations: {}
+    hosts:
+      - host: "{{ .Values.host }}"
+        paths:
+          - path: "{{ .Values.paths.keycloak }}"
+            pathType: PathPrefix
+
   resources:
     {}
     # limits:
@@ -544,6 +566,17 @@ submodelRepository:
         paths:
           - path: "{{ .Values.paths.submodelRepository }}"
             pathType: Prefix
+
+  httpRoute:
+    enabled: false
+    parentRefs: []
+    annotations: {}
+    hosts:
+      - host: "{{ .Values.host }}"
+        paths:
+          - path: "{{ .Values.paths.submodelRepository }}"
+            pathType: PathPrefix
+
   environment:
     # Keep the Submodel Registry in sync when submodels are created, updated or deleted.
     GENERAL_SUBMODELREGISTRYINTEGRATION: true
@@ -642,6 +675,17 @@ submodelRegistry:
         paths:
           - path: "{{ .Values.paths.submodelRegistry }}"
             pathType: Prefix
+
+  httpRoute:
+    enabled: false
+    parentRefs: []
+    annotations: {}
+    hosts:
+      - host: "{{ .Values.host }}"
+        paths:
+          - path: "{{ .Values.paths.submodelRegistry }}"
+            pathType: PathPrefix
+
   environment: {}
   general: {}
   server: {}
@@ -737,6 +781,16 @@ aasRegistry:
         paths:
           - path: "{{ .Values.paths.aasRegistry }}"
             pathType: Prefix
+
+  httpRoute:
+    enabled: false
+    parentRefs: []
+    annotations: {}
+    hosts:
+      - host: "{{ .Values.host }}"
+        paths:
+          - path: "{{ .Values.paths.aasRegistry }}"
+            pathType: PathPrefix
 
   # Content of application.yaml
   # central environment variables (will be set in configmap.yaml via tpl interpolation)
@@ -844,6 +898,16 @@ digitalTwinRegistry:
           - path: "{{ .Values.paths.digitalTwinRegistry }}"
             pathType: Prefix
 
+  httpRoute:
+    enabled: false
+    parentRefs: []
+    annotations: {}
+    hosts:
+      - host: "{{ .Values.host }}"
+        paths:
+          - path: "{{ .Values.paths.digitalTwinRegistry }}"
+            pathType: PathPrefix
+
   # Content of application.yaml
   # central environment variables (will be set in configmap.yaml via tpl interpolation)
   environment: {}
@@ -950,6 +1014,16 @@ aasRepository:
           - path: "{{ .Values.paths.aasRepository }}"
             pathType: Prefix
 
+  httpRoute:
+    enabled: false
+    parentRefs: []
+    annotations: {}
+    hosts:
+      - host: "{{ .Values.host }}"
+        paths:
+          - path: "{{ .Values.paths.aasRepository }}"
+            pathType: PathPrefix
+
   # Content of application.yaml
   # central environment variables (will be set in configmap.yaml via tpl interpolation)
   environment:
@@ -1052,6 +1126,16 @@ aasEnvironment:
         paths:
           - path: "{{ .Values.paths.aasEnvironment }}"
             pathType: Prefix
+
+  httpRoute:
+    enabled: false
+    parentRefs: []
+    annotations: {}
+    hosts:
+      - host: "{{ .Values.host }}"
+        paths:
+          - path: "{{ .Values.paths.aasEnvironment }}"
+            pathType: PathPrefix
 
   # AAS Environment bundles the AAS, submodel, concept description, registry
   # and discovery APIs in one service. Preconfigured AAS files can be imported
@@ -1160,6 +1244,16 @@ dppApi:
           - path: "{{ .Values.paths.dppApi }}"
             pathType: Prefix
 
+  httpRoute:
+    enabled: false
+    parentRefs: []
+    annotations: {}
+    hosts:
+      - host: "{{ .Values.host }}"
+        paths:
+          - path: "{{ .Values.paths.dppApi }}"
+            pathType: PathPrefix
+
   # The DPP API composes Digital Product Passport data with the shared BaSyx
   # database. The default history settings mirror the BaSyx DPP API example.
   environment: {}
@@ -1260,6 +1354,16 @@ cdRepository:
           - path: "{{ .Values.paths.cdRepository }}"
             pathType: Prefix
 
+  httpRoute:
+    enabled: false
+    parentRefs: []
+    annotations: {}
+    hosts:
+      - host: "{{ .Values.host }}"
+        paths:
+          - path: "{{ .Values.paths.cdRepository }}"
+            pathType: PathPrefix
+
   # Content of application.yaml
   # central environment variables (will be set in configmap.yaml via tpl interpolation)
   environment: {}
@@ -1353,6 +1457,17 @@ companyLookup:
         paths:
           - path: "{{ .Values.paths.companyLookup }}"
             pathType: Prefix
+
+  httpRoute:
+    enabled: false
+    parentRefs: []
+    annotations: {}
+    hosts:
+      - host: "{{ .Values.host }}"
+        paths:
+          - path: "{{ .Values.paths.companyLookup }}"
+            pathType: PathPrefix
+
   environment: {}
   general: {}
   server: {}
@@ -1447,6 +1562,16 @@ aasDiscovery:
         paths:
           - path: "{{ .Values.paths.aasDiscovery }}"
             pathType: Prefix
+
+  httpRoute:
+    enabled: false
+    parentRefs: []
+    annotations: {}
+    hosts:
+      - host: "{{ .Values.host }}"
+        paths:
+          - path: "{{ .Values.paths.aasDiscovery }}"
+            pathType: PathPrefix
 
   # central environment variables (will be set in configmap.yaml via tpl interpolation)
   environment: {}
@@ -1580,6 +1705,16 @@ aasWebGui:
         paths:
           - path: "{{ .Values.paths.aasWebUi }}"
             pathType: Prefix
+
+  httpRoute:
+    enabled: false
+    parentRefs: []
+    annotations: {}
+    hosts:
+      - host: "{{ .Values.host }}"
+        paths:
+          - path: "{{ .Values.paths.aasWebUi }}"
+            pathType: PathPrefix
 
   resources: {}
     # limits:

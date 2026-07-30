@@ -1143,6 +1143,33 @@ annotations:
 {{- end }}
 {{- end }}
 
+{{/*
+Render parentRefs for a Gateway API HTTPRoute. Falls back to the chart-wide
+default parentRefs (.Values.gatewayApi.parentRefs) when the component does
+not define its own.
+*/}}
+{{- define "common.httpRoute.parentRefs" -}}
+{{- $parentRefs := .parentRefs -}}
+{{- if not $parentRefs }}
+{{- $parentRefs = .root.Values.gatewayApi.parentRefs }}
+{{- end }}
+{{- if not $parentRefs }}
+{{- fail "httpRoute is enabled but no parentRefs are configured — set <component>.httpRoute.parentRefs or the chart-wide gatewayApi.parentRefs" }}
+{{- end }}
+{{- range $parentRefs }}
+- name: {{ .name | quote }}
+  {{- if .namespace }}
+  namespace: {{ .namespace | quote }}
+  {{- end }}
+  {{- if .sectionName }}
+  sectionName: {{ .sectionName | quote }}
+  {{- end }}
+  {{- if .port }}
+  port: {{ .port }}
+  {{- end }}
+{{- end }}
+{{- end }}
+
 {{- define "common.ingressTLS.annotations" -}}
   {{- if .Values.tls.enabled }}
   {{- if .Values.ingress.certificateIssuer.enabled }}
