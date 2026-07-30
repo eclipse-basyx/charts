@@ -822,6 +822,82 @@ rolling updates, primary switchovers and connection saturation. Watch
 distinguish application-pool waits from PgBouncer queueing and PostgreSQL
 execution time.
 
+#### Database and Pooler PodMonitors
+
+The chart can create Prometheus Operator `PodMonitor` resources for the managed
+CloudNativePG instances and the read-write Pooler. Both are disabled by default,
+and the chart does not install Prometheus Operator or the
+`monitoring.coreos.com` CRDs.
+
+```yaml
+database:
+  monitoring:
+    enabled: true
+    # Add labels required by the Prometheus podMonitorSelector.
+    labels:
+      release: kube-prometheus-stack
+    annotations: {}
+    interval: 30s
+    scrapeTimeout: 10s
+    # Empty selects pods in the Helm release namespace.
+    namespaceSelector: {}
+    relabelings: []
+    metricRelabelings:
+      - sourceLabels:
+          - __name__
+        regex: go_.*
+        action: drop
+  pooler:
+    enabled: true
+    monitoring:
+      enabled: true
+      labels:
+        release: kube-prometheus-stack
+      annotations: {}
+      interval: 30s
+      scrapeTimeout: 10s
+      namespaceSelector: {}
+      relabelings: []
+      metricRelabelings: []
+```
+
+PostgreSQL and Pooler monitoring can be enabled independently. The PostgreSQL
+monitor is rendered only for a managed database. The Pooler monitor is rendered
+only when the managed read-write Pooler is also enabled. Neither monitor is
+rendered for `database.type: external`; monitoring an external database remains
+the responsibility of that database's platform.
+
+The chart selects PostgreSQL pods through `cnpg.io/cluster` and Pooler pods
+through `cnpg.io/poolerName`. Both exporters are scraped through the named
+`metrics` port at `/metrics`. An empty `namespaceSelector` keeps target
+discovery in the PodMonitor's namespace. If `matchNames` or `any` is configured,
+make sure it cannot select an unrelated CloudNativePG resource with the same
+name in another namespace.
+
+Prometheus must be configured to discover `PodMonitor` resources in the Helm
+release namespace and to match the configured metadata `labels`. `annotations`
+are applied to the `PodMonitor` itself. `relabelings` modify discovered targets,
+while `metricRelabelings` modify or discard samples before ingestion. Review
+metric relabeling rules carefully because they can silently remove metrics.
+Prometheus Operator rejects a `scrapeTimeout` greater than the `interval`.
+
+Useful starting points for dashboards and alerts include:
+
+| Area | Metrics |
+| --- | --- |
+| PostgreSQL availability | `cnpg_collector_up`, `cnpg_collector_last_collection_error` |
+| WAL and archiving | `cnpg_collector_pg_wal`, `cnpg_collector_pg_wal_archive_status`, `cnpg_collector_wal_bytes`, `cnpg_collector_wal_write_time`, `cnpg_collector_wal_sync_time` |
+| Replication | `cnpg_pg_replication_lag`, `cnpg_pg_replication_is_wal_receiver_up`, `cnpg_pg_replication_streaming_replicas`, `cnpg_collector_sync_replicas` |
+| Pooler pressure | `cnpg_pgbouncer_pools_cl_active`, `cnpg_pgbouncer_pools_cl_waiting`, `cnpg_pgbouncer_pools_maxwait` |
+| Pooler server use | `cnpg_pgbouncer_pools_sv_active`, `cnpg_pgbouncer_pools_sv_idle` |
+| Pooler throughput and waits | `cnpg_pgbouncer_stats_total_query_count`, `cnpg_pgbouncer_stats_total_xact_count`, `cnpg_pgbouncer_stats_total_wait_time` |
+
+Some PostgreSQL query metrics depend on the default monitoring queries shipped
+with the installed CloudNativePG version. For storage capacity and latency,
+combine these database metrics with Kubernetes PVC and node/storage metrics
+such as `kubelet_volume_stats_available_bytes`; those are not emitted by the
+CloudNativePG PodMonitor.
+
 ### BaSyx Configuration Service
 
 BaSyx Go requires the database schema to be prepared before DB-backed services start. The chart enables `configurationService` by default for this. It renders a Kubernetes `Job` using `eclipsebasyx/basyxconfigurationservice-go` and the same PostgreSQL Secret as the runtime services.
