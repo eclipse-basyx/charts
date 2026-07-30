@@ -522,6 +522,27 @@
         }
       }
     },
+    "positiveResourceQuantity": {
+      "oneOf": [
+        {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        {
+          "type": "string",
+          "allOf": [
+            {
+              "pattern": "^\\+?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[numkMGTPE]|[KMGTPE]i|[eE][+-]?[0-9]+)?$"
+            },
+            {
+              "not": {
+                "pattern": "^\\+?(?:0+(?:\\.0*)?|\\.0+)(?:[numkMGTPE]|[KMGTPE]i|[eE][+-]?[0-9]+)?$"
+              }
+            }
+          ]
+        }
+      ]
+    },
     "hpaScalingPolicy": {
       "type": "object",
       "additionalProperties": false,
@@ -657,7 +678,12 @@
                 "required": ["requests"],
                 "properties": {
                   "requests": {
-                    "required": ["cpu"]
+                    "required": ["cpu"],
+                    "properties": {
+                      "cpu": {
+                        "$ref": "#/definitions/positiveResourceQuantity"
+                      }
+                    }
                   }
                 }
               }
@@ -684,7 +710,12 @@
                 "required": ["requests"],
                 "properties": {
                   "requests": {
-                    "required": ["memory"]
+                    "required": ["memory"],
+                    "properties": {
+                      "memory": {
+                        "$ref": "#/definitions/positiveResourceQuantity"
+                      }
+                    }
                   }
                 }
               }

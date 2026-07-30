@@ -107,6 +107,27 @@ tests:
       - failedTemplate:
           errorPattern: "aasRepository.resources"
 
+  - it: fails when autoscaling has a numeric zero CPU request
+    values:
+      - fixtures/invalid_autoscaling_cpu_request_zero.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "aasRepository.resources.requests.cpu"
+
+  - it: fails when autoscaling has a zero CPU quantity
+    values:
+      - fixtures/invalid_autoscaling_cpu_request_zero_quantity.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "aasRepository.resources.requests.cpu"
+
+  - it: fails when autoscaling has an invalid CPU quantity
+    values:
+      - fixtures/invalid_autoscaling_resource_quantity.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "aasRepository.resources.requests.cpu"
+
   - it: fails when the autoscaling CPU target is invalid
     values:
       - fixtures/invalid_autoscaling_cpu_target.yaml
@@ -120,6 +141,20 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "aasRepository.resources"
+
+  - it: fails when memory autoscaling has a numeric zero memory request
+    values:
+      - fixtures/invalid_autoscaling_memory_request_zero.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "aasRepository.resources.requests.memory"
+
+  - it: fails when memory autoscaling has a zero memory quantity
+    values:
+      - fixtures/invalid_autoscaling_memory_request_zero_quantity.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "aasRepository.resources.requests.memory"
 
   - it: fails when an autoscaling policy period is invalid
     values:

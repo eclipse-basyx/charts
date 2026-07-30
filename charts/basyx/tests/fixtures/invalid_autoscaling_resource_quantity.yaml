@@ -1,0 +1,7 @@
+aasRepository:
+  enabled: true
+  autoscaling:
+    enabled: true
+  resources:
+    requests:
+      cpu: not-a-quantity
