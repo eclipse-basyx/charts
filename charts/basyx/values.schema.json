@@ -314,6 +314,194 @@
         }
       }
     },
+    "prometheusRelabelConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sourceLabels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "separator": {
+          "type": "string"
+        },
+        "targetLabel": {
+          "type": "string"
+        },
+        "regex": {
+          "type": "string"
+        },
+        "modulus": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "replacement": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "replace",
+            "Replace",
+            "keep",
+            "Keep",
+            "drop",
+            "Drop",
+            "hashmod",
+            "HashMod",
+            "labelmap",
+            "LabelMap",
+            "labeldrop",
+            "LabelDrop",
+            "labelkeep",
+            "LabelKeep",
+            "lowercase",
+            "Lowercase",
+            "uppercase",
+            "Uppercase",
+            "keepequal",
+            "KeepEqual",
+            "dropequal",
+            "DropEqual"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "anyOf": [
+              {
+                "not": {
+                  "required": ["action"]
+                }
+              },
+              {
+                "properties": {
+                  "action": {
+                    "enum": [
+                      "replace",
+                      "Replace",
+                      "hashmod",
+                      "HashMod",
+                      "lowercase",
+                      "Lowercase",
+                      "uppercase",
+                      "Uppercase",
+                      "keepequal",
+                      "KeepEqual",
+                      "dropequal",
+                      "DropEqual"
+                    ]
+                  }
+                },
+                "required": ["action"]
+              }
+            ]
+          },
+          "then": {
+            "required": ["targetLabel"],
+            "properties": {
+              "targetLabel": {
+                "minLength": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "enum": ["hashmod", "HashMod"]
+              }
+            },
+            "required": ["action"]
+          },
+          "then": {
+            "required": ["modulus"],
+            "properties": {
+              "modulus": {
+                "minimum": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "prometheusNamespaceSelector": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "any": {
+          "type": "boolean"
+        },
+        "matchNames": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "podMonitor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "labels",
+        "annotations",
+        "interval",
+        "scrapeTimeout",
+        "namespaceSelector",
+        "relabelings",
+        "metricRelabelings"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "labels": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "interval": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(0|(([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?)$"
+        },
+        "scrapeTimeout": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(0|(([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?)$"
+        },
+        "namespaceSelector": {
+          "$ref": "#/definitions/prometheusNamespaceSelector"
+        },
+        "relabelings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/prometheusRelabelConfig"
+          }
+        },
+        "metricRelabelings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/prometheusRelabelConfig"
+          }
+        }
+      }
+    },
     "serviceRuntimeOverrides": {
       "type": "object",
       "properties": {
@@ -1245,6 +1433,9 @@
             }
           }
         },
+        "monitoring": {
+          "$ref": "#/definitions/podMonitor"
+        },
         "pooler": {
           "type": "object",
           "required": [
@@ -1259,7 +1450,8 @@
             "nodeSelector",
             "affinity",
             "tolerations",
-            "topologySpreadConstraints"
+            "topologySpreadConstraints",
+            "monitoring"
           ],
           "properties": {
             "enabled": {
@@ -1422,6 +1614,9 @@
                   }
                 ]
               }
+            },
+            "monitoring": {
+              "$ref": "#/definitions/podMonitor"
             }
           }
         }

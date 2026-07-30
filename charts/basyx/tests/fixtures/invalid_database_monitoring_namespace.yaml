@@ -1,0 +1,6 @@
+database:
+  pooler:
+    monitoring:
+      namespaceSelector:
+        matchNames:
+          - ""

@@ -1,0 +1,7 @@
+database:
+  pooler:
+    monitoring:
+      metricRelabelings:
+        - action: hashmod
+          targetLabel: shard
+          modulus: 0

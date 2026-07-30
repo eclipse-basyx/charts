@@ -1633,6 +1633,18 @@ database:
   # PostgreSQL settings accepted by CloudNativePG. Values must be strings.
   postgresql:
     parameters: {}
+  # Optional Prometheus Operator PodMonitor for the managed PostgreSQL pods.
+  # The chart does not install Prometheus Operator or its CRDs.
+  monitoring:
+    enabled: false
+    labels: {}
+    annotations: {}
+    interval: 30s
+    scrapeTimeout: 10s
+    # Empty selects pods in the PodMonitor's namespace.
+    namespaceSelector: {}
+    relabelings: []
+    metricRelabelings: []
   # Optional CloudNativePG read-write Pooler for BaSyx runtime services.
   # The Configuration Service always connects directly to the primary because
   # schema migrations use session-level advisory locks.
@@ -1653,6 +1665,17 @@ database:
     affinity: {}
     tolerations: []
     topologySpreadConstraints: []
+    # Optional Prometheus Operator PodMonitor for this Pooler.
+    monitoring:
+      enabled: false
+      labels: {}
+      annotations: {}
+      interval: 30s
+      scrapeTimeout: 10s
+      # Empty selects pods in the PodMonitor's namespace.
+      namespaceSelector: {}
+      relabelings: []
+      metricRelabelings: []
 
 # PodDisruptionBudget: not managed by this chart. For HA deployments, create
 # PDBs separately to guarantee availability during node drains. Example:

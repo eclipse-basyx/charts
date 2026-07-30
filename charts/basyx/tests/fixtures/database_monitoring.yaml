@@ -1,0 +1,30 @@
+database:
+  monitoring:
+    enabled: true
+    labels:
+      release: kube-prometheus-stack
+    annotations:
+      monitoring.example.com/owner: platform
+    interval: 20s
+    scrapeTimeout: 5s
+    namespaceSelector:
+      matchNames:
+        - basyx-system
+    relabelings:
+      - sourceLabels:
+          - __meta_kubernetes_pod_node_name
+        targetLabel: kubernetes_node
+        action: replace
+    metricRelabelings:
+      - sourceLabels:
+          - __name__
+        regex: go_.*
+        action: drop
+  pooler:
+    enabled: true
+    monitoring:
+      enabled: true
+      labels:
+        release: kube-prometheus-stack
+      interval: 15s
+      scrapeTimeout: 5s

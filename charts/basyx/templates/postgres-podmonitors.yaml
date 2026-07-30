@@ -1,0 +1,19 @@
+{{- if and (eq (include "database.managed" .) "true") .Values.database.monitoring.enabled -}}
+{{- include "database.podMonitor" (dict
+  "root" .
+  "monitor" .Values.database.monitoring
+  "name" .Values.database.clusterName
+  "selectorKey" "cnpg.io/cluster"
+  "selectorValue" .Values.database.clusterName
+) -}}
+{{- end }}
+{{- if and (eq (include "database.poolerEnabled" .) "true") .Values.database.pooler.monitoring.enabled }}
+---
+{{ include "database.podMonitor" (dict
+  "root" .
+  "monitor" .Values.database.pooler.monitoring
+  "name" (include "database.poolerName" .)
+  "selectorKey" "cnpg.io/poolerName"
+  "selectorValue" (include "database.poolerName" .)
+) -}}
+{{- end }}

@@ -1,0 +1,121 @@
+suite: CloudNativePG monitoring
+release:
+  name: basyx
+  namespace: basyx-system
+templates:
+  - templates/postgres-podmonitors.yaml
+tests:
+  - it: does not render PodMonitors by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders PostgreSQL monitoring independently
+    set:
+      database.monitoring.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: PodMonitor
+      - equal:
+          path: apiVersion
+          value: monitoring.coreos.com/v1
+      - equal:
+          path: metadata.name
+          value: basyx-database
+      - equal:
+          path: spec.selector.matchLabels["cnpg.io/cluster"]
+          value: basyx-database
+      - equal:
+          path: spec.podMetricsEndpoints[0].port
+          value: metrics
+      - equal:
+          path: spec.podMetricsEndpoints[0].path
+          value: /metrics
+      - equal:
+          path: spec.podMetricsEndpoints[0].interval
+          value: 30s
+      - equal:
+          path: spec.podMetricsEndpoints[0].scrapeTimeout
+          value: 10s
+      - notExists:
+          path: spec.namespaceSelector
+
+  - it: renders RW Pooler monitoring independently when the Pooler is enabled
+    set:
+      database.pooler.enabled: true
+      database.pooler.monitoring.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: PodMonitor
+      - equal:
+          path: metadata.name
+          value: basyx-database-rw-pooler
+      - equal:
+          path: spec.selector.matchLabels["cnpg.io/poolerName"]
+          value: basyx-database-rw-pooler
+
+  - it: renders both monitors with custom discovery and relabeling
+    values:
+      - fixtures/database_monitoring.yaml
+    asserts:
+      - hasDocuments:
+          count: 2
+      - documentSelector:
+          path: metadata.name
+          value: basyx-database
+        equal:
+          path: metadata.labels.release
+          value: kube-prometheus-stack
+      - documentSelector:
+          path: metadata.name
+          value: basyx-database
+        equal:
+          path: metadata.annotations["monitoring.example.com/owner"]
+          value: platform
+      - documentSelector:
+          path: metadata.name
+          value: basyx-database
+        equal:
+          path: spec.namespaceSelector.matchNames
+          value:
+            - basyx-system
+      - documentSelector:
+          path: metadata.name
+          value: basyx-database
+        equal:
+          path: spec.podMetricsEndpoints[0].relabelings[0].targetLabel
+          value: kubernetes_node
+      - documentSelector:
+          path: metadata.name
+          value: basyx-database
+        equal:
+          path: spec.podMetricsEndpoints[0].metricRelabelings[0].action
+          value: drop
+      - documentSelector:
+          path: metadata.name
+          value: basyx-database-rw-pooler
+        equal:
+          path: spec.podMetricsEndpoints[0].interval
+          value: 15s
+
+  - it: omits RW monitoring while the Pooler is disabled
+    set:
+      database.pooler.monitoring.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: omits managed database monitors for an external database
+    set:
+      database.type: external
+      database.existingSecret: basyx-external-postgres
+      database.monitoring.enabled: true
+      database.pooler.enabled: true
+      database.pooler.monitoring.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0

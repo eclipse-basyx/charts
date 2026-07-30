@@ -78,6 +78,9 @@ jobs:
             fi
           done
 
+      - name: Lint enabled database monitoring
+        run: helm lint charts/basyx --values charts/basyx/tests/fixtures/database_monitoring.yaml
+
       - name: Create kind cluster
         uses: helm/kind-action@v1.12.0
         if: steps.list-changed.outputs.changed == 'true'
