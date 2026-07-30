@@ -49,6 +49,32 @@ tests:
       - notExists:
           path: spec.template
 
+  - it: keeps a maximum-length cluster name distinct from the Pooler name
+    template: templates/postgres-pooler.yaml
+    set:
+      database.clusterName: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      database.pooler.enabled: true
+    asserts:
+      - equal:
+          path: metadata.name
+          value: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-rw-pooler
+      - equal:
+          path: spec.cluster.name
+          value: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+
+  - it: avoids a collision when the cluster name already has the Pooler suffix
+    template: templates/postgres-pooler.yaml
+    set:
+      database.clusterName: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-rw-pooler
+      database.pooler.enabled: true
+    asserts:
+      - equal:
+          path: metadata.name
+          value: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-rw-pooler
+      - equal:
+          path: spec.cluster.name
+          value: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-rw-pooler
+
   - it: disables prepared statement tracking explicitly
     template: templates/postgres-pooler.yaml
     set:

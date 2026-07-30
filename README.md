@@ -767,7 +767,9 @@ The Pooler is disabled by default and is rendered only for a managed database.
 When enabled, BaSyx runtime services using the global database connect to
 `<database.clusterName>-rw-pooler`. They reuse the user, password, database and
 port from the CloudNativePG application Secret. Service-specific database
-overrides are not redirected.
+overrides are not redirected. For long cluster names, the chart truncates the
+cluster-name portion of the Pooler service name to keep the generated name
+within 63 characters and distinct from the CloudNativePG Cluster name.
 
 The Configuration Service wait container and migration container always use
 the direct CloudNativePG read-write service from the application Secret.

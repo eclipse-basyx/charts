@@ -799,7 +799,12 @@ Create the name of the service account to use
 {{- end}}
 
 {{- define "database.poolerName" -}}
-{{- printf "%s-rw-pooler" .Values.database.clusterName | trunc 63 | trimSuffix "-" -}}
+{{- $clusterName := .Values.database.clusterName -}}
+{{- $poolerName := printf "%s-rw-pooler" ($clusterName | trunc 53 | trimSuffix "-") -}}
+{{- if eq $poolerName $clusterName -}}
+{{- $poolerName = printf "%s-rw-pooler" ($clusterName | trunc 52 | trimSuffix "-") -}}
+{{- end -}}
+{{- $poolerName -}}
 {{- end}}
 
 {{/*
