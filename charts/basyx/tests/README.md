@@ -31,3 +31,4 @@ The suites cover stable chart contracts such as:
 - optional CPU and memory HorizontalPodAutoscalers for every shared BaSyx Go backend deployment
 - shared per-pod PostgreSQL pool defaults and Configuration Service propagation
 - keycloak init resources and a runtime `helm test` realm check
+- Gateway API HTTPRoute rendering, parentRefs precedence and fail-fast validation

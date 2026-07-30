@@ -1,0 +1,123 @@
+suite: gateway api httproute
+release:
+  name: basyx
+templates:
+  - templates/keycloak/httproute.yaml
+  - templates/aas-registry/httproute.yaml
+tests:
+  - it: renders no keycloak httproute when httpRoute is disabled by default
+    template: templates/keycloak/httproute.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders no aas registry httproute when httpRoute is disabled by default
+    template: templates/aas-registry/httproute.yaml
+    set:
+      aasRegistry.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: falls back to the chart-wide gatewayApi parentRefs when no local override is set
+    template: templates/keycloak/httproute.yaml
+    set:
+      keycloak.enabled: true
+      keycloak.httpRoute.enabled: true
+      gatewayApi.parentRefs:
+        - name: shared-gateway
+          namespace: gateway-system
+    asserts:
+      - equal:
+          path: spec.parentRefs[0].name
+          value: shared-gateway
+      - equal:
+          path: spec.parentRefs[0].namespace
+          value: gateway-system
+
+  - it: prefers the component-local parentRefs over the chart-wide default
+    template: templates/aas-registry/httproute.yaml
+    set:
+      aasRegistry.enabled: true
+      aasRegistry.httpRoute.enabled: true
+      aasRegistry.httpRoute.parentRefs:
+        - name: aas-registry-gateway
+          namespace: aas-registry-ns
+      gatewayApi.parentRefs:
+        - name: shared-gateway
+          namespace: gateway-system
+    asserts:
+      - equal:
+          path: spec.parentRefs[0].name
+          value: aas-registry-gateway
+      - equal:
+          path: spec.parentRefs[0].namespace
+          value: aas-registry-ns
+
+  - it: renders custom httpRoute annotations
+    template: templates/keycloak/httproute.yaml
+    set:
+      keycloak.enabled: true
+      keycloak.httpRoute.enabled: true
+      keycloak.httpRoute.annotations:
+        example.com/foo: bar
+      gatewayApi.parentRefs:
+        - name: shared-gateway
+    asserts:
+      - equal:
+          path: metadata.annotations["example.com/foo"]
+          value: bar
+
+  - it: renders multiple hosts and paths as hostnames and rule matches
+    template: templates/aas-registry/httproute.yaml
+    set:
+      aasRegistry.enabled: true
+      aasRegistry.httpRoute.enabled: true
+      gatewayApi.parentRefs:
+        - name: shared-gateway
+      aasRegistry.httpRoute.hosts:
+        - host: basyx.example.com
+          paths:
+            - path: /aas-registry
+              pathType: PathPrefix
+            - path: /aas-registry-exact
+              pathType: Exact
+        - host: alt.example.com
+          paths:
+            - path: /alt-registry
+              pathType: PathPrefix
+    asserts:
+      - equal:
+          path: spec.hostnames[0]
+          value: basyx.example.com
+      - equal:
+          path: spec.hostnames[1]
+          value: alt.example.com
+      - equal:
+          path: spec.rules[0].matches[0].path.value
+          value: /aas-registry
+      - equal:
+          path: spec.rules[0].matches[0].path.type
+          value: PathPrefix
+      - equal:
+          path: spec.rules[1].matches[0].path.value
+          value: /aas-registry-exact
+      - equal:
+          path: spec.rules[1].matches[0].path.type
+          value: Exact
+      - equal:
+          path: spec.rules[2].matches[0].path.value
+          value: /alt-registry
+      - equal:
+          path: spec.rules[2].matches[0].path.type
+          value: PathPrefix
+
+  - it: fails when httpRoute is enabled without any parentRefs configured
+    template: templates/keycloak/httproute.yaml
+    set:
+      keycloak.enabled: true
+      keycloak.httpRoute.enabled: true
+      gatewayApi.parentRefs: []
+    asserts:
+      - failedTemplate:
+          errorPattern: "parentRefs"
