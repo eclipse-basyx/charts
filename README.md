@@ -808,6 +808,13 @@ sum(BaSyx maximum replicas × POSTGRES_MAXOPENCONNECTIONS)
 < Pooler instances × maxClientConn
 ```
 
+This is an absolute aggregate ceiling, not a production target. Client
+connections are persistent and can be distributed unevenly across Pooler pods.
+For deployments that must tolerate one Pooler restart or failure, budget
+against `(Pooler instances - 1) × maxClientConn` and leave additional headroom
+for distribution skew. A single Pooler instance has no client-capacity
+redundancy.
+
 A Pooler controls connection concurrency; it does not add write capacity to the
 single PostgreSQL primary. If latency rises while PgBouncer clients wait for
 server connections, first inspect query time, lock contention, storage latency
@@ -1271,15 +1278,20 @@ available Kubernetes CPU. For a service that connects directly to PostgreSQL,
 keep:
 
 ```text
-maxReplicas × POSTGRES_MAXOPENCONNECTIONS
+(maxReplicas + rollout surge pods) × POSTGRES_MAXOPENCONNECTIONS
 <= that service's writer connection budget
 ```
 
+The shared Deployments use Kubernetes' default rolling-update strategy, which
+can create `ceil(maxReplicas × 25%)` surge pods. Include that overlap unless a
+post-renderer or another deployment policy sets a different `maxSurge`. This is
+the service-specific part of the complete PostgreSQL budget described above.
 Calculate the same limit independently for `POSTGRES_READER_MAXOPENCONNECTIONS`
 when reader routing is enabled. When PgBouncer is used, the HPA maximum must
-also fit its client limit and the Pooler server pools must stay within the
-PostgreSQL backend budget. PgBouncer queues connections but does not add write
-capacity to the primary.
+also fit the surviving Pooler client capacity with headroom for connection
+distribution, and the Pooler server pools must stay within the PostgreSQL
+backend budget. PgBouncer queues connections but does not add write capacity to
+the primary.
 
 Do not use HPA to react to PostgreSQL latency or an exhausted connection pool:
 adding application pods during a database incident can increase pressure.
