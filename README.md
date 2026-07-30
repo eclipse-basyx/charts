@@ -886,8 +886,10 @@ Useful starting points for dashboards and alerts include:
 | Area | Metrics |
 | --- | --- |
 | PostgreSQL availability | `cnpg_collector_up`, `cnpg_collector_last_collection_error` |
+| PostgreSQL connection pressure | `cnpg_backends_total`, `cnpg_backends_waiting_total`, `cnpg_backends_max_tx_duration_seconds` |
 | WAL and archiving | `cnpg_collector_pg_wal`, `cnpg_collector_pg_wal_archive_status`, `cnpg_collector_wal_bytes`, `cnpg_collector_wal_write_time`, `cnpg_collector_wal_sync_time` |
 | Replication | `cnpg_pg_replication_lag`, `cnpg_pg_replication_is_wal_receiver_up`, `cnpg_pg_replication_streaming_replicas`, `cnpg_collector_sync_replicas` |
+| Database size | `cnpg_pg_database_size_bytes` |
 | Pooler pressure | `cnpg_pgbouncer_pools_cl_active`, `cnpg_pgbouncer_pools_cl_waiting`, `cnpg_pgbouncer_pools_maxwait` |
 | Pooler server use | `cnpg_pgbouncer_pools_sv_active`, `cnpg_pgbouncer_pools_sv_idle` |
 | Pooler throughput and waits | `cnpg_pgbouncer_stats_total_query_count`, `cnpg_pgbouncer_stats_total_xact_count`, `cnpg_pgbouncer_stats_total_wait_time` |
