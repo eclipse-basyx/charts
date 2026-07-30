@@ -307,11 +307,61 @@ Render service-local BaSyx runtime overrides as explicit container env values.
 {{- end }}
 
 {{/*
+Render an optional HorizontalPodAutoscaler for a BaSyx Go backend service.
+*/}}
+{{- define "basyx.service.hpa" -}}
+{{- $root := .root -}}
+{{- $values := index $root.Values .component -}}
+{{- $autoscaling := $values.autoscaling -}}
+{{- if gt (int $autoscaling.minReplicas) (int $autoscaling.maxReplicas) -}}
+{{- fail (printf "%s.autoscaling.minReplicas must not exceed %s.autoscaling.maxReplicas" .component .component) -}}
+{{- end -}}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include .fullnameHelper $root }}
+  {{- if $root.Values.argocd.enabled }}
+  annotations:
+    argocd.argoproj.io/sync-wave: {{ $root.Values.argocd.runtimeSyncWave | quote }}
+  {{- end }}
+  labels:
+    {{- include .labelsHelper $root | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include .fullnameHelper $root }}
+  minReplicas: {{ $autoscaling.minReplicas }}
+  maxReplicas: {{ $autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ $autoscaling.targetCPUUtilizationPercentage }}
+    {{- with $autoscaling.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ . }}
+    {{- end }}
+  {{- with $autoscaling.behavior }}
+  behavior:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}
+
+{{/*
 Shared deployment template for the BaSyx Go backend services with common database/ABAC wiring.
+It also renders the service HPA when autoscaling is enabled.
 */}}
 {{- define "basyx.service.deployment" -}}
 {{- $root := .root -}}
 {{- $values := index $root.Values .component -}}
+{{- $autoscaling := $values.autoscaling | default dict -}}
 {{- $abac := dict "root" $root "component" .component "nameSuffix" .nameSuffix -}}
 apiVersion: apps/v1
 kind: Deployment
@@ -324,7 +374,9 @@ metadata:
   labels:
     {{- include .labelsHelper $root | nindent 4 }}
 spec:
+  {{- if not $autoscaling.enabled }}
   replicas: {{ $values.replicaCount }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include .selectorLabelsHelper $root | nindent 6 }}
@@ -431,6 +483,10 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+{{- if $autoscaling.enabled }}
+---
+{{ include "basyx.service.hpa" . }}
+{{- end }}
 {{- end }}
 
 {{/*

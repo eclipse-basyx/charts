@@ -1,0 +1,13 @@
+aasRepository:
+  enabled: true
+  autoscaling:
+    enabled: true
+    behavior:
+      scaleUp:
+        policies:
+          - type: Percent
+            value: 100
+            periodSeconds: 0
+  resources:
+    requests:
+      cpu: 250m

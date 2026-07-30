@@ -1,0 +1,229 @@
+suite: backend autoscaling
+release:
+  name: basyx
+templates:
+  - templates/aas-discovery/deployment.yaml
+  - templates/aas-environment/deployment.yaml
+  - templates/aas-registry/deployment.yaml
+  - templates/aas-repository/deployment.yaml
+  - templates/cd-repository/deployment.yaml
+  - templates/company-lookup/deployment.yaml
+  - templates/digital-twin-registry/deployment.yaml
+  - templates/dpp-api/deployment.yaml
+  - templates/submodel-registry/deployment.yaml
+  - templates/submodel-repository/deployment.yaml
+tests:
+  - it: keeps the static replica count when autoscaling is disabled
+    template: templates/aas-repository/deployment.yaml
+    set:
+      aasRepository.enabled: true
+      aasRepository.replicaCount: 3
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.replicas
+          value: 3
+
+  - it: omits the static replica count when autoscaling is enabled
+    template: templates/aas-repository/deployment.yaml
+    documentIndex: 0
+    set:
+      aasRepository.enabled: true
+      aasRepository.replicaCount: 9
+      aasRepository.autoscaling.enabled: true
+      aasRepository.resources.requests.cpu: 250m
+    asserts:
+      - notExists:
+          path: spec.replicas
+
+  - it: renders CPU and memory targets with scaling behavior
+    template: templates/aas-repository/deployment.yaml
+    documentIndex: 1
+    values:
+      - fixtures/autoscaling_full.yaml
+    asserts:
+      - equal:
+          path: apiVersion
+          value: autoscaling/v2
+      - equal:
+          path: kind
+          value: HorizontalPodAutoscaler
+      - equal:
+          path: metadata.name
+          value: basyx-aas-repository
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "20"
+      - equal:
+          path: spec.scaleTargetRef
+          value:
+            apiVersion: apps/v1
+            kind: Deployment
+            name: basyx-aas-repository
+      - equal:
+          path: spec.minReplicas
+          value: 2
+      - equal:
+          path: spec.maxReplicas
+          value: 6
+      - contains:
+          path: spec.metrics
+          content:
+            type: Resource
+            resource:
+              name: cpu
+              target:
+                type: Utilization
+                averageUtilization: 65
+      - contains:
+          path: spec.metrics
+          content:
+            type: Resource
+            resource:
+              name: memory
+              target:
+                type: Utilization
+                averageUtilization: 75
+      - equal:
+          path: spec.behavior.scaleUp
+          value:
+            stabilizationWindowSeconds: 30
+            selectPolicy: Max
+            policies:
+              - type: Percent
+                value: 100
+                periodSeconds: 60
+      - equal:
+          path: spec.behavior.scaleDown.stabilizationWindowSeconds
+          value: 300
+
+  - it: omits the optional memory metric and empty behavior
+    template: templates/aas-repository/deployment.yaml
+    documentIndex: 1
+    set:
+      aasRepository.enabled: true
+      aasRepository.autoscaling.enabled: true
+      aasRepository.resources.requests.cpu: 250m
+    asserts:
+      - lengthEqual:
+          path: spec.metrics
+          count: 1
+      - notExists:
+          path: spec.behavior
+
+  - it: fails when minimum replicas exceed maximum replicas
+    template: templates/aas-repository/deployment.yaml
+    values:
+      - fixtures/invalid_autoscaling_replica_range.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "aasRepository.autoscaling.minReplicas must not exceed aasRepository.autoscaling.maxReplicas"
+
+  - it: enables autoscaling for AAS Discovery
+    template: templates/aas-discovery/deployment.yaml
+    documentIndex: 1
+    set:
+      aasDiscovery.enabled: true
+      aasDiscovery.autoscaling.enabled: true
+      aasDiscovery.resources.requests.cpu: 100m
+    asserts:
+      - equal:
+          path: spec.scaleTargetRef.name
+          value: basyx-aas-discovery
+
+  - it: enables autoscaling for AAS Environment
+    template: templates/aas-environment/deployment.yaml
+    documentIndex: 1
+    set:
+      aasEnvironment.enabled: true
+      aasEnvironment.autoscaling.enabled: true
+      aasEnvironment.resources.requests.cpu: 100m
+    asserts:
+      - equal:
+          path: spec.scaleTargetRef.name
+          value: basyx-aas-environment
+
+  - it: enables autoscaling for AAS Registry
+    template: templates/aas-registry/deployment.yaml
+    documentIndex: 1
+    set:
+      aasRegistry.enabled: true
+      aasRegistry.autoscaling.enabled: true
+      aasRegistry.resources.requests.cpu: 100m
+    asserts:
+      - equal:
+          path: spec.scaleTargetRef.name
+          value: basyx-aas-registry
+
+  - it: enables autoscaling for Concept Description Repository
+    template: templates/cd-repository/deployment.yaml
+    documentIndex: 1
+    set:
+      cdRepository.enabled: true
+      cdRepository.autoscaling.enabled: true
+      cdRepository.resources.requests.cpu: 100m
+    asserts:
+      - equal:
+          path: spec.scaleTargetRef.name
+          value: basyx-cd-repository
+
+  - it: enables autoscaling for Company Lookup
+    template: templates/company-lookup/deployment.yaml
+    documentIndex: 1
+    set:
+      companyLookup.enabled: true
+      companyLookup.autoscaling.enabled: true
+      companyLookup.resources.requests.cpu: 100m
+    asserts:
+      - equal:
+          path: spec.scaleTargetRef.name
+          value: basyx-company-lookup
+
+  - it: enables autoscaling for Digital Twin Registry
+    template: templates/digital-twin-registry/deployment.yaml
+    documentIndex: 1
+    set:
+      digitalTwinRegistry.enabled: true
+      digitalTwinRegistry.autoscaling.enabled: true
+      digitalTwinRegistry.resources.requests.cpu: 100m
+    asserts:
+      - equal:
+          path: spec.scaleTargetRef.name
+          value: basyx-digital-twin-registry
+
+  - it: enables autoscaling for DPP API
+    template: templates/dpp-api/deployment.yaml
+    documentIndex: 1
+    set:
+      dppApi.enabled: true
+      dppApi.autoscaling.enabled: true
+      dppApi.resources.requests.cpu: 100m
+    asserts:
+      - equal:
+          path: spec.scaleTargetRef.name
+          value: basyx-dpp-api
+
+  - it: enables autoscaling for Submodel Registry
+    template: templates/submodel-registry/deployment.yaml
+    documentIndex: 1
+    set:
+      submodelRegistry.enabled: true
+      submodelRegistry.autoscaling.enabled: true
+      submodelRegistry.resources.requests.cpu: 100m
+    asserts:
+      - equal:
+          path: spec.scaleTargetRef.name
+          value: basyx-submodel-registry
+
+  - it: enables autoscaling for Submodel Repository
+    template: templates/submodel-repository/deployment.yaml
+    documentIndex: 1
+    set:
+      submodelRepository.enabled: true
+      submodelRepository.autoscaling.enabled: true
+      submodelRepository.resources.requests.cpu: 100m
+    asserts:
+      - equal:
+          path: spec.scaleTargetRef.name
+          value: basyx-submodel-repository

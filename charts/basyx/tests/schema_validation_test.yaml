@@ -100,6 +100,34 @@ tests:
       - failedTemplate:
           errorPattern: "aasRepository.server.shutdownTimeoutSeconds"
 
+  - it: fails when autoscaling has no CPU request
+    values:
+      - fixtures/invalid_autoscaling_cpu_request.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "aasRepository.resources"
+
+  - it: fails when the autoscaling CPU target is invalid
+    values:
+      - fixtures/invalid_autoscaling_cpu_target.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "aasRepository.autoscaling.targetCPUUtilizationPercentage"
+
+  - it: fails when memory autoscaling has no memory request
+    values:
+      - fixtures/invalid_autoscaling_memory_request.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "aasRepository.resources"
+
+  - it: fails when an autoscaling policy period is invalid
+    values:
+      - fixtures/invalid_autoscaling_policy.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "aasRepository.autoscaling.behavior.scaleUp.policies.0.periodSeconds"
+
   - it: fails when the logging format is unsupported
     values:
       - fixtures/invalid_logging_format.yaml

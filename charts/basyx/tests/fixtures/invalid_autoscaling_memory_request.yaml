@@ -1,0 +1,8 @@
+aasRepository:
+  enabled: true
+  autoscaling:
+    enabled: true
+    targetMemoryUtilizationPercentage: 75
+  resources:
+    requests:
+      cpu: 250m
