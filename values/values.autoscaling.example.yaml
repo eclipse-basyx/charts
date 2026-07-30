@@ -1,0 +1,39 @@
+# Example overlay for HorizontalPodAutoscaler support on a BaSyx Go backend.
+#
+# Apply this together with a deployment values file. The cluster must expose
+# resource metrics, for example through Metrics Server. Treat these values as a
+# starting point and replace them with limits measured for the target workload
+# and PostgreSQL connection budget.
+
+digitalTwinRegistry:
+  enabled: true
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      memory: 2Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 75
+    behavior:
+      scaleUp:
+        stabilizationWindowSeconds: 0
+        selectPolicy: Max
+        policies:
+          - type: Percent
+            value: 100
+            periodSeconds: 60
+          - type: Pods
+            value: 2
+            periodSeconds: 60
+      scaleDown:
+        stabilizationWindowSeconds: 300
+        selectPolicy: Max
+        policies:
+          - type: Percent
+            value: 25
+            periodSeconds: 60
