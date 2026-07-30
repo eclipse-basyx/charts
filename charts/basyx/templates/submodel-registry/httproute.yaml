@@ -1,0 +1,33 @@
+{{- if .Values.submodelRegistry.enabled -}}
+{{- if .Values.submodelRegistry.httpRoute.enabled }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "basyx-submodelRegistry.fullname" . }}
+  labels:
+    {{- include "basyx-submodelRegistry.labels" . | nindent 4 }}
+  {{- with .Values.submodelRegistry.httpRoute.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  parentRefs:
+    {{- include "common.httpRoute.parentRefs" (dict "root" $ "parentRefs" .Values.submodelRegistry.httpRoute.parentRefs) | nindent 4 }}
+  hostnames:
+    {{- range .Values.submodelRegistry.httpRoute.hosts }}
+    - {{ tpl .host $ | quote }}
+    {{- end }}
+  rules:
+    {{- range .Values.submodelRegistry.httpRoute.hosts }}
+    {{- range .paths }}
+    - matches:
+        - path:
+            type: {{ .pathType }}
+            value: {{ tpl .path $ | quote }}
+      backendRefs:
+        - name: {{ include "basyx-submodelRegistry.fullname" $ }}
+          port: {{ $.Values.submodelRegistry.service.port }}
+    {{- end }}
+    {{- end }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,33 @@
+{{- if .Values.digitalTwinRegistry.enabled -}}
+{{- if .Values.digitalTwinRegistry.httpRoute.enabled }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "basyx-digitalTwinRegistry.fullname" . }}
+  labels:
+    {{- include "basyx-digitalTwinRegistry.labels" . | nindent 4 }}
+  {{- with .Values.digitalTwinRegistry.httpRoute.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  parentRefs:
+    {{- include "common.httpRoute.parentRefs" (dict "root" $ "parentRefs" .Values.digitalTwinRegistry.httpRoute.parentRefs) | nindent 4 }}
+  hostnames:
+    {{- range .Values.digitalTwinRegistry.httpRoute.hosts }}
+    - {{ tpl .host $ | quote }}
+    {{- end }}
+  rules:
+    {{- range .Values.digitalTwinRegistry.httpRoute.hosts }}
+    {{- range .paths }}
+    - matches:
+        - path:
+            type: {{ .pathType }}
+            value: {{ tpl .path $ | quote }}
+      backendRefs:
+        - name: {{ include "basyx-digitalTwinRegistry.fullname" $ }}
+          port: {{ $.Values.digitalTwinRegistry.service.port }}
+    {{- end }}
+    {{- end }}
+{{- end }}
+{{- end }}
