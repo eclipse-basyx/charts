@@ -52,6 +52,7 @@ values/values.catena-x.example.yaml
 values/values.example.yaml
 values/values.minimal.yaml
 values/values.observability.example.yaml
+values/values.autoscaling.example.yaml
 values/values.secured.example.yaml
 ```
 
@@ -133,6 +134,9 @@ cp values/values.catena-x.example.yaml values/values.my-catena-x-environment.yam
 
 # Optional logging and tracing overlay for an existing Collector.
 cp values/values.observability.example.yaml values/values.my-observability.yaml
+
+# Optional HPA overlay for a BaSyx Go backend.
+cp values/values.autoscaling.example.yaml values/values.my-autoscaling.yaml
 ```
 
 The unsecured example enables the core BaSyx Go services and the Web UI:
@@ -215,6 +219,7 @@ helm lint charts/basyx -f values/values.minimal.yaml
 helm lint charts/basyx -f values/values.secured.example.yaml
 helm lint charts/basyx -f values/values.catena-x.example.yaml
 helm lint charts/basyx -f values/values.minimal.yaml -f values/values.observability.example.yaml
+helm lint charts/basyx -f values/values.example.yaml -f values/values.autoscaling.example.yaml
 
 helm template basyx charts/basyx \
   -n basyx-custom \
@@ -712,10 +717,13 @@ environment:
     POSTGRES_CONNMAXIDLETIMEMINUTES: 0
 ```
 
-Budget connections before increasing a service's `replicaCount`. For all pods that connect to the same PostgreSQL primary, keep:
+Budget connections before increasing a service's `replicaCount` or
+`autoscaling.maxReplicas`. Use `replicaCount` as the maximum when autoscaling is
+disabled and `autoscaling.maxReplicas` when it is enabled. For all pods that
+connect to the same PostgreSQL primary, keep:
 
 ```text
-sum(BaSyx replicaCount × POSTGRES_MAXOPENCONNECTIONS)
+sum(BaSyx maximum replicas × POSTGRES_MAXOPENCONNECTIONS)
 + Keycloak and other application pools
 + temporary rolling-update pods
 + migration jobs
@@ -796,9 +804,16 @@ PgBouncer queues work, but they must remain below the aggregate client capacity
 and within acceptable queueing latency:
 
 ```text
-sum(BaSyx replicas × POSTGRES_MAXOPENCONNECTIONS)
+sum(BaSyx maximum replicas × POSTGRES_MAXOPENCONNECTIONS)
 < Pooler instances × maxClientConn
 ```
+
+This is an absolute aggregate ceiling, not a production target. Client
+connections are persistent and can be distributed unevenly across Pooler pods.
+For deployments that must tolerate one Pooler restart or failure, budget
+against `(Pooler instances - 1) × maxClientConn` and leave additional headroom
+for distribution skew. A single Pooler instance has no client-capacity
+redundancy.
 
 A Pooler controls connection concurrency; it does not add write capacity to the
 single PostgreSQL primary. If latency rises while PgBouncer clients wait for
@@ -1107,7 +1122,7 @@ aasRepository:
   replicaCount: 1
   image:
     repository: eclipsebasyx/aasrepository-go
-    tag: "1.0.2"
+    tag: "1.0.7"
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
@@ -1129,7 +1144,7 @@ Supported service blocks:
 - `companyLookup`
 - `digitalTwinRegistry`
 
-Most service blocks support `enabled`, `replicaCount`, `image.*`, `imagePullSecrets`, `service.*`, `ingress.*`, `resources`, `nodeSelector`, `tolerations`, `affinity`, `podAnnotations`, `podLabels`, `podSecurityContext`, `securityContext`, `volumes`, `volumeMounts` and optional service-local `server`, `history`, `eventing`, `general` and `abac` overrides.
+Most service blocks support `enabled`, `replicaCount`, `autoscaling`, `image.*`, `imagePullSecrets`, `service.*`, `ingress.*`, `resources`, `nodeSelector`, `tolerations`, `affinity`, `podAnnotations`, `podLabels`, `podSecurityContext`, `securityContext`, `volumes`, `volumeMounts` and optional service-local `server`, `history`, `eventing`, `general` and `abac` overrides.
 
 `aasEnvironment` uses the `eclipsebasyx/aasenvironment-go` image and defaults to service port `8082`. It can be deployed as a single BaSyx Go API endpoint backed by the chart's PostgreSQL database and Configuration Service. It enables AAS Registry, Submodel Registry and Discovery integration by default:
 
@@ -1206,6 +1221,83 @@ aasWebGui:
           type: None
           config: null
 ```
+
+#### Horizontal Pod Autoscaling
+
+Every BaSyx Go backend listed above can use an `autoscaling/v2`
+`HorizontalPodAutoscaler`. Autoscaling is disabled by default. When it is
+enabled, the chart omits `spec.replicas` from the Deployment so that Helm does
+not reset the replica count managed by the HPA.
+
+The HPA uses the Kubernetes resource metrics API. Install and verify a metrics
+pipeline such as Metrics Server before enabling it:
+
+```bash
+kubectl get --raw /apis/metrics.k8s.io/v1beta1/nodes
+kubectl top pods
+```
+
+CPU utilization requires a CPU request. Enabling a service HPA without
+`resources.requests.cpu` fails chart validation. A memory request is also
+required when `targetMemoryUtilizationPercentage` is configured.
+
+```yaml
+digitalTwinRegistry:
+  enabled: true
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      memory: 2Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 75
+    behavior:
+      scaleUp:
+        stabilizationWindowSeconds: 0
+        selectPolicy: Max
+        policies:
+          - type: Percent
+            value: 100
+            periodSeconds: 60
+      scaleDown:
+        stabilizationWindowSeconds: 300
+```
+
+`behavior.scaleUp` and `behavior.scaleDown` accept Kubernetes HPA
+`stabilizationWindowSeconds`, `selectPolicy`, and `policies`. Leave `behavior`
+empty to use Kubernetes defaults. The static `replicaCount` remains the
+Deployment replica count only while autoscaling is disabled.
+
+Set `maxReplicas` from a measured service and database budget, not only from
+available Kubernetes CPU. For a service that connects directly to PostgreSQL,
+keep:
+
+```text
+(maxReplicas + rollout surge pods) × POSTGRES_MAXOPENCONNECTIONS
+<= that service's writer connection budget
+```
+
+The shared Deployments use Kubernetes' default rolling-update strategy, which
+can create `ceil(maxReplicas × 25%)` surge pods. Include that overlap unless a
+post-renderer or another deployment policy sets a different `maxSurge`. This is
+the service-specific part of the complete PostgreSQL budget described above.
+Calculate the same limit independently for `POSTGRES_READER_MAXOPENCONNECTIONS`
+when reader routing is enabled. When PgBouncer is used, the HPA maximum must
+also fit the surviving Pooler client capacity with headroom for connection
+distribution, and the Pooler server pools must stay within the PostgreSQL
+backend budget. PgBouncer queues connections but does not add write capacity to
+the primary.
+
+Do not use HPA to react to PostgreSQL latency or an exhausted connection pool:
+adding application pods during a database incident can increase pressure.
+Load-test scale-up, scale-down, rolling updates, standby loss, and the maximum
+replica count before production rollout. Start from
+[`values/values.autoscaling.example.yaml`](values/values.autoscaling.example.yaml).
 
 ### BaSyx Runtime Configuration
 

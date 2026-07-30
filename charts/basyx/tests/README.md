@@ -28,5 +28,6 @@ The suites cover stable chart contracts such as:
 - schema validation for required values and basic formats
 - managed PostgreSQL storage, WAL, resources, scheduling and parameters
 - optional CloudNativePG read-write and read-only Pooler rendering, reader routing, and monitoring
+- optional CPU and memory HorizontalPodAutoscalers for every shared BaSyx Go backend deployment
 - shared per-pod PostgreSQL pool defaults and Configuration Service propagation
 - keycloak init resources and a runtime `helm test` realm check

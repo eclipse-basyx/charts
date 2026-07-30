@@ -1,0 +1,4 @@
+aasRepository:
+  enabled: true
+  autoscaling:
+    enabled: true

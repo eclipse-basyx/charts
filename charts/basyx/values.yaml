@@ -492,6 +492,13 @@ keycloak:
 submodelRepository:
   enabled: false
   replicaCount: 1
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: null
+    behavior: {}
   image:
     repository: eclipsebasyx/submodelrepository-go
     pullPolicy: IfNotPresent
@@ -582,6 +589,13 @@ submodelRepository:
 submodelRegistry:
   enabled: false
   replicaCount: 1
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: null
+    behavior: {}
   image:
     repository: eclipsebasyx/submodelregistry-go
     pullPolicy: IfNotPresent
@@ -669,6 +683,13 @@ submodelRegistry:
 aasRegistry:
   enabled: false
   replicaCount: 1
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: null
+    behavior: {}
   image:
     repository: eclipsebasyx/aasregistry-go
     pullPolicy: IfNotPresent
@@ -767,6 +788,13 @@ aasRegistry:
 digitalTwinRegistry:
   enabled: false
   replicaCount: 1
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: null
+    behavior: {}
   image:
     repository: eclipsebasyx/digitaltwinregistry-go
     pullPolicy: IfNotPresent
@@ -864,6 +892,13 @@ digitalTwinRegistry:
 aasRepository:
   enabled: false
   replicaCount: 1
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: null
+    behavior: {}
   image:
     repository: eclipsebasyx/aasrepository-go
     pullPolicy: IfNotPresent
@@ -959,6 +994,13 @@ aasRepository:
 aasEnvironment:
   enabled: false
   replicaCount: 1
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: null
+    behavior: {}
   image:
     repository: eclipsebasyx/aasenvironment-go
     pullPolicy: IfNotPresent
@@ -1058,6 +1100,13 @@ aasEnvironment:
 dppApi:
   enabled: false
   replicaCount: 1
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: null
+    behavior: {}
   image:
     repository: eclipsebasyx/dppapi-go
     pullPolicy: IfNotPresent
@@ -1151,6 +1200,13 @@ dppApi:
 cdRepository:
   enabled: false
   replicaCount: 1
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: null
+    behavior: {}
   image:
     repository: eclipsebasyx/conceptdescriptionrepository-go
     pullPolicy: IfNotPresent
@@ -1242,6 +1298,13 @@ cdRepository:
 companyLookup:
   enabled: false
   replicaCount: 1
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: null
+    behavior: {}
   image:
     repository: eclipsebasyx/companylookup-go
     pullPolicy: IfNotPresent
@@ -1325,6 +1388,13 @@ companyLookup:
 aasDiscovery:
   enabled: false
   replicaCount: 1
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: null
+    behavior: {}
   image:
     repository: eclipsebasyx/aasdiscovery-go
     pullPolicy: IfNotPresent
