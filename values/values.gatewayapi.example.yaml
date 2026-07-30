@@ -1,0 +1,164 @@
+# Example values for a BaSyx Go deployment routed through the Kubernetes
+# Gateway API (HTTPRoute) instead of a classic Ingress controller.
+#
+# Prerequisite: the target cluster must already have the Gateway API CRDs
+# installed and an existing `Gateway` resource (e.g. named "basyx-gateway" in
+# the "gateway-system" namespace, with a listener named "https"). This chart
+# does not create the Gateway itself, only HTTPRoute resources that attach to
+# it via `gatewayApi.parentRefs`.
+#
+# Copy this file and adapt it for your own cluster:
+#
+#   cp values/values.gatewayapi.example.yaml values/values.my-environment.yaml
+#
+# Do not commit real passwords, client secrets or private certificate material.
+
+instanceName: example
+host: basyx.example.com
+
+fullnameOverride: basyx
+
+tls:
+  enabled: true
+  hosts:
+    - basyx.example.com
+
+internal:
+  CACertificates:
+    trustStore:
+      useDefaultCAs: true
+      chartFileDirectory: ""
+      additionalCACertificates: ""
+  certificateIssuer:
+    name: internal-issuer
+    autocreateCa: true
+    autocreateCaSecretName: internal-issuer-ca
+    spec:
+      ca:
+        secretName: internal-issuer-ca
+
+ingress:
+  # Use this issuer when the chart should create and use its own internal CA.
+  issuer: internal-issuer
+
+  # For a production setup with an existing cert-manager ClusterIssuer, use this instead:
+  # clusterIssuer: letsencrypt-prod
+  # issuer: ""
+
+# Chart-wide default parentRefs used by every component's HTTPRoute unless a
+# component sets its own <component>.httpRoute.parentRefs. This must point at
+# a Gateway that already exists in the cluster.
+gatewayApi:
+  parentRefs:
+    - name: basyx-gateway
+      namespace: gateway-system
+      sectionName: https
+
+database:
+  clusterName: basyx-database
+  instances: 1
+  storage:
+    size: 10Gi
+
+keycloak:
+  enabled: false
+
+abac:
+  enabled: false
+
+aasDiscovery:
+  enabled: true
+  ingress:
+    enabled: false
+  httpRoute:
+    enabled: true
+
+
+aasRegistry:
+  enabled: true
+  ingress:
+    enabled: false
+  httpRoute:
+    enabled: true
+
+
+aasRepository:
+  enabled: true
+  ingress:
+    enabled: false
+  httpRoute:
+    enabled: true
+
+
+aasEnvironment:
+  enabled: false
+
+
+dppApi:
+  enabled: false
+
+
+submodelRegistry:
+  enabled: true
+  ingress:
+    enabled: false
+  httpRoute:
+    enabled: true
+
+
+submodelRepository:
+  enabled: true
+  ingress:
+    enabled: false
+  httpRoute:
+    enabled: true
+
+
+cdRepository:
+  enabled: true
+  ingress:
+    enabled: false
+  httpRoute:
+    enabled: true
+
+
+aasWebGui:
+  enabled: true
+  ingress:
+    enabled: false
+  httpRoute:
+    enabled: true
+  infrastructureConfig:
+    infrastructures:
+      default: main
+      main:
+        name: "BaSyx Go {{ .Values.instanceName }}"
+        components:
+          aasDiscovery:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.aasDiscovery }}"
+          aasRegistry:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.aasRegistry }}"
+          submodelRegistry:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.submodelRegistry }}"
+          aasRepository:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.aasRepository }}"
+          submodelRepository:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.submodelRepository }}"
+          conceptDescriptionRepository:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.cdRepository }}"
+          companyLookup:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.companyLookup }}"
+        security:
+          type: None
+          config: null
+
+companyLookup:
+  enabled: true
+  ingress:
+    enabled: false
+  httpRoute:
+    enabled: true
+
+
+digitalTwinRegistry:
+  enabled: false
