@@ -254,6 +254,27 @@ tests:
       - failedTemplate:
           errorPattern: "database.pooler.topologySpreadConstraints"
 
+  - it: fails when a database monitoring interval is invalid
+    values:
+      - fixtures/invalid_database_monitoring_interval.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "database.monitoring.interval"
+
+  - it: fails when a database monitoring relabeling action is unsupported
+    values:
+      - fixtures/invalid_database_monitoring_relabeling.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "database.monitoring.relabelings"
+
+  - it: fails when a Pooler monitoring namespace is empty
+    values:
+      - fixtures/invalid_database_monitoring_namespace.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "database.pooler.monitoring.namespaceSelector"
+
   - it: fails when minDomains is used with ScheduleAnyway
     values:
       - fixtures/invalid_database_min_domains.yaml

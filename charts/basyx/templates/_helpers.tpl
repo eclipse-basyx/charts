@@ -807,6 +807,43 @@ Create the name of the service account to use
 {{- $poolerName -}}
 {{- end}}
 
+{{- define "database.podMonitor" -}}
+{{- $root := .root -}}
+{{- $monitor := .monitor -}}
+{{- $labels := mergeOverwrite (include "basyx.labels" $root | fromYaml) ($monitor.labels | default dict) -}}
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: {{ .name }}
+  labels:
+    {{- toYaml $labels | nindent 4 }}
+  {{- with $monitor.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with $monitor.namespaceSelector }}
+  namespaceSelector:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{ .selectorKey | quote }}: {{ .selectorValue | quote }}
+  podMetricsEndpoints:
+    - port: metrics
+      path: /metrics
+      interval: {{ $monitor.interval | quote }}
+      scrapeTimeout: {{ $monitor.scrapeTimeout | quote }}
+      {{- with $monitor.relabelings }}
+      relabelings:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $monitor.metricRelabelings }}
+      metricRelabelings:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end}}
+
 {{/*
 Helper to render TLS block if enabled
 */}}
