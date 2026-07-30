@@ -6,8 +6,29 @@ on:
     branches:
       - main
 
+permissions: {}
+
 jobs:
+  guard:
+    runs-on: ubuntu-latest
+    outputs:
+      should-run: ${{ steps.check.outputs.should-run }}
+    steps:
+      - id: check
+        env:
+          GITHUB_EVENT_REPOSITORY_FORK: ${{ github.event.repository.fork }}
+        run: |
+          if [[ "${GITHUB_REPOSITORY}" == "eclipse-basyx/charts" && "${GITHUB_EVENT_REPOSITORY_FORK}" != "true" ]]; then
+            echo "✅ Running in upstream repository"
+            echo "should-run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "⏭️ Skipping release — fork detected (${GITHUB_REPOSITORY})"
+            echo "should-run=false" >> "$GITHUB_OUTPUT"
+          fi
+
   release:
+    needs: guard
+    if: ${{ needs.guard.outputs.should-run == 'true' }}
     permissions:
       contents: write
     runs-on: ubuntu-latest
@@ -24,7 +45,7 @@ jobs:
 
       - name: Run chart-releaser
         uses: helm/chart-releaser-action@v1.6.0
-        with: 
+        with:
           skip_existing: true
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"

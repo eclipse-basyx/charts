@@ -1,54 +1,7 @@
 {{- if eq (include "database.poolerEnabled" .) "true" -}}
-{{- $pooler := .Values.database.pooler -}}
-{{- $parameters := deepCopy ($pooler.parameters | default dict) -}}
-{{- $_ := set $parameters "max_client_conn" ($pooler.maxClientConn | toString) -}}
-{{- $_ := set $parameters "default_pool_size" ($pooler.defaultPoolSize | toString) -}}
-{{- $maxPreparedStatements := "0" -}}
-{{- if $pooler.preparedStatements.enabled -}}
-{{- $maxPreparedStatements = $pooler.preparedStatements.maxPreparedStatements | toString -}}
-{{- end -}}
-{{- $_ := set $parameters "max_prepared_statements" $maxPreparedStatements -}}
-apiVersion: postgresql.cnpg.io/v1
-kind: Pooler
-metadata:
-  name: {{ include "database.poolerName" . }}
-  labels:
-    {{- include "basyx.labels" . | nindent 4 }}
-spec:
-  cluster:
-    name: {{ .Values.database.clusterName }}
-  instances: {{ $pooler.instances }}
-  type: rw
-  pgbouncer:
-    poolMode: {{ $pooler.poolMode }}
-    parameters:
-      {{- toYaml $parameters | nindent 6 }}
-  {{- if or $pooler.resources $pooler.nodeSelector $pooler.affinity $pooler.tolerations $pooler.topologySpreadConstraints }}
-  template:
-    spec:
-      {{- if $pooler.resources }}
-      containers:
-        - name: pgbouncer
-          resources:
-            {{- toYaml $pooler.resources | nindent 12 }}
-      {{- else }}
-      containers: []
-      {{- end }}
-      {{- with $pooler.nodeSelector }}
-      nodeSelector:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with $pooler.affinity }}
-      affinity:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with $pooler.tolerations }}
-      tolerations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with $pooler.topologySpreadConstraints }}
-      topologySpreadConstraints:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-  {{- end }}
+{{- include "database.poolerResource" (dict "root" . "pooler" .Values.database.pooler "name" (include "database.poolerName" .) "type" "rw") }}
+{{- end }}
+{{- if eq (include "database.readOnlyPoolerEnabled" .) "true" }}
+---
+{{ include "database.poolerResource" (dict "root" . "pooler" .Values.database.reader.pooler "name" (include "database.readOnlyPoolerName" .) "type" "ro") }}
 {{- end }}

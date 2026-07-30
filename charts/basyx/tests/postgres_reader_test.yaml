@@ -1,0 +1,423 @@
+suite: PostgreSQL reader configuration
+release:
+  name: basyx
+templates:
+  - templates/database-secret.yaml
+  - templates/configuration-service-job.yaml
+  - templates/keycloak/deployment.yaml
+  - templates/aas-discovery/deployment.yaml
+  - templates/aas-registry/deployment.yaml
+  - templates/aas-repository/deployment.yaml
+  - templates/aas-environment/deployment.yaml
+  - templates/dpp-api/deployment.yaml
+  - templates/submodel-registry/deployment.yaml
+  - templates/submodel-repository/deployment.yaml
+  - templates/cd-repository/deployment.yaml
+  - templates/company-lookup/deployment.yaml
+  - templates/digital-twin-registry/deployment.yaml
+tests:
+  - it: does not inject reader configuration by default
+    template: templates/aas-registry/deployment.yaml
+    set:
+      aasRegistry.enabled: true
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_READER_HOST
+
+  - it: routes a managed reader directly to the CloudNativePG read-only service
+    template: templates/aas-registry/deployment.yaml
+    set:
+      aasRegistry.enabled: true
+      database.reader.enabled: true
+      database.reader.maxOpenConnections: 40
+      database.reader.maxIdleConnections: 20
+      database.reader.connMaxLifetimeMinutes: 10
+      database.reader.connMaxIdleTimeMinutes: 2
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_READER_HOST
+            value: basyx-database-ro
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_READER_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: basyx-database-app
+                key: password
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_READER_MAXOPENCONNECTIONS
+            value: "40"
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_READER_MAXIDLECONNECTIONS
+            value: "20"
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_READER_CONNMAXLIFETIMEMINUTES
+            value: "10"
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_READER_CONNMAXIDLETIMEMINUTES
+            value: "2"
+          count: 1
+
+  - it: routes a managed reader through the read-only Pooler when enabled
+    template: templates/aas-registry/deployment.yaml
+    set:
+      aasRegistry.enabled: true
+      database.reader.enabled: true
+      database.reader.pooler.enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_READER_HOST
+            value: basyx-database-ro-pooler
+          count: 1
+
+  - it: routes through the read-only Pooler from the read-replica example
+    template: templates/aas-environment/deployment.yaml
+    values:
+      - ../../../values/values.read-replica.example.yaml
+    set:
+      aasEnvironment.enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_READER_HOST
+            value: basyx-database-ro-pooler
+          count: 1
+
+  - it: uses a complete external reader Secret
+    template: templates/aas-registry/deployment.yaml
+    set:
+      aasRegistry.enabled: true
+      database.type: external
+      database.existingSecret: basyx-writer
+      database.reader.enabled: true
+      database.reader.existingSecret: basyx-reader
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_READER_HOST
+            valueFrom:
+              secretKeyRef:
+                name: basyx-reader
+                key: host
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_READER_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: basyx-reader
+                key: password
+          count: 1
+
+  - it: stores an inline reader endpoint in a Secret and reuses writer credentials
+    template: templates/database-secret.yaml
+    set:
+      database.type: external
+      database.existingSecret: basyx-writer
+      database.reader.enabled: true
+      database.reader.host: postgres-reader.example.internal
+      database.reader.sslmode: verify-full
+    documentSelector:
+      path: metadata.name
+      value: basyx-reader-database
+    asserts:
+      - equal:
+          path: stringData.host
+          value: postgres-reader.example.internal
+      - equal:
+          path: stringData.sslmode
+          value: verify-full
+      - notExists:
+          path: stringData.password
+
+  - it: sources omitted inline reader fields from the writer Secret
+    template: templates/aas-registry/deployment.yaml
+    set:
+      aasRegistry.enabled: true
+      database.type: external
+      database.existingSecret: basyx-writer
+      database.reader.enabled: true
+      database.reader.host: postgres-reader.example.internal
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_READER_HOST
+            valueFrom:
+              secretKeyRef:
+                name: basyx-reader-database
+                key: host
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_READER_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: basyx-writer
+                key: password
+          count: 1
+
+  - it: supports the same external endpoint for writer and reader
+    template: templates/aas-registry/deployment.yaml
+    set:
+      aasRegistry.enabled: true
+      database.type: external
+      database.existingSecret: basyx-writer
+      database.reader.enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_READER_HOST
+            valueFrom:
+              secretKeyRef:
+                name: basyx-writer
+                key: host
+          count: 1
+
+  - it: allows a managed writer with one instance and an explicit external reader
+    template: templates/aas-registry/deployment.yaml
+    set:
+      aasRegistry.enabled: true
+      database.instances: 1
+      database.reader.enabled: true
+      database.reader.host: postgres-reader.example.internal
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_READER_HOST
+            valueFrom:
+              secretKeyRef:
+                name: basyx-reader-database
+                key: host
+          count: 1
+
+  - it: does not inherit the writer application name
+    template: templates/aas-registry/deployment.yaml
+    set:
+      aasRegistry.enabled: true
+      database.type: external
+      database.existingSecret: basyx-writer
+      database.reader.enabled: true
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_READER_APPLICATIONNAME
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_READER_FALLBACKAPPLICATIONNAME
+
+  - it: disables global reader inheritance for a service-local writer
+    template: templates/aas-registry/deployment.yaml
+    set:
+      aasRegistry.enabled: true
+      database.reader.enabled: true
+      aasRegistry.database.existingSecret: registry-writer
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_HOST
+            valueFrom:
+              secretKeyRef:
+                name: registry-writer
+                key: host
+          count: 1
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_READER_HOST
+
+  - it: supports a reader-only service override with the global writer
+    template: templates/aas-registry/deployment.yaml
+    set:
+      aasRegistry.enabled: true
+      aasRegistry.database.reader.enabled: true
+      aasRegistry.database.reader.host: registry-reader.example.internal
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_HOST
+            valueFrom:
+              secretKeyRef:
+                name: basyx-database-app
+                key: host
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_READER_HOST
+            valueFrom:
+              secretKeyRef:
+                name: basyx-aas-registry-reader-database
+                key: host
+          count: 1
+
+  - it: allows a service to disable the global reader
+    template: templates/aas-registry/deployment.yaml
+    set:
+      aasRegistry.enabled: true
+      database.reader.enabled: true
+      aasRegistry.database.reader.enabled: false
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_READER_HOST
+
+  - it: uses service-local writer and reader Secrets together
+    template: templates/aas-registry/deployment.yaml
+    set:
+      aasRegistry.enabled: true
+      database.reader.enabled: true
+      aasRegistry.database.existingSecret: registry-writer
+      aasRegistry.database.reader.enabled: true
+      aasRegistry.database.reader.existingSecret: registry-reader
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_HOST
+            valueFrom:
+              secretKeyRef:
+                name: registry-writer
+                key: host
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_READER_HOST
+            valueFrom:
+              secretKeyRef:
+                name: registry-reader
+                key: host
+          count: 1
+
+  - it: keeps the Configuration Service writer-only
+    template: templates/configuration-service-job.yaml
+    set:
+      database.reader.enabled: true
+      database.reader.pooler.enabled: true
+    asserts:
+      - notContains:
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: POSTGRES_READER_HOST
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_READER_HOST
+
+  - it: keeps Keycloak writer-only
+    template: templates/keycloak/deployment.yaml
+    set:
+      keycloak.enabled: true
+      database.reader.enabled: true
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_READER_HOST
+
+  - it: injects the reader into the Discovery Service
+    template: templates/aas-discovery/deployment.yaml
+    values:
+      - fixtures/database_reader_all_services.yaml
+    asserts:
+      - contains: &managedReaderHost
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_READER_HOST
+            value: basyx-database-ro
+          count: 1
+
+  - it: injects the reader into the AAS Registry
+    template: templates/aas-registry/deployment.yaml
+    values:
+      - fixtures/database_reader_all_services.yaml
+    asserts:
+      - contains: *managedReaderHost
+
+  - it: injects the reader into the AAS Repository
+    template: templates/aas-repository/deployment.yaml
+    values:
+      - fixtures/database_reader_all_services.yaml
+    asserts:
+      - contains: *managedReaderHost
+
+  - it: injects the reader into the AAS Environment
+    template: templates/aas-environment/deployment.yaml
+    values:
+      - fixtures/database_reader_all_services.yaml
+    asserts:
+      - contains: *managedReaderHost
+
+  - it: injects the reader into the DPP API
+    template: templates/dpp-api/deployment.yaml
+    values:
+      - fixtures/database_reader_all_services.yaml
+    asserts:
+      - contains: *managedReaderHost
+
+  - it: injects the reader into the Submodel Registry
+    template: templates/submodel-registry/deployment.yaml
+    values:
+      - fixtures/database_reader_all_services.yaml
+    asserts:
+      - contains: *managedReaderHost
+
+  - it: injects the reader into the Submodel Repository
+    template: templates/submodel-repository/deployment.yaml
+    values:
+      - fixtures/database_reader_all_services.yaml
+    asserts:
+      - contains: *managedReaderHost
+
+  - it: injects the reader into the Concept Description Repository
+    template: templates/cd-repository/deployment.yaml
+    values:
+      - fixtures/database_reader_all_services.yaml
+    asserts:
+      - contains: *managedReaderHost
+
+  - it: injects the reader into the Company Lookup Service
+    template: templates/company-lookup/deployment.yaml
+    values:
+      - fixtures/database_reader_all_services.yaml
+    asserts:
+      - contains: *managedReaderHost
+
+  - it: injects the reader into the Digital Twin Registry
+    template: templates/digital-twin-registry/deployment.yaml
+    values:
+      - fixtures/database_reader_all_services.yaml
+    asserts:
+      - contains: *managedReaderHost

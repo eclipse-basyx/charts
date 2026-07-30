@@ -530,6 +530,46 @@
         "environment": { "type": "object" }
       }
     },
+    "readerDatabase": {
+      "type": "object",
+      "required": ["enabled"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "existingSecret": { "type": "string" },
+        "host": { "type": "string" },
+        "port": {
+          "oneOf": [
+            { "type": "integer", "minimum": 1 },
+            { "type": "string" }
+          ]
+        },
+        "dbname": { "type": "string" },
+        "user": { "type": "string" },
+        "password": { "type": "string" },
+        "sslmode": {
+          "type": "string",
+          "enum": ["", "disable", "allow", "prefer", "require", "verify-ca", "verify-full"]
+        },
+        "sslcert": { "type": "string" },
+        "sslkey": { "type": "string" },
+        "sslrootcert": { "type": "string" },
+        "connectTimeoutSeconds": {
+          "oneOf": [
+            { "type": "integer", "minimum": 0 },
+            { "type": "string", "pattern": "^[0-9]*$" }
+          ]
+        },
+        "applicationName": { "type": "string" },
+        "fallbackApplicationName": { "type": "string" },
+        "searchPath": { "type": "string" },
+        "options": { "type": "string" },
+        "timezone": { "type": "string" },
+        "maxOpenConnections": { "type": "integer", "minimum": 0 },
+        "maxIdleConnections": { "type": "integer", "minimum": 0 },
+        "connMaxLifetimeMinutes": { "type": "integer", "minimum": 0 },
+        "connMaxIdleTimeMinutes": { "type": "integer", "minimum": 0 }
+      }
+    },
     "serviceDatabase": {
       "type": "object",
       "properties": {
@@ -563,6 +603,9 @@
         "searchPath": { "type": "string" },
         "options": { "type": "string" },
         "timezone": { "type": "string" },
+        "reader": {
+          "$ref": "#/definitions/readerDatabase"
+        },
         "external": {
           "type": "object",
           "properties": {
@@ -634,6 +677,9 @@
             }
           },
           "required": ["external"]
+        },
+        {
+          "required": ["reader"]
         }
       ]
     }
@@ -1208,7 +1254,7 @@
     "digitalTwinRegistry": { "$ref": "#/definitions/serviceRuntimeOverrides" },
     "database": {
       "type": "object",
-      "required": ["clusterName", "type", "instances", "storage"],
+      "required": ["clusterName", "type", "instances", "storage", "reader"],
       "properties": {
         "clusterName": {
           "type": "string",
@@ -1248,6 +1294,123 @@
             "options": { "type": "string" },
             "timezone": { "type": "string" }
           }
+        },
+        "reader": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/readerDatabase"
+            },
+            {
+              "type": "object",
+              "required": [
+                "existingSecret",
+                "host",
+                "port",
+                "dbname",
+                "user",
+                "password",
+                "sslmode",
+                "sslcert",
+                "sslkey",
+                "sslrootcert",
+                "connectTimeoutSeconds",
+                "applicationName",
+                "fallbackApplicationName",
+                "searchPath",
+                "options",
+                "timezone",
+                "maxOpenConnections",
+                "maxIdleConnections",
+                "connMaxLifetimeMinutes",
+                "connMaxIdleTimeMinutes",
+                "pooler"
+              ],
+              "properties": {
+                "pooler": {
+                  "$ref": "#/properties/database/properties/pooler"
+                }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "enabled": {
+                        "const": false
+                      }
+                    },
+                    "required": ["enabled"]
+                  },
+                  "then": {
+                    "properties": {
+                      "pooler": {
+                        "properties": {
+                          "enabled": {
+                            "const": false
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "pooler": {
+                        "properties": {
+                          "enabled": {
+                            "const": true
+                          }
+                        },
+                        "required": ["enabled"]
+                      }
+                    },
+                    "required": ["pooler"]
+                  },
+                  "then": {
+                    "properties": {
+                      "existingSecret": {
+                        "const": ""
+                      },
+                      "host": {
+                        "const": ""
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "pooler": {
+                        "properties": {
+                          "monitoring": {
+                            "properties": {
+                              "enabled": {
+                                "const": true
+                              }
+                            },
+                            "required": ["enabled"]
+                          }
+                        },
+                        "required": ["monitoring"]
+                      }
+                    },
+                    "required": ["pooler"]
+                  },
+                  "then": {
+                    "properties": {
+                      "pooler": {
+                        "properties": {
+                          "enabled": {
+                            "const": true
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          ]
         },
         "instances": {
           "type": "integer",
@@ -1681,6 +1844,56 @@
                   "size": {
                     "type": "string",
                     "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "enum": ["postgres", "managed", "cnpg"]
+              },
+              "reader": {
+                "properties": {
+                  "enabled": { "const": true },
+                  "existingSecret": { "const": "" },
+                  "host": { "const": "" }
+                },
+                "required": ["enabled", "existingSecret", "host"]
+              }
+            },
+            "required": ["type", "reader"]
+          },
+          "then": {
+            "properties": {
+              "instances": {
+                "minimum": 2
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "external"
+              }
+            },
+            "required": ["type"]
+          },
+          "then": {
+            "properties": {
+              "reader": {
+                "properties": {
+                  "pooler": {
+                    "properties": {
+                      "enabled": {
+                        "const": false
+                      }
+                    }
                   }
                 }
               }

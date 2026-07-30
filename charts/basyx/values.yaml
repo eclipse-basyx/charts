@@ -1587,6 +1587,9 @@ database:
   # aasRegistry:
   #   database:
   #     existingSecret: basyx-aas-registry-postgres
+  #     reader:
+  #       enabled: true
+  #       host: postgres-reader.example.internal
   #
   # Or inline for test deployments:
   #
@@ -1600,6 +1603,67 @@ database:
   #     password: change-me
   #     sslmode: require
   #     searchPath: registry_schema
+  # Optional reader connection for BaSyx Go HTTP services. When disabled, the
+  # services reuse their writer pool and no POSTGRES_READER_* variables render.
+  # For managed CloudNativePG, enabling this targets <clusterName>-ro, or the
+  # read-only Pooler below when reader.pooler.enabled is also true.
+  reader:
+    enabled: false
+    # Existing reader Secret. It must contain host, port, dbname, user and
+    # password. Optional connection keys use the same names as database.external.
+    existingSecret: ""
+    # Inline connection values are stored in a generated Secret. Omitted values
+    # reuse the effective writer Secret, so setting only host avoids duplication.
+    host: ""
+    port: ""
+    dbname: ""
+    user: ""
+    password: ""
+    sslmode: ""
+    sslcert: ""
+    sslkey: ""
+    sslrootcert: ""
+    connectTimeoutSeconds: 0
+    applicationName: ""
+    fallbackApplicationName: ""
+    searchPath: ""
+    options: ""
+    timezone: ""
+    # Independent per-pod reader pool limits.
+    maxOpenConnections: 50
+    maxIdleConnections: 25
+    connMaxLifetimeMinutes: 5
+    connMaxIdleTimeMinutes: 0
+    # Optional CloudNativePG read-only Pooler. This requires a managed database,
+    # reader.enabled=true and at least two database instances.
+    pooler:
+      enabled: false
+      instances: 2
+      poolMode: transaction
+      maxClientConn: 1000
+      defaultPoolSize: 25
+      preparedStatements:
+        enabled: true
+        maxPreparedStatements: 100
+      # Additional CloudNativePG-supported PgBouncer parameters. Values must be
+      # strings. The three settings above take precedence over duplicate keys.
+      parameters: {}
+      resources: {}
+      nodeSelector: {}
+      affinity: {}
+      tolerations: []
+      topologySpreadConstraints: []
+      # Optional Prometheus Operator PodMonitor for the read-only Pooler.
+      monitoring:
+        enabled: false
+        labels: {}
+        annotations: {}
+        interval: 30s
+        scrapeTimeout: 10s
+        # Empty selects pods in the PodMonitor's namespace.
+        namespaceSelector: {}
+        relabelings: []
+        metricRelabelings: []
   # name for the cnpg cluster resource
   # clusterName: "basyx-database"
   # name of database
