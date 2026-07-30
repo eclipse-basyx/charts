@@ -9,7 +9,7 @@
 {{- end }}
 {{- if and (eq (include "database.poolerEnabled" .) "true") .Values.database.pooler.monitoring.enabled }}
 ---
-{{- include "database.podMonitor" (dict
+{{ include "database.podMonitor" (dict
   "root" .
   "monitor" .Values.database.pooler.monitoring
   "name" (include "database.poolerName" .)

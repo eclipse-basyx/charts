@@ -1,0 +1,4 @@
+database:
+  monitoring:
+    relabelings:
+      - action: replace

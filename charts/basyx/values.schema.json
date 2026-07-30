@@ -367,7 +367,67 @@
             "DropEqual"
           ]
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "anyOf": [
+              {
+                "not": {
+                  "required": ["action"]
+                }
+              },
+              {
+                "properties": {
+                  "action": {
+                    "enum": [
+                      "replace",
+                      "Replace",
+                      "hashmod",
+                      "HashMod",
+                      "lowercase",
+                      "Lowercase",
+                      "uppercase",
+                      "Uppercase",
+                      "keepequal",
+                      "KeepEqual",
+                      "dropequal",
+                      "DropEqual"
+                    ]
+                  }
+                },
+                "required": ["action"]
+              }
+            ]
+          },
+          "then": {
+            "required": ["targetLabel"],
+            "properties": {
+              "targetLabel": {
+                "minLength": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "enum": ["hashmod", "HashMod"]
+              }
+            },
+            "required": ["action"]
+          },
+          "then": {
+            "required": ["modulus"],
+            "properties": {
+              "modulus": {
+                "minimum": 1
+              }
+            }
+          }
+        }
+      ]
     },
     "prometheusNamespaceSelector": {
       "type": "object",

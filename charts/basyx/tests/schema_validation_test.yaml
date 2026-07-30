@@ -268,6 +268,20 @@ tests:
       - failedTemplate:
           errorPattern: "database.monitoring.relabelings"
 
+  - it: fails when a database monitoring relabeling has no target label
+    values:
+      - fixtures/invalid_database_monitoring_target_label.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "database.monitoring.relabelings"
+
+  - it: fails when a Pooler monitoring hashmod modulus is zero
+    values:
+      - fixtures/invalid_database_monitoring_hashmod.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "database.pooler.monitoring.metricRelabelings"
+
   - it: fails when a Pooler monitoring namespace is empty
     values:
       - fixtures/invalid_database_monitoring_namespace.yaml
