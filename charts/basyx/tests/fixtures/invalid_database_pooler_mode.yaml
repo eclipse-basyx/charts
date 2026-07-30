@@ -1,0 +1,4 @@
+database:
+  pooler:
+    enabled: true
+    poolMode: statement

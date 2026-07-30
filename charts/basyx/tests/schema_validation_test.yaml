@@ -114,9 +114,30 @@ tests:
       - failedTemplate:
           errorPattern: "telemetry.tracesExporter"
 
+  - it: fails when the metrics exporter is unsupported
+    values:
+      - fixtures/invalid_telemetry_metrics_exporter.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "telemetry.metricsExporter"
+
+  - it: fails when the metrics export interval is not positive
+    values:
+      - fixtures/invalid_telemetry_metrics_interval.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "telemetry.metricsExportInterval"
+
   - it: fails when OTLP tracing has no Collector endpoint
     values:
       - fixtures/invalid_telemetry_otlp_endpoint.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "telemetry.endpoint"
+
+  - it: fails when OTLP metrics have no Collector endpoint
+    values:
+      - fixtures/invalid_telemetry_metrics_otlp_endpoint.yaml
     asserts:
       - failedTemplate:
           errorPattern: "telemetry.endpoint"
@@ -211,6 +232,27 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "database.resources.requests.cpu"
+
+  - it: fails when the Pooler mode is unsupported
+    values:
+      - fixtures/invalid_database_pooler_mode.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "database.pooler.poolMode"
+
+  - it: fails when an additional Pooler parameter is not a string
+    values:
+      - fixtures/invalid_database_pooler_parameter.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "database.pooler.parameters.reserve_pool_size"
+
+  - it: fails when Pooler minDomains is used with ScheduleAnyway
+    values:
+      - fixtures/invalid_database_pooler_topology.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "database.pooler.topologySpreadConstraints"
 
   - it: fails when minDomains is used with ScheduleAnyway
     values:

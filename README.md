@@ -735,6 +735,93 @@ Six BaSyx backend pods at the default maximum can request up to 300 connections 
 
 `POSTGRES_MAXIDLECONNECTIONS` must not exceed the open limit. With the BaSyx Go pool configuration tracked in [basyx-go-components#535](https://github.com/eclipse-basyx/basyx-go-components/issues/535) and implemented by [PR #537](https://github.com/eclipse-basyx/basyx-go-components/pull/537), zero for max open, max idle, or maximum lifetime selects the application default of 50, 25, or 5 minutes respectively. When the explicit open limit is below 25 and idle is zero, the effective idle limit is capped to the open limit. Zero for `POSTGRES_CONNMAXIDLETIMEMINUTES` has different semantics: it disables recycling based on idle time. These settings and validation rules require BaSyx Go 1.0.5 or later.
 
+#### Optional CloudNativePG read-write Pooler
+
+For a managed CloudNativePG database, the chart can place a PgBouncer access
+layer between BaSyx runtime pods and the PostgreSQL primary:
+
+```yaml
+database:
+  pooler:
+    enabled: true
+    instances: 2
+    poolMode: transaction
+    maxClientConn: 1000
+    defaultPoolSize: 25
+    preparedStatements:
+      enabled: true
+      maxPreparedStatements: 100
+    parameters:
+      reserve_pool_size: "5"
+    resources:
+      requests:
+        cpu: 250m
+        memory: 256Mi
+    nodeSelector: {}
+    affinity: {}
+    tolerations: []
+    topologySpreadConstraints: []
+```
+
+The Pooler is disabled by default and is rendered only for a managed database.
+When enabled, BaSyx runtime services using the global database connect to
+`<database.clusterName>-rw-pooler`. They reuse the user, password, database and
+port from the CloudNativePG application Secret. Service-specific database
+overrides are not redirected. For long cluster names, the chart truncates the
+cluster-name portion of the Pooler service name to keep the generated name
+within 63 characters and distinct from the CloudNativePG Cluster name.
+
+The Configuration Service wait container and migration container always use
+the direct CloudNativePG read-write service from the application Secret.
+Migrations use session-level advisory locks and must not run through a
+transaction Pooler. Keycloak also continues to use the direct JDBC URI.
+
+`maxClientConn` is the maximum number of client connections accepted by each
+PgBouncer pod. `defaultPoolSize` is the default number of PostgreSQL server
+connections maintained by each PgBouncer pod for each user/database pair. A
+useful starting budget for the primary is:
+
+```text
+Pooler instances × (defaultPoolSize + reserve_pool_size)
++ direct Keycloak connections
++ migration, monitoring, administration and failover reserve
+< PostgreSQL max_connections
+```
+
+Adjust the formula when multiple user/database pairs use the Pooler or when
+additional PgBouncer limits are configured. The BaSyx per-pod
+`POSTGRES_MAXOPENCONNECTIONS` values still bound client connections into
+PgBouncer. They may collectively exceed the PgBouncer server pool because
+PgBouncer queues work, but they must remain below the aggregate client capacity
+and within acceptable queueing latency:
+
+```text
+sum(BaSyx replicas × POSTGRES_MAXOPENCONNECTIONS)
+< Pooler instances × maxClientConn
+```
+
+A Pooler controls connection concurrency; it does not add write capacity to the
+single PostgreSQL primary. If latency rises while PgBouncer clients wait for
+server connections, first inspect query time, lock contention, storage latency
+and primary CPU before increasing `defaultPoolSize`.
+
+Transaction pooling requires PgBouncer prepared-statement tracking for clients
+that use protocol-level prepared statements. The chart enables
+`max_prepared_statements` with a value of `100` by default when the Pooler is
+enabled. Set `preparedStatements.enabled: false` only for a verified workload
+that does not use them. Additional values under `parameters` must be strings
+and must be supported by the PgBouncer version bundled with the installed
+CloudNativePG operator. The first-class connection limits and prepared
+statement settings take precedence over duplicate parameter keys.
+
+Before production rollout, verify the exact CloudNativePG and PgBouncer
+versions, render the `Pooler` resource, and run the BaSyx integration and load
+tests through the Pooler. Include bulk endpoints, large-object operations,
+rolling updates, primary switchovers and connection saturation. Watch
+`cnpg_pgbouncer_*` metrics together with the BaSyx PostgreSQL pool metrics to
+distinguish application-pool waits from PgBouncer queueing and PostgreSQL
+execution time.
+
 ### BaSyx Configuration Service
 
 BaSyx Go requires the database schema to be prepared before DB-backed services start. The chart enables `configurationService` by default for this. It renders a Kubernetes `Job` using `eclipsebasyx/basyxconfigurationservice-go` and the same PostgreSQL Secret as the runtime services.
@@ -935,10 +1022,10 @@ This applies to:
 - `companyLookup`
 - `digitalTwinRegistry`
 
-#### Logging, Request Correlation And Tracing
+#### Logging, Request Correlation And Telemetry
 
-The structured logging and OpenTelemetry values require BaSyx Go `1.0.4` or
-newer.
+Structured logging and tracing require BaSyx Go `1.0.4` or newer. PostgreSQL
+pool metrics require BaSyx Go `1.0.6` or newer.
 
 Logging is configured for every BaSyx Go backend and the Configuration Service:
 
@@ -957,14 +1044,17 @@ emit one structured access record for each request. No chart value is required
 for request correlation, and these IDs must not be treated as authenticated
 identity data.
 
-Tracing is disabled by default. To send traces to an existing OpenTelemetry
-Collector:
+Tracing and metrics are independently disabled by default. To send both signals
+to an existing OpenTelemetry Collector:
 
 ```yaml
 telemetry:
   tracesExporter: otlp
+  metricsExporter: otlp
   endpoint: http://opentelemetry-collector.observability.svc.cluster.local:4318
   protocol: http/protobuf
+  metricsExportInterval: "60000"
+  metricsExportTimeout: "30000"
   existingSecret: ""
   resourceAttributes: deployment.environment.name=production
   tracesSampler: parentbased_traceidratio
@@ -974,10 +1064,31 @@ telemetry:
     - baggage
 ```
 
-The Configuration Service has no HTTP server and remains logging-only. Advanced
-standard OpenTelemetry settings such as compression, timeouts, batch processor
-limits, and service-specific names can be supplied through
-`environment.common` or a service's `environment` map.
+`metricsExportInterval` and `metricsExportTimeout` are optional positive
+millisecond values. Leave them empty to use the OpenTelemetry SDK defaults.
+The shared endpoint and protocol apply to traces and metrics. Advanced standard
+settings, including signal-specific endpoints, headers, compression and
+timeouts, can be supplied through `environment.common`,
+`telemetry.existingSecret`, or a service's `environment` map.
+
+BaSyx Go exports the following PostgreSQL writer-pool metrics without executing
+additional database queries:
+
+| Metric | Meaning |
+| --- | --- |
+| `db.client.connection.max` | Configured maximum open connections |
+| `db.client.connection.count` with `state=used` or `state=idle` | Current pool use |
+| `basyx.db.client.connection.waits` | Cumulative waits for a connection |
+| `basyx.db.client.connection.wait_time` | Cumulative wait duration in seconds |
+| `basyx.db.client.connection.closed` with a bounded `reason` | Cumulative closures caused by pool limits |
+
+Use rates for cumulative counters. A rising wait rate while used connections
+approach the maximum points to the BaSyx application pool. When the optional
+CloudNativePG Pooler is enabled, compare these metrics with
+`cnpg_pgbouncer_*` metrics to distinguish waits inside the application from
+PgBouncer queueing.
+
+The Configuration Service has no HTTP server and remains logging-only.
 
 Do not put OTLP authorization headers into a values file. Create a Kubernetes
 Secret containing the standard environment variable and reference it instead:

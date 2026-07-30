@@ -20,12 +20,13 @@ The suites cover stable chart contracts such as:
 - optional DPP API deployment, ingress and ABAC wiring
 - Catena-X example values and marker-based ABAC wiring
 - common OIDC and ingress configuration
-- structured logging, optional OTLP tracing and telemetry Secret wiring
+- structured logging, optional OTLP traces and metrics, and telemetry Secret wiring
 - additional custom CA certificate mounts and trust-store wiring
 - runtime `helm test` hook for custom CA mount checks
 - service account helper behavior
 - digest-aware image rendering
 - schema validation for required values and basic formats
 - managed PostgreSQL storage, WAL, resources, scheduling and parameters
+- optional CloudNativePG read-write Pooler rendering and connection routing
 - shared per-pod PostgreSQL pool defaults and Configuration Service propagation
 - keycloak init resources and a runtime `helm test` realm check

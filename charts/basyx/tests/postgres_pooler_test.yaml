@@ -1,0 +1,218 @@
+suite: CloudNativePG read-write Pooler
+release:
+  name: basyx
+templates:
+  - templates/postgres-pooler.yaml
+  - templates/configuration-service-job.yaml
+  - templates/aas-registry/deployment.yaml
+tests:
+  - it: does not render the Pooler by default
+    template: templates/postgres-pooler.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders a transaction Pooler with prepared statement support
+    template: templates/postgres-pooler.yaml
+    set:
+      database.pooler.enabled: true
+    asserts:
+      - isKind:
+          of: Pooler
+      - equal:
+          path: apiVersion
+          value: postgresql.cnpg.io/v1
+      - equal:
+          path: metadata.name
+          value: basyx-database-rw-pooler
+      - equal:
+          path: spec.cluster.name
+          value: basyx-database
+      - equal:
+          path: spec.instances
+          value: 2
+      - equal:
+          path: spec.type
+          value: rw
+      - equal:
+          path: spec.pgbouncer.poolMode
+          value: transaction
+      - equal:
+          path: spec.pgbouncer.parameters.max_client_conn
+          value: "1000"
+      - equal:
+          path: spec.pgbouncer.parameters.default_pool_size
+          value: "25"
+      - equal:
+          path: spec.pgbouncer.parameters.max_prepared_statements
+          value: "100"
+      - notExists:
+          path: spec.template
+
+  - it: keeps a maximum-length cluster name distinct from the Pooler name
+    template: templates/postgres-pooler.yaml
+    set:
+      database.clusterName: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      database.pooler.enabled: true
+    asserts:
+      - equal:
+          path: metadata.name
+          value: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-rw-pooler
+      - equal:
+          path: spec.cluster.name
+          value: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+
+  - it: avoids a collision when the cluster name already has the Pooler suffix
+    template: templates/postgres-pooler.yaml
+    set:
+      database.clusterName: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-rw-pooler
+      database.pooler.enabled: true
+    asserts:
+      - equal:
+          path: metadata.name
+          value: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-rw-pooler
+      - equal:
+          path: spec.cluster.name
+          value: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-rw-pooler
+
+  - it: disables prepared statement tracking explicitly
+    template: templates/postgres-pooler.yaml
+    set:
+      database.pooler.enabled: true
+      database.pooler.preparedStatements.enabled: false
+    asserts:
+      - equal:
+          path: spec.pgbouncer.parameters.max_prepared_statements
+          value: "0"
+
+  - it: renders additional parameters resources and scheduling
+    template: templates/postgres-pooler.yaml
+    values:
+      - fixtures/database_pooler_scheduling.yaml
+    asserts:
+      - equal:
+          path: spec.instances
+          value: 3
+      - equal:
+          path: spec.pgbouncer.poolMode
+          value: session
+      - equal:
+          path: spec.pgbouncer.parameters.reserve_pool_size
+          value: "5"
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: pgbouncer
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.cpu
+          value: 250m
+      - equal:
+          path: spec.template.spec.nodeSelector.workload
+          value: database
+      - equal:
+          path: spec.template.spec.tolerations[0].effect
+          value: NoSchedule
+      - equal:
+          path: spec.template.spec.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution[0].topologyKey
+          value: kubernetes.io/hostname
+      - equal:
+          path: spec.template.spec.topologySpreadConstraints[0].topologyKey
+          value: topology.kubernetes.io/zone
+
+  - it: gives first-class connection limits precedence over additional parameters
+    template: templates/postgres-pooler.yaml
+    set:
+      database.pooler.enabled: true
+      database.pooler.maxClientConn: 600
+      database.pooler.defaultPoolSize: 30
+      database.pooler.preparedStatements.maxPreparedStatements: 150
+      database.pooler.parameters.max_client_conn: "10"
+      database.pooler.parameters.default_pool_size: "5"
+      database.pooler.parameters.max_prepared_statements: "1"
+    asserts:
+      - equal:
+          path: spec.pgbouncer.parameters.max_client_conn
+          value: "600"
+      - equal:
+          path: spec.pgbouncer.parameters.default_pool_size
+          value: "30"
+      - equal:
+          path: spec.pgbouncer.parameters.max_prepared_statements
+          value: "150"
+
+  - it: routes BaSyx runtime services through the Pooler with CNPG credentials
+    template: templates/aas-registry/deployment.yaml
+    set:
+      aasRegistry.enabled: true
+      database.pooler.enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_HOST
+            value: basyx-database-rw-pooler
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: basyx-database-app
+                key: password
+          count: 1
+
+  - it: keeps the configuration service on the direct read-write service
+    template: templates/configuration-service-job.yaml
+    set:
+      database.pooler.enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: POSTGRES_HOST
+            valueFrom:
+              secretKeyRef:
+                name: basyx-database-app
+                key: host
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_HOST
+            valueFrom:
+              secretKeyRef:
+                name: basyx-database-app
+                key: host
+          count: 1
+
+  - it: does not render a Pooler for an external database
+    template: templates/postgres-pooler.yaml
+    set:
+      database.type: external
+      database.existingSecret: basyx-external-postgres
+      database.pooler.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: does not redirect service-specific database connections
+    template: templates/aas-registry/deployment.yaml
+    set:
+      aasRegistry.enabled: true
+      database.pooler.enabled: true
+      aasRegistry.database.existingSecret: basyx-aas-registry-postgres
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_HOST
+            valueFrom:
+              secretKeyRef:
+                name: basyx-aas-registry-postgres
+                key: host
+          count: 1
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_HOST
+            value: basyx-database-rw-pooler
