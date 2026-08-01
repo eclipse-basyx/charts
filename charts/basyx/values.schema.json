@@ -78,6 +78,72 @@
         }
       }
     },
+    "topologySpreadConstraints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["maxSkew", "topologyKey", "whenUnsatisfiable"],
+        "properties": {
+          "maxSkew": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "topologyKey": {
+            "type": "string",
+            "minLength": 1
+          },
+          "whenUnsatisfiable": {
+            "type": "string",
+            "enum": ["DoNotSchedule", "ScheduleAnyway"]
+          },
+          "labelSelector": {
+            "$ref": "#/definitions/labelSelector"
+          },
+          "minDomains": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "matchLabelKeys": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "nodeAffinityPolicy": {
+            "type": "string",
+            "enum": ["Honor", "Ignore"]
+          },
+          "nodeTaintsPolicy": {
+            "type": "string",
+            "enum": ["Honor", "Ignore"]
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "required": ["minDomains"]
+            },
+            "then": {
+              "properties": {
+                "whenUnsatisfiable": {
+                  "const": "DoNotSchedule"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "required": ["matchLabelKeys"]
+            },
+            "then": {
+              "required": ["labelSelector"]
+            }
+          }
+        ]
+      }
+    },
     "nodeSelectorRequirement": {
       "type": "object",
       "additionalProperties": false,
@@ -656,7 +722,8 @@
         },
         "environment": { "type": "object" },
         "resources": { "$ref": "#/definitions/resourceRequirements" },
-        "autoscaling": { "$ref": "#/definitions/serviceAutoscaling" }
+        "autoscaling": { "$ref": "#/definitions/serviceAutoscaling" },
+        "topologySpreadConstraints": { "$ref": "#/definitions/topologySpreadConstraints" }
       },
       "allOf": [
         {

@@ -575,6 +575,7 @@ submodelRepository:
     failureThreshold: 3
   nodeSelector: {}
   tolerations: []
+  topologySpreadConstraints: []
   # affinity:
   #   podAntiAffinity:
   #     preferredDuringSchedulingIgnoredDuringExecution:
@@ -669,6 +670,7 @@ submodelRegistry:
     failureThreshold: 3
   nodeSelector: {}
   tolerations: []
+  topologySpreadConstraints: []
   # affinity:
   #   podAntiAffinity:
   #     preferredDuringSchedulingIgnoredDuringExecution:
@@ -771,6 +773,7 @@ aasRegistry:
     failureThreshold: 3
   nodeSelector: {}
   tolerations: []
+  topologySpreadConstraints: []
   # For HA deployments (replicaCount > 1), configure pod anti-affinity to spread
   # replicas across nodes. Adjust matchLabels to this service's app.kubernetes.io/name.
   # affinity:
@@ -876,6 +879,7 @@ digitalTwinRegistry:
     failureThreshold: 3
   nodeSelector: {}
   tolerations: []
+  topologySpreadConstraints: []
   # For HA deployments (replicaCount > 1), configure pod anti-affinity to spread
   # replicas across nodes. Adjust matchLabels to this service's app.kubernetes.io/name.
   # affinity:
@@ -980,6 +984,7 @@ aasRepository:
     failureThreshold: 3
   nodeSelector: {}
   tolerations: []
+  topologySpreadConstraints: []
   # affinity:
   #   podAntiAffinity:
   #     preferredDuringSchedulingIgnoredDuringExecution:
@@ -1084,6 +1089,7 @@ aasEnvironment:
     failureThreshold: 3
   nodeSelector: {}
   tolerations: []
+  topologySpreadConstraints: []
   # volumes:
   #   - name: aas-preconfiguration
   #     configMap:
@@ -1195,6 +1201,7 @@ dppApi:
     failureThreshold: 3
   nodeSelector: {}
   tolerations: []
+  topologySpreadConstraints: []
   affinity: {}
 
 cdRepository:
@@ -1284,6 +1291,7 @@ cdRepository:
     failureThreshold: 3
   nodeSelector: {}
   tolerations: []
+  topologySpreadConstraints: []
   # affinity:
   #   podAntiAffinity:
   #     preferredDuringSchedulingIgnoredDuringExecution:
@@ -1373,6 +1381,7 @@ companyLookup:
     failureThreshold: 3
   nodeSelector: {}
   tolerations: []
+  topologySpreadConstraints: []
   # affinity:
   #   podAntiAffinity:
   #     preferredDuringSchedulingIgnoredDuringExecution:
@@ -1468,6 +1477,7 @@ aasDiscovery:
     failureThreshold: 3
   nodeSelector: {}
   tolerations: []
+  topologySpreadConstraints: []
   # affinity:
   #   podAntiAffinity:
   #     preferredDuringSchedulingIgnoredDuringExecution:
