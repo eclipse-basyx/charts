@@ -80,6 +80,25 @@ tests:
           path: metadata.annotations["argocd.argoproj.io/sync-wave"]
           value: "20"
 
+  - it: renders topology spread constraints for shared backend deployments
+    template: templates/aas-repository/deployment.yaml
+    values:
+      - fixtures/backend_topology_spread.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.topologySpreadConstraints[0]
+          value:
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/component: aas-repository
+                app.kubernetes.io/name: basyx
+            matchLabelKeys:
+              - pod-template-hash
+            maxSkew: 1
+            minDomains: 3
+            topologyKey: kubernetes.io/hostname
+            whenUnsatisfiable: DoNotSchedule
+
   - it: renders Argo CD runtime sync wave for keycloak
     template: templates/keycloak/deployment.yaml
     set:

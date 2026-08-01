@@ -100,6 +100,13 @@ tests:
       - failedTemplate:
           errorPattern: "aasRepository.server.shutdownTimeoutSeconds"
 
+  - it: fails when a backend topology spread constraint is incomplete
+    values:
+      - fixtures/invalid_backend_topology_spread.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "maxSkew is required"
+
   - it: fails when autoscaling has no CPU request
     values:
       - fixtures/invalid_autoscaling_cpu_request.yaml
