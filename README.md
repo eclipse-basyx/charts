@@ -1144,7 +1144,32 @@ Supported service blocks:
 - `companyLookup`
 - `digitalTwinRegistry`
 
-Most service blocks support `enabled`, `replicaCount`, `autoscaling`, `image.*`, `imagePullSecrets`, `service.*`, `ingress.*`, `resources`, `nodeSelector`, `tolerations`, `affinity`, `podAnnotations`, `podLabels`, `podSecurityContext`, `securityContext`, `volumes`, `volumeMounts` and optional service-local `server`, `history`, `eventing`, `general` and `abac` overrides.
+Most service blocks support `enabled`, `replicaCount`, `autoscaling`, `image.*`, `imagePullSecrets`, `service.*`, `ingress.*`, `resources`, `nodeSelector`, `tolerations`, `affinity`, `topologySpreadConstraints`, `podAnnotations`, `podLabels`, `podSecurityContext`, `securityContext`, `volumes`, `volumeMounts` and optional service-local `server`, `history`, `eventing`, `general` and `abac` overrides.
+
+Use topology spread constraints to distribute replicas across nodes or zones. A
+dedicated pod label keeps the selector independent of the Helm release name:
+
+```yaml
+submodelRepository:
+  replicaCount: 3
+  podLabels:
+    basyx.eclipse.org/topology-group: submodel-repository
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          basyx.eclipse.org/topology-group: submodel-repository
+      matchLabelKeys:
+        - pod-template-hash
+```
+
+The selector must match the labels of the service's own pods. Use
+`DoNotSchedule` only after verifying that enough eligible topology domains and
+capacity are available, otherwise replicas can remain pending. `matchLabelKeys`
+requires Kubernetes 1.27 or later, and `minDomains` can require feature-gate
+support before Kubernetes 1.30.
 
 `aasEnvironment` uses the `eclipsebasyx/aasenvironment-go` image and defaults to service port `8082`. It can be deployed as a single BaSyx Go API endpoint backed by the chart's PostgreSQL database and Configuration Service. It enables AAS Registry, Submodel Registry and Discovery integration by default:
 
