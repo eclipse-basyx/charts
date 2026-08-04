@@ -1122,7 +1122,7 @@ aasRepository:
   replicaCount: 1
   image:
     repository: eclipsebasyx/aasrepository-go
-    tag: "1.0.8"
+    tag: "1.0.9"
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
