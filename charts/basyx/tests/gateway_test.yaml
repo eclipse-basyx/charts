@@ -1,0 +1,152 @@
+suite: gateway api gateway
+release:
+  name: basyx
+  namespace: basyx
+templates:
+  - templates/gateway.yaml
+  - templates/keycloak/httproute.yaml
+tests:
+  - it: renders no Gateway when gatewayApi.gateway is disabled by default
+    template: templates/gateway.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: fails when gatewayApi.gateway is enabled without a className
+    template: templates/gateway.yaml
+    set:
+      gatewayApi.gateway.enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: "className"
+
+  - it: renders a Gateway with the default name, class and listeners
+    template: templates/gateway.yaml
+    set:
+      gatewayApi.gateway.enabled: true
+      gatewayApi.gateway.className: envoy-gateway
+    asserts:
+      - equal:
+          path: metadata.name
+          value: basyx-gateway
+      - equal:
+          path: spec.gatewayClassName
+          value: envoy-gateway
+      - equal:
+          path: spec.listeners[0].name
+          value: http
+      - equal:
+          path: spec.listeners[0].port
+          value: 80
+      - equal:
+          path: spec.listeners[0].hostname
+          value: basyx.example.com
+      - equal:
+          path: spec.listeners[1].name
+          value: https
+      - equal:
+          path: spec.listeners[1].port
+          value: 443
+      - equal:
+          path: spec.listeners[1].hostname
+          value: basyx.example.com
+      - equal:
+          path: spec.listeners[1].tls.certificateRefs[0].name
+          value: basyx-tls-secret
+
+  - it: uses a custom Gateway name when set
+    template: templates/gateway.yaml
+    set:
+      gatewayApi.gateway.enabled: true
+      gatewayApi.gateway.className: envoy-gateway
+      gatewayApi.gateway.name: custom-gateway
+    asserts:
+      - equal:
+          path: metadata.name
+          value: custom-gateway
+
+  - it: uses tls.secretName over the release-name default when set
+    template: templates/gateway.yaml
+    set:
+      gatewayApi.gateway.enabled: true
+      gatewayApi.gateway.className: envoy-gateway
+      tls.secretName: shared-tls-secret
+    asserts:
+      - equal:
+          path: spec.listeners[1].tls.certificateRefs[0].name
+          value: shared-tls-secret
+
+  - it: omits the https listener when gateway tls is disabled
+    template: templates/gateway.yaml
+    set:
+      gatewayApi.gateway.enabled: true
+      gatewayApi.gateway.className: envoy-gateway
+      gatewayApi.gateway.tls.enabled: false
+    asserts:
+      - lengthEqual:
+          path: spec.listeners
+          count: 1
+      - equal:
+          path: spec.listeners[0].name
+          value: http
+
+  - it: renders custom Gateway annotations
+    template: templates/gateway.yaml
+    set:
+      gatewayApi.gateway.enabled: true
+      gatewayApi.gateway.className: envoy-gateway
+      gatewayApi.gateway.annotations:
+        example.com/foo: bar
+    asserts:
+      - equal:
+          path: metadata.annotations["example.com/foo"]
+          value: bar
+
+  - it: derives HTTPRoute parentRefs from the self-created Gateway when none are set
+    template: templates/keycloak/httproute.yaml
+    set:
+      keycloak.enabled: true
+      keycloak.httpRoute.enabled: true
+      gatewayApi.gateway.enabled: true
+      gatewayApi.gateway.className: envoy-gateway
+    asserts:
+      - equal:
+          path: spec.parentRefs[0].name
+          value: basyx-gateway
+      - equal:
+          path: spec.parentRefs[0].namespace
+          value: basyx
+      - equal:
+          path: spec.parentRefs[0].sectionName
+          value: https
+
+  - it: derives HTTPRoute parentRefs with the http sectionName when gateway tls is disabled
+    template: templates/keycloak/httproute.yaml
+    set:
+      keycloak.enabled: true
+      keycloak.httpRoute.enabled: true
+      gatewayApi.gateway.enabled: true
+      gatewayApi.gateway.className: envoy-gateway
+      gatewayApi.gateway.tls.enabled: false
+    asserts:
+      - equal:
+          path: spec.parentRefs[0].sectionName
+          value: http
+
+  - it: prefers explicit gatewayApi.parentRefs over the self-created Gateway
+    template: templates/keycloak/httproute.yaml
+    set:
+      keycloak.enabled: true
+      keycloak.httpRoute.enabled: true
+      gatewayApi.gateway.enabled: true
+      gatewayApi.gateway.className: envoy-gateway
+      gatewayApi.parentRefs:
+        - name: external-gateway
+          namespace: gateway-system
+    asserts:
+      - equal:
+          path: spec.parentRefs[0].name
+          value: external-gateway
+      - equal:
+          path: spec.parentRefs[0].namespace
+          value: gateway-system
