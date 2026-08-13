@@ -32,3 +32,4 @@ The suites cover stable chart contracts such as:
 - shared per-pod PostgreSQL pool defaults and Configuration Service propagation
 - keycloak init resources and a runtime `helm test` realm check
 - Gateway API HTTPRoute rendering, parentRefs precedence and fail-fast validation
+- optional self-managed Gateway rendering, className validation and derived HTTPRoute parentRefs

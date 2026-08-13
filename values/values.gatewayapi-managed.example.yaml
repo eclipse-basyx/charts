@@ -1,18 +1,18 @@
-# Example values for a BaSyx Go deployment routed through the Kubernetes
-# Gateway API (HTTPRoute) instead of a classic Ingress controller, against a
-# Gateway you bring yourself (the recommended path - see
-# values.gatewayapi-managed.example.yaml for the alternative where the chart
-# creates its own Gateway instead).
+# Example values for a BaSyx Go deployment where the chart creates its own
+# Gateway API `Gateway` resource, instead of requiring one to already exist
+# (see values.gatewayapi.example.yaml for that bring-your-own alternative,
+# which remains the recommended path for anything beyond a standalone/demo
+# deployment - a Gateway is normally shared cluster infrastructure, and each
+# self-created Gateway typically provisions its own LoadBalancer).
 #
 # Prerequisite: the target cluster must already have the Gateway API CRDs
-# installed and an existing `Gateway` resource (e.g. named "basyx-gateway" in
-# the "gateway-system" namespace, with a listener named "https"). This chart
-# does not create the Gateway itself, only HTTPRoute resources that attach to
-# it via `gatewayApi.parentRefs`.
+# and a Gateway API controller (e.g. Envoy Gateway, Traefik, Contour)
+# installed, with a matching GatewayClass. This chart still does not create
+# the GatewayClass or the controller itself - only the Gateway.
 #
 # Copy this file and adapt it for your own cluster:
 #
-#   cp values/values.gatewayapi.example.yaml values/values.my-environment.yaml
+#   cp values/values.gatewayapi-managed.example.yaml values/values.my-environment.yaml
 #
 # Do not commit real passwords, client secrets or private certificate material.
 
@@ -48,14 +48,16 @@ ingress:
   # clusterIssuer: letsencrypt-prod
   # issuer: ""
 
-# Chart-wide default parentRefs used by every component's HTTPRoute unless a
-# component sets its own <component>.httpRoute.parentRefs. This must point at
-# a Gateway that already exists in the cluster.
+# The chart creates its own Gateway (named "basyx-gateway" here, defaults to
+# "<release-name>-gateway" if `name` is left empty) with a fixed `http`
+# listener and an `https` listener reusing the same TLS certificate the
+# Ingress path would otherwise use. No `gatewayApi.parentRefs` needed - it is
+# derived automatically to point at this Gateway.
 gatewayApi:
-  parentRefs:
-    - name: basyx-gateway
-      namespace: gateway-system
-      sectionName: https
+  gateway:
+    enabled: true
+    name: basyx-gateway
+    className: envoy-gateway # GatewayClass name - matches your installed Gateway API controller
 
 database:
   clusterName: basyx-database

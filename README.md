@@ -50,6 +50,7 @@ Custom values files live outside the chart, for example:
 ```text
 values/values.catena-x.example.yaml
 values/values.example.yaml
+values/values.gatewayapi-managed.example.yaml
 values/values.gatewayapi.example.yaml
 values/values.minimal.yaml
 values/values.observability.example.yaml
@@ -421,13 +422,14 @@ Use `ingress.className` for AGIC instead of the legacy `kubernetes.io/ingress.cl
 
 As an alternative to Ingress, each service can optionally be exposed through a [Gateway API](https://gateway-api.sigs.k8s.io/) `HTTPRoute` resource instead. This is opt-in and disabled by default per service; Ingress remains the default routing mechanism for the chart.
 
-Using this feature requires the Gateway API CRDs and an existing `Gateway` resource to already be installed in the cluster. The chart does not create the `Gateway` itself, it only renders `HTTPRoute` resources that attach to one via `spec.parentRefs`.
+Using this feature requires the Gateway API CRDs to already be installed in the cluster, and either a `Gateway` resource that already exists (bring-your-own, the default) or `gatewayApi.gateway.enabled: true` to let the chart create its own (see below).
 
 Enable `<service>.httpRoute.enabled` per service to render its `HTTPRoute`. Every `HTTPRoute` needs at least one `parentRefs` entry, resolved in this order:
 
 1. `<service>.httpRoute.parentRefs`, if non-empty.
 2. Otherwise the chart-wide `gatewayApi.parentRefs` default.
-3. If both are empty while `httpRoute.enabled: true`, the chart fails the render with an explicit error instead of emitting an `HTTPRoute` with an invalid empty `spec.parentRefs`, which the Gateway API rejects.
+3. Otherwise, if `gatewayApi.gateway.enabled: true`, a `parentRefs` entry pointing at the Gateway the chart itself creates (see below) - no need to also set `gatewayApi.parentRefs` in that case.
+4. If all of the above are empty while `httpRoute.enabled: true`, the chart fails the render with an explicit error instead of emitting an `HTTPRoute` with an invalid empty `spec.parentRefs`, which the Gateway API rejects.
 
 Example pointing at an existing Gateway and enabling Gateway API routing for Keycloak:
 
@@ -452,6 +454,36 @@ A service can override the chart-wide default by setting its own `<service>.http
 | `<service>.httpRoute.parentRefs` | Service-local `parentRefs`. Overrides `gatewayApi.parentRefs` when non-empty. |
 | `<service>.httpRoute.annotations` | Annotations added to the service's `HTTPRoute` metadata. |
 | `<service>.httpRoute.hosts` | Hostnames and paths routed to the service. Uses the Gateway API `pathType` values (`Exact`, `PathPrefix`, `RegularExpression`), which are not the same enum as the Ingress `pathType`. |
+
+#### Optionally letting the chart create its own Gateway
+
+A `Gateway` is cluster-operator-owned, shared infrastructure in the Gateway API model - normally one `Gateway` serves `HTTPRoute`s from many applications, and every self-created `Gateway` typically provisions its own LoadBalancer. For that reason `gatewayApi.gateway.enabled` defaults to `false` and bring-your-own via `gatewayApi.parentRefs` remains the primary, recommended path. Enable it for standalone/demo deployments that don't have a pre-existing shared `Gateway` to attach to:
+
+```yaml
+gatewayApi:
+  gateway:
+    enabled: true
+    className: envoy-gateway # GatewayClass name - required, no cluster-portable default
+
+keycloak:
+  httpRoute:
+    enabled: true
+```
+
+This renders one `Gateway` (named `<release-name>-gateway` unless `gatewayApi.gateway.name` is set) with a fixed `http` listener and, unless `gatewayApi.gateway.tls.enabled: false`, a fixed `https` listener terminating TLS with the same certificate already used by the Ingress path (`tls.secretName` / `<release-name>-tls-secret`). Both listeners are scoped to `host`, matching how the Ingress path is host-scoped too - required for cert-manager's [gateway-shim](https://cert-manager.io/docs/usage/gateway/) to know which hostname to request a certificate for if you annotate the Gateway with `cert-manager.io/issuer`/`cert-manager.io/cluster-issuer` to issue it its own certificate (rather than reusing the Ingress-issued one). If you need more control over listeners than these opinionated defaults offer, use the bring-your-own path (`gatewayApi.parentRefs`) against a `Gateway` you manage yourself instead.
+
+The derived `parentRefs` (see step 3 above) always target the `https` listener while `gatewayApi.gateway.tls.enabled` is `true` (the default). The `http` listener is still created and its port is still exposed, but no `HTTPRoute` attaches to it automatically, and the chart does not configure an HTTP-to-HTTPS redirect. To route plain HTTP traffic for a service instead, set that service's own `<service>.httpRoute.parentRefs` with `sectionName: http` explicitly.
+
+| Value | Description |
+| --- | --- |
+| `gatewayApi.gateway.enabled` | Lets the chart create its own `Gateway` instead of requiring one to already exist. Disabled by default. |
+| `gatewayApi.gateway.name` | Name of the chart-created `Gateway`. Defaults to `<release-name>-gateway`. |
+| `gatewayApi.gateway.className` | `GatewayClass` name. Required when enabled. |
+| `gatewayApi.gateway.annotations` | Annotations added to the `Gateway` metadata. |
+| `gatewayApi.gateway.port` | Port for the fixed `http` listener. Defaults to `80`. |
+| `gatewayApi.gateway.tls.enabled` | Whether to also render the fixed `https` listener. Defaults to `true`. |
+| `gatewayApi.gateway.tls.port` | Port for the `https` listener. Defaults to `443`. |
+| `gatewayApi.gateway.tls.secretName` | TLS certificate secret for the `https` listener. Defaults to `tls.secretName` / `<release-name>-tls-secret`. |
 
 ### Additional CA Certificates
 
