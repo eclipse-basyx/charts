@@ -1,0 +1,42 @@
+{{- if .Values.gatewayApi.gateway.enabled }}
+{{- if not .Values.gatewayApi.gateway.className }}
+{{- fail "gatewayApi.gateway.enabled is true but gatewayApi.gateway.className is not set" }}
+{{- end }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ include "common.gatewayApi.gatewayName" . }}
+  namespace: {{ .Release.Namespace }}
+  {{- with .Values.gatewayApi.gateway.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  gatewayClassName: {{ tpl (print .Values.gatewayApi.gateway.className) . | quote }}
+  listeners:
+    - name: http
+      hostname: {{ tpl (print .Values.host) . | quote }}
+      protocol: HTTP
+      port: {{ .Values.gatewayApi.gateway.port }}
+      allowedRoutes:
+        namespaces:
+          from: Same
+    {{- if .Values.gatewayApi.gateway.tls.enabled }}
+    - name: https
+      # cert-manager's gateway-shim requires an explicit hostname on the
+      # listener to know which SAN to request - without it, it silently
+      # skips the listener ("Skipped a listener block: ... hostname cannot
+      # be empty") and never issues a Certificate for gatewayApi.gateway
+      # annotations like cert-manager.io/issuer.
+      hostname: {{ tpl (print .Values.host) . | quote }}
+      protocol: HTTPS
+      port: {{ .Values.gatewayApi.gateway.tls.port }}
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: {{ .Values.gatewayApi.gateway.tls.secretName | default .Values.tls.secretName | default (printf "%s-tls-secret" .Release.Name) | quote }}
+      allowedRoutes:
+        namespaces:
+          from: Same
+    {{- end }}
+{{- end }}
