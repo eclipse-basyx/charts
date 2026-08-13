@@ -81,6 +81,29 @@ gatewayApi:
   #     namespace: gateway-system
   #     sectionName: https
 
+  # Optionally let the chart create its own Gateway instead of requiring one
+  # to already exist (bring-your-own via parentRefs above remains available
+  # and still takes precedence when explicitly set). Off by default: a
+  # Gateway is cluster-operator-owned, shared infrastructure in the Gateway
+  # API model, and every self-created Gateway typically provisions its own
+  # LoadBalancer - avoid enabling this across multiple releases that could
+  # otherwise share one Gateway.
+  gateway:
+    enabled: false
+    # Defaults to "<release-name>-gateway" when empty.
+    name: ""
+    # GatewayClass name, e.g. "envoy-gateway". Required when enabled - unlike
+    # ingress.className, there is no cluster-portable default.
+    className: ""
+    annotations: {}
+    port: 80
+    tls:
+      enabled: true
+      port: 443
+      # Defaults to tls.secretName / "<release-name>-tls-secret" when empty,
+      # the same certificate already used by the Ingress path.
+      secretName: ""
+
 paths:
   dashboard: /aas-dataspace-dashboard
   aasDiscovery: /aas-discovery

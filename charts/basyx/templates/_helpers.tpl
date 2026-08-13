@@ -1144,17 +1144,35 @@ annotations:
 {{- end }}
 
 {{/*
-Render parentRefs for a Gateway API HTTPRoute. Falls back to the chart-wide
-default parentRefs (.Values.gatewayApi.parentRefs) when the component does
-not define its own.
+Name of the Gateway this chart creates when gatewayApi.gateway.enabled is
+true. Shared between templates/gateway.yaml and the parentRefs fallback
+below so both agree on the same name.
+*/}}
+{{- define "common.gatewayApi.gatewayName" -}}
+{{- .Values.gatewayApi.gateway.name | default (printf "%s-gateway" .Release.Name) -}}
+{{- end }}
+
+{{/*
+Render parentRefs for a Gateway API HTTPRoute. Falls back, in order, to: the
+chart-wide default parentRefs (.Values.gatewayApi.parentRefs), then - if the
+chart is creating its own Gateway (.Values.gatewayApi.gateway.enabled) - a
+parentRefs entry pointing at that Gateway, so enabling gatewayApi.gateway
+alone is enough without also duplicating parentRefs.
 */}}
 {{- define "common.httpRoute.parentRefs" -}}
 {{- $parentRefs := .parentRefs -}}
 {{- if not $parentRefs }}
 {{- $parentRefs = .root.Values.gatewayApi.parentRefs }}
 {{- end }}
+{{- if and (not $parentRefs) .root.Values.gatewayApi.gateway.enabled }}
+{{- $sectionName := "http" -}}
+{{- if .root.Values.gatewayApi.gateway.tls.enabled }}
+{{- $sectionName = "https" -}}
+{{- end }}
+{{- $parentRefs = list (dict "name" (include "common.gatewayApi.gatewayName" .root) "namespace" .root.Release.Namespace "sectionName" $sectionName) }}
+{{- end }}
 {{- if not $parentRefs }}
-{{- fail "httpRoute is enabled but no parentRefs are configured — set <component>.httpRoute.parentRefs or the chart-wide gatewayApi.parentRefs" }}
+{{- fail "httpRoute is enabled but no parentRefs are configured — set <component>.httpRoute.parentRefs, the chart-wide gatewayApi.parentRefs, or gatewayApi.gateway.enabled" }}
 {{- end }}
 {{- range $parentRefs }}
 - name: {{ .name | quote }}
