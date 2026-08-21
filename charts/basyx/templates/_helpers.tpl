@@ -1153,6 +1153,39 @@ below so both agree on the same name.
 {{- end }}
 
 {{/*
+Cert-manager annotations for the chart-created Gateway's https listener,
+derived from the same tls.enabled + ingress.certificateIssuer/issuer/clusterIssuer
+config already used for Ingress - so cert-manager's gateway-shim issues the
+same certificate (same secretName) the Ingress path would otherwise reuse,
+without requiring a second, gateway-specific issuer configuration. Explicit
+gatewayApi.gateway.annotations always take precedence over the derived
+cert-manager annotation.
+*/}}
+{{- define "common.gatewayApi.gateway.annotations" -}}
+{{- $root := . -}}
+{{- $annotations := dict -}}
+{{- if and $root.Values.tls.enabled $root.Values.gatewayApi.gateway.tls.enabled -}}
+{{- if $root.Values.ingress.certificateIssuer.enabled -}}
+{{- $_ := set $annotations "cert-manager.io/issuer" ($root.Values.ingress.certificateIssuer.name | toString) -}}
+{{- else if $root.Values.ingress.issuer -}}
+{{- $_ := set $annotations "cert-manager.io/issuer" ($root.Values.ingress.issuer | toString) -}}
+{{- else if $root.Values.ingress.clusterIssuer -}}
+{{- $_ := set $annotations "cert-manager.io/cluster-issuer" ($root.Values.ingress.clusterIssuer | toString) -}}
+{{- end -}}
+{{- end -}}
+{{- range $key, $value := ($root.Values.gatewayApi.gateway.annotations | default dict) -}}
+{{- if kindIs "invalid" $value -}}
+{{- $_ := unset $annotations $key -}}
+{{- else -}}
+{{- $_ := set $annotations $key (tpl (print $value) $root) -}}
+{{- end -}}
+{{- end -}}
+{{- if $annotations -}}
+{{- toYaml $annotations -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Render parentRefs for a Gateway API HTTPRoute. Falls back, in order, to: the
 chart-wide default parentRefs (.Values.gatewayApi.parentRefs), then - if the
 chart is creating its own Gateway (.Values.gatewayApi.gateway.enabled) - a

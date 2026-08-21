@@ -7,9 +7,12 @@ kind: Gateway
 metadata:
   name: {{ include "common.gatewayApi.gatewayName" . }}
   namespace: {{ .Release.Namespace }}
-  {{- with .Values.gatewayApi.gateway.annotations }}
+  labels:
+    {{- include "basyx.labels" . | nindent 4 }}
+  {{- $gatewayAnnotations := include "common.gatewayApi.gateway.annotations" . }}
+  {{- if $gatewayAnnotations }}
   annotations:
-    {{- toYaml . | nindent 4 }}
+    {{- $gatewayAnnotations | nindent 4 }}
   {{- end }}
 spec:
   gatewayClassName: {{ tpl (print .Values.gatewayApi.gateway.className) . | quote }}
