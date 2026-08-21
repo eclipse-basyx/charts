@@ -53,6 +53,15 @@ tests:
       - equal:
           path: spec.listeners[1].tls.certificateRefs[0].name
           value: basyx-tls-secret
+      - equal:
+          path: metadata.labels["app.kubernetes.io/name"]
+          value: basyx
+      - equal:
+          path: metadata.labels["app.kubernetes.io/instance"]
+          value: basyx
+      - equal:
+          path: metadata.labels["app.kubernetes.io/managed-by"]
+          value: Helm
 
   - it: uses a custom Gateway name when set
     template: templates/gateway.yaml
@@ -101,6 +110,80 @@ tests:
       - equal:
           path: metadata.annotations["example.com/foo"]
           value: bar
+
+  - it: derives a cert-manager issuer annotation from the same ingress.issuer used by Ingress
+    template: templates/gateway.yaml
+    set:
+      gatewayApi.gateway.enabled: true
+      gatewayApi.gateway.className: envoy-gateway
+      tls.enabled: true
+      ingress.issuer: internal-issuer
+    asserts:
+      - equal:
+          path: metadata.annotations["cert-manager.io/issuer"]
+          value: internal-issuer
+
+  - it: derives a cert-manager cluster-issuer annotation from ingress.clusterIssuer
+    template: templates/gateway.yaml
+    set:
+      gatewayApi.gateway.enabled: true
+      gatewayApi.gateway.className: envoy-gateway
+      tls.enabled: true
+      ingress.clusterIssuer: letsencrypt-prod
+    asserts:
+      - equal:
+          path: metadata.annotations["cert-manager.io/cluster-issuer"]
+          value: letsencrypt-prod
+
+  - it: derives a cert-manager issuer annotation from ingress.certificateIssuer when enabled
+    template: templates/gateway.yaml
+    set:
+      gatewayApi.gateway.enabled: true
+      gatewayApi.gateway.className: envoy-gateway
+      tls.enabled: true
+      ingress.certificateIssuer.enabled: true
+      ingress.certificateIssuer.name: ingress-issuer
+    asserts:
+      - equal:
+          path: metadata.annotations["cert-manager.io/issuer"]
+          value: ingress-issuer
+
+  - it: lets explicit gatewayApi.gateway.annotations override the derived cert-manager issuer
+    template: templates/gateway.yaml
+    set:
+      gatewayApi.gateway.enabled: true
+      gatewayApi.gateway.className: envoy-gateway
+      tls.enabled: true
+      ingress.issuer: internal-issuer
+      gatewayApi.gateway.annotations:
+        cert-manager.io/issuer: custom-issuer
+    asserts:
+      - equal:
+          path: metadata.annotations["cert-manager.io/issuer"]
+          value: custom-issuer
+
+  - it: does not derive a cert-manager annotation when the Gateway https listener is disabled
+    template: templates/gateway.yaml
+    set:
+      gatewayApi.gateway.enabled: true
+      gatewayApi.gateway.className: envoy-gateway
+      gatewayApi.gateway.tls.enabled: false
+      tls.enabled: true
+      ingress.issuer: internal-issuer
+    asserts:
+      - notExists:
+          path: metadata.annotations
+
+  - it: does not derive a cert-manager annotation when tls is globally disabled
+    template: templates/gateway.yaml
+    set:
+      gatewayApi.gateway.enabled: true
+      gatewayApi.gateway.className: envoy-gateway
+      tls.enabled: false
+      ingress.issuer: internal-issuer
+    asserts:
+      - notExists:
+          path: metadata.annotations
 
   - it: derives HTTPRoute parentRefs from the self-created Gateway when none are set
     template: templates/keycloak/httproute.yaml
