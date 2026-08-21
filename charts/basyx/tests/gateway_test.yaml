@@ -111,42 +111,43 @@ tests:
           path: metadata.annotations["example.com/foo"]
           value: bar
 
-  - it: derives a cert-manager issuer annotation from the same ingress.issuer used by Ingress
+  - it: derives a cert-manager issuer annotation from gatewayApi.gateway.issuer
+    template: templates/gateway.yaml
+    set:
+      gatewayApi.gateway.enabled: true
+      gatewayApi.gateway.className: envoy-gateway
+      tls.enabled: true
+      gatewayApi.gateway.issuer: internal-issuer
+    asserts:
+      - equal:
+          path: metadata.annotations["cert-manager.io/issuer"]
+          value: internal-issuer
+
+  - it: derives a cert-manager cluster-issuer annotation from gatewayApi.gateway.clusterIssuer
+    template: templates/gateway.yaml
+    set:
+      gatewayApi.gateway.enabled: true
+      gatewayApi.gateway.className: envoy-gateway
+      tls.enabled: true
+      gatewayApi.gateway.clusterIssuer: letsencrypt-prod
+    asserts:
+      - equal:
+          path: metadata.annotations["cert-manager.io/cluster-issuer"]
+          value: letsencrypt-prod
+
+  - it: does not derive a cert-manager annotation from ingress.issuer or ingress.clusterIssuer
     template: templates/gateway.yaml
     set:
       gatewayApi.gateway.enabled: true
       gatewayApi.gateway.className: envoy-gateway
       tls.enabled: true
       ingress.issuer: internal-issuer
-    asserts:
-      - equal:
-          path: metadata.annotations["cert-manager.io/issuer"]
-          value: internal-issuer
-
-  - it: derives a cert-manager cluster-issuer annotation from ingress.clusterIssuer
-    template: templates/gateway.yaml
-    set:
-      gatewayApi.gateway.enabled: true
-      gatewayApi.gateway.className: envoy-gateway
-      tls.enabled: true
       ingress.clusterIssuer: letsencrypt-prod
-    asserts:
-      - equal:
-          path: metadata.annotations["cert-manager.io/cluster-issuer"]
-          value: letsencrypt-prod
-
-  - it: derives a cert-manager issuer annotation from ingress.certificateIssuer when enabled
-    template: templates/gateway.yaml
-    set:
-      gatewayApi.gateway.enabled: true
-      gatewayApi.gateway.className: envoy-gateway
-      tls.enabled: true
       ingress.certificateIssuer.enabled: true
       ingress.certificateIssuer.name: ingress-issuer
     asserts:
-      - equal:
-          path: metadata.annotations["cert-manager.io/issuer"]
-          value: ingress-issuer
+      - notExists:
+          path: metadata.annotations
 
   - it: lets explicit gatewayApi.gateway.annotations override the derived cert-manager issuer
     template: templates/gateway.yaml
@@ -154,7 +155,7 @@ tests:
       gatewayApi.gateway.enabled: true
       gatewayApi.gateway.className: envoy-gateway
       tls.enabled: true
-      ingress.issuer: internal-issuer
+      gatewayApi.gateway.issuer: internal-issuer
       gatewayApi.gateway.annotations:
         cert-manager.io/issuer: custom-issuer
     asserts:
@@ -169,7 +170,7 @@ tests:
       gatewayApi.gateway.className: envoy-gateway
       gatewayApi.gateway.tls.enabled: false
       tls.enabled: true
-      ingress.issuer: internal-issuer
+      gatewayApi.gateway.issuer: internal-issuer
     asserts:
       - notExists:
           path: metadata.annotations
@@ -180,7 +181,7 @@ tests:
       gatewayApi.gateway.enabled: true
       gatewayApi.gateway.className: envoy-gateway
       tls.enabled: false
-      ingress.issuer: internal-issuer
+      gatewayApi.gateway.issuer: internal-issuer
     asserts:
       - notExists:
           path: metadata.annotations

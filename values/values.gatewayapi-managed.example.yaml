@@ -50,14 +50,17 @@ ingress:
 
 # The chart creates its own Gateway (named "basyx-gateway" here, defaults to
 # "<release-name>-gateway" if `name` is left empty) with a fixed `http`
-# listener and an `https` listener reusing the same TLS certificate the
-# Ingress path would otherwise use. No `gatewayApi.parentRefs` needed - it is
+# listener and an `https` listener. No `gatewayApi.parentRefs` needed - it is
 # derived automatically to point at this Gateway.
 gatewayApi:
   gateway:
     enabled: true
     name: basyx-gateway
     className: envoy-gateway # GatewayClass name - matches your installed Gateway API controller
+    # Independent of ingress.issuer - point at the same Issuer name ("internal-issuer"
+    # here, matching internal.certificateIssuer below) to reuse that certificate,
+    # or at a different Issuer/ClusterIssuer to issue the Gateway its own.
+    issuer: internal-issuer
 
 database:
   clusterName: basyx-database
