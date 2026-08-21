@@ -96,6 +96,19 @@ gatewayApi:
     # ingress.className, there is no cluster-portable default.
     className: ""
     annotations: {}
+    # Namespaced cert-manager Issuer used to annotate the Gateway with
+    # cert-manager.io/issuer, so cert-manager's gateway-shim issues a
+    # certificate for the https listener below. Deliberately independent of
+    # ingress.issuer - set this to the same Issuer name if you want the
+    # Gateway to reuse the certificate the Ingress path would otherwise use,
+    # e.g. "internal-issuer" when using the internal CA (see
+    # internal.certificateIssuer) or the name of an Issuer created via
+    # ingress.certificateIssuer.
+    issuer: ""
+    # cert-manager ClusterIssuer name, annotated as
+    # cert-manager.io/cluster-issuer. Only one of issuer/clusterIssuer should
+    # be set; issuer takes precedence when both are.
+    clusterIssuer: ""
     port: 80
     tls:
       enabled: true

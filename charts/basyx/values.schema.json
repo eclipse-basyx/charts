@@ -1361,6 +1361,8 @@
             "name": { "type": "string" },
             "className": { "type": "string" },
             "annotations": { "type": "object" },
+            "issuer": { "type": "string" },
+            "clusterIssuer": { "type": "string" },
             "port": { "type": "integer" },
             "tls": {
               "type": "object",
