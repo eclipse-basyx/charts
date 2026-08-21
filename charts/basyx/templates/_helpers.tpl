@@ -1154,26 +1154,24 @@ below so both agree on the same name.
 
 {{/*
 Cert-manager annotations for the chart-created Gateway's https listener,
-derived from the same tls.enabled + ingress.certificateIssuer/issuer/clusterIssuer
-config already used for Ingress - so cert-manager's gateway-shim issues the
-same certificate (same secretName) the Ingress path would otherwise reuse,
-without requiring a second, gateway-specific issuer configuration. Explicit
-gatewayApi.gateway.annotations always take precedence over the derived
-cert-manager annotation.
+derived from gatewayApi.gateway.issuer/clusterIssuer - deliberately its own,
+independent config rather than reusing ingress.issuer/clusterIssuer, so
+Gateway API usage never implicitly depends on the Ingress-shaped values.
+Explicit gatewayApi.gateway.annotations always take precedence over the
+derived cert-manager annotation.
 */}}
 {{- define "common.gatewayApi.gateway.annotations" -}}
 {{- $root := . -}}
+{{- $gateway := $root.Values.gatewayApi.gateway -}}
 {{- $annotations := dict -}}
-{{- if and $root.Values.tls.enabled $root.Values.gatewayApi.gateway.tls.enabled -}}
-{{- if $root.Values.ingress.certificateIssuer.enabled -}}
-{{- $_ := set $annotations "cert-manager.io/issuer" ($root.Values.ingress.certificateIssuer.name | toString) -}}
-{{- else if $root.Values.ingress.issuer -}}
-{{- $_ := set $annotations "cert-manager.io/issuer" ($root.Values.ingress.issuer | toString) -}}
-{{- else if $root.Values.ingress.clusterIssuer -}}
-{{- $_ := set $annotations "cert-manager.io/cluster-issuer" ($root.Values.ingress.clusterIssuer | toString) -}}
+{{- if and $root.Values.tls.enabled $gateway.tls.enabled -}}
+{{- if $gateway.issuer -}}
+{{- $_ := set $annotations "cert-manager.io/issuer" ($gateway.issuer | toString) -}}
+{{- else if $gateway.clusterIssuer -}}
+{{- $_ := set $annotations "cert-manager.io/cluster-issuer" ($gateway.clusterIssuer | toString) -}}
 {{- end -}}
 {{- end -}}
-{{- range $key, $value := ($root.Values.gatewayApi.gateway.annotations | default dict) -}}
+{{- range $key, $value := ($gateway.annotations | default dict) -}}
 {{- if kindIs "invalid" $value -}}
 {{- $_ := unset $annotations $key -}}
 {{- else -}}
