@@ -1,7 +1,4 @@
 {{- if .Values.gatewayApi.gateway.enabled }}
-{{- if not .Values.gatewayApi.gateway.className }}
-{{- fail "gatewayApi.gateway.enabled is true but gatewayApi.gateway.className is not set" }}
-{{- end }}
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
@@ -15,7 +12,7 @@ metadata:
     {{- $gatewayAnnotations | nindent 4 }}
   {{- end }}
 spec:
-  gatewayClassName: {{ tpl (print .Values.gatewayApi.gateway.className) . | quote }}
+  gatewayClassName: {{ required "gatewayApi.gateway.className is required when gatewayApi.gateway.enabled is true" (tpl (print .Values.gatewayApi.gateway.className) .) | quote }}
   listeners:
     - name: http
       hostname: {{ tpl (print .Values.host) . | quote }}
