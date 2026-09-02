@@ -1,0 +1,33 @@
+{{- if .Values.cdRepository.enabled -}}
+{{- if .Values.cdRepository.httpRoute.enabled }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "basyx-cdRepository.fullname" . }}
+  labels:
+    {{- include "basyx-cdRepository.labels" . | nindent 4 }}
+  {{- with .Values.cdRepository.httpRoute.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  parentRefs:
+    {{- include "common.httpRoute.parentRefs" (dict "root" $ "parentRefs" .Values.cdRepository.httpRoute.parentRefs) | nindent 4 }}
+  hostnames:
+    {{- range .Values.cdRepository.httpRoute.hosts }}
+    - {{ tpl .host $ | quote }}
+    {{- end }}
+  rules:
+    {{- range .Values.cdRepository.httpRoute.hosts }}
+    {{- range .paths }}
+    - matches:
+        - path:
+            type: {{ .pathType }}
+            value: {{ tpl .path $ | quote }}
+      backendRefs:
+        - name: {{ include "basyx-cdRepository.fullname" $ }}
+          port: {{ $.Values.cdRepository.service.port }}
+    {{- end }}
+    {{- end }}
+{{- end }}
+{{- end }}

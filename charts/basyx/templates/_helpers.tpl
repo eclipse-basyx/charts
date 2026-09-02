@@ -1143,6 +1143,82 @@ annotations:
 {{- end }}
 {{- end }}
 
+{{/*
+Name of the Gateway this chart creates when gatewayApi.gateway.enabled is
+true. Shared between templates/gateway.yaml and the parentRefs fallback
+below so both agree on the same name.
+*/}}
+{{- define "common.gatewayApi.gatewayName" -}}
+{{- .Values.gatewayApi.gateway.name | default (printf "%s-gateway" .Release.Name) -}}
+{{- end }}
+
+{{/*
+Cert-manager annotations for the chart-created Gateway's https listener,
+derived from gatewayApi.gateway.issuer/clusterIssuer - deliberately its own,
+independent config rather than reusing ingress.issuer/clusterIssuer, so
+Gateway API usage never implicitly depends on the Ingress-shaped values.
+Explicit gatewayApi.gateway.annotations always take precedence over the
+derived cert-manager annotation.
+*/}}
+{{- define "common.gatewayApi.gateway.annotations" -}}
+{{- $root := . -}}
+{{- $gateway := $root.Values.gatewayApi.gateway -}}
+{{- $annotations := dict -}}
+{{- if and $root.Values.tls.enabled $gateway.tls.enabled -}}
+{{- if $gateway.issuer -}}
+{{- $_ := set $annotations "cert-manager.io/issuer" ($gateway.issuer | toString) -}}
+{{- else if $gateway.clusterIssuer -}}
+{{- $_ := set $annotations "cert-manager.io/cluster-issuer" ($gateway.clusterIssuer | toString) -}}
+{{- end -}}
+{{- end -}}
+{{- range $key, $value := ($gateway.annotations | default dict) -}}
+{{- if kindIs "invalid" $value -}}
+{{- $_ := unset $annotations $key -}}
+{{- else -}}
+{{- $_ := set $annotations $key (tpl (print $value) $root) -}}
+{{- end -}}
+{{- end -}}
+{{- if $annotations -}}
+{{- toYaml $annotations -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+Render parentRefs for a Gateway API HTTPRoute. Falls back, in order, to: the
+chart-wide default parentRefs (.Values.gatewayApi.parentRefs), then - if the
+chart is creating its own Gateway (.Values.gatewayApi.gateway.enabled) - a
+parentRefs entry pointing at that Gateway, so enabling gatewayApi.gateway
+alone is enough without also duplicating parentRefs.
+*/}}
+{{- define "common.httpRoute.parentRefs" -}}
+{{- $parentRefs := .parentRefs -}}
+{{- if not $parentRefs }}
+{{- $parentRefs = .root.Values.gatewayApi.parentRefs }}
+{{- end }}
+{{- if and (not $parentRefs) .root.Values.gatewayApi.gateway.enabled }}
+{{- $sectionName := "http" -}}
+{{- if .root.Values.gatewayApi.gateway.tls.enabled }}
+{{- $sectionName = "https" -}}
+{{- end }}
+{{- $parentRefs = list (dict "name" (include "common.gatewayApi.gatewayName" .root) "namespace" .root.Release.Namespace "sectionName" $sectionName) }}
+{{- end }}
+{{- if not $parentRefs }}
+{{- fail "httpRoute is enabled but no parentRefs are configured — set <component>.httpRoute.parentRefs, the chart-wide gatewayApi.parentRefs, or gatewayApi.gateway.enabled" }}
+{{- end }}
+{{- range $parentRefs }}
+- name: {{ .name | quote }}
+  {{- if .namespace }}
+  namespace: {{ .namespace | quote }}
+  {{- end }}
+  {{- if .sectionName }}
+  sectionName: {{ .sectionName | quote }}
+  {{- end }}
+  {{- if .port }}
+  port: {{ .port }}
+  {{- end }}
+{{- end }}
+{{- end }}
+
 {{- define "common.ingressTLS.annotations" -}}
   {{- if .Values.tls.enabled }}
   {{- if .Values.ingress.certificateIssuer.enabled }}

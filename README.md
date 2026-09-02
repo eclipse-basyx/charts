@@ -2,7 +2,7 @@
 
 This repository contains a Helm chart for deploying an Eclipse BaSyx Go based environment on Kubernetes.
 
-The chart installs the BaSyx Go backend services, a PostgreSQL database, optional Keycloak-based authentication, optional ABAC authorization, ingress resources, certificates, the AAS Web UI and optional supporting runtime tests.
+The chart installs the BaSyx Go backend services, a PostgreSQL database, optional Keycloak-based authentication, optional ABAC authorization, ingress resources (or Gateway API `HTTPRoute` resources as an opt-in alternative), certificates, the AAS Web UI and optional supporting runtime tests.
 
 The repository follows the common Helm multi-chart layout:
 
@@ -50,6 +50,8 @@ Custom values files live outside the chart, for example:
 ```text
 values/values.catena-x.example.yaml
 values/values.example.yaml
+values/values.gatewayapi-managed.example.yaml
+values/values.gatewayapi.example.yaml
 values/values.minimal.yaml
 values/values.observability.example.yaml
 values/values.autoscaling.example.yaml
@@ -415,6 +417,77 @@ ingress:
 ```
 
 Use `ingress.className` for AGIC instead of the legacy `kubernetes.io/ingress.class` annotation. Kubernetes rejects manifests when both values are set and do not match exactly. `null` removes an inherited default annotation, which is useful when switching away from nginx and avoiding nginx-specific annotations on non-nginx controllers.
+
+### Gateway API (HTTPRoute)
+
+As an alternative to Ingress, each service can optionally be exposed through a [Gateway API](https://gateway-api.sigs.k8s.io/) `HTTPRoute` resource instead. This is opt-in and disabled by default per service; Ingress remains the default routing mechanism for the chart.
+
+Using this feature requires the Gateway API CRDs to already be installed in the cluster, and either a `Gateway` resource that already exists (bring-your-own, the default) or `gatewayApi.gateway.enabled: true` to let the chart create its own (see below).
+
+Enable `<service>.httpRoute.enabled` per service to render its `HTTPRoute`. Every `HTTPRoute` needs at least one `parentRefs` entry, resolved in this order:
+
+1. `<service>.httpRoute.parentRefs`, if non-empty.
+2. Otherwise the chart-wide `gatewayApi.parentRefs` default.
+3. Otherwise, if `gatewayApi.gateway.enabled: true`, a `parentRefs` entry pointing at the Gateway the chart itself creates (see below) - no need to also set `gatewayApi.parentRefs` in that case.
+4. If all of the above are empty while `httpRoute.enabled: true`, the chart fails the render with an explicit error instead of emitting an `HTTPRoute` with an invalid empty `spec.parentRefs`, which the Gateway API rejects.
+
+Example pointing at an existing Gateway and enabling Gateway API routing for Keycloak:
+
+```yaml
+gatewayApi:
+  parentRefs:
+    - name: my-gateway
+      namespace: gateway-system
+      sectionName: https
+
+keycloak:
+  httpRoute:
+    enabled: true
+```
+
+A service can override the chart-wide default by setting its own `<service>.httpRoute.parentRefs`, which then takes precedence over `gatewayApi.parentRefs`.
+
+| Value | Description |
+| --- | --- |
+| `gatewayApi.parentRefs` | Chart-wide default `parentRefs`, used by any `HTTPRoute` that does not define its own. |
+| `<service>.httpRoute.enabled` | Enables rendering an `HTTPRoute` for the service. Disabled by default. |
+| `<service>.httpRoute.parentRefs` | Service-local `parentRefs`. Overrides `gatewayApi.parentRefs` when non-empty. |
+| `<service>.httpRoute.annotations` | Annotations added to the service's `HTTPRoute` metadata. |
+| `<service>.httpRoute.hosts` | Hostnames and paths routed to the service. Uses the Gateway API `pathType` values (`Exact`, `PathPrefix`, `RegularExpression`), which are not the same enum as the Ingress `pathType`. |
+
+#### Optionally letting the chart create its own Gateway
+
+A `Gateway` is cluster-operator-owned, shared infrastructure in the Gateway API model - normally one `Gateway` serves `HTTPRoute`s from many applications, and every self-created `Gateway` typically provisions its own LoadBalancer. For that reason `gatewayApi.gateway.enabled` defaults to `false` and bring-your-own via `gatewayApi.parentRefs` remains the primary, recommended path. Enable it for standalone/demo deployments that don't have a pre-existing shared `Gateway` to attach to:
+
+```yaml
+gatewayApi:
+  gateway:
+    enabled: true
+    className: envoy-gateway # GatewayClass name - required, no cluster-portable default
+
+keycloak:
+  httpRoute:
+    enabled: true
+```
+
+This renders one `Gateway` (named `<release-name>-gateway` unless `gatewayApi.gateway.name` is set, carrying the same `app.kubernetes.io/*`/`helm.sh/chart` labels as every other chart resource) with a fixed `http` listener and, unless `gatewayApi.gateway.tls.enabled: false`, a fixed `https` listener terminating TLS with the certificate named by `gatewayApi.gateway.tls.secretName` (defaults to `tls.secretName` / `<release-name>-tls-secret` - the same secret name the Ingress path uses, so the two can share a certificate if you point both at the same issuer). Both listeners are scoped to `host`, matching how the Ingress path is host-scoped too - required for cert-manager's [gateway-shim](https://cert-manager.io/docs/usage/gateway/) to know which hostname to request a certificate for.
+
+To have cert-manager actually issue that certificate, set `gatewayApi.gateway.issuer` or `gatewayApi.gateway.clusterIssuer`; the chart then annotates the Gateway with `cert-manager.io/issuer`/`cert-manager.io/cluster-issuer` accordingly, so gateway-shim issues the certificate independently of whether any Ingress is ever rendered. This is deliberately its own, separate setting rather than a reuse of `ingress.issuer`/`ingress.clusterIssuer`/`ingress.certificateIssuer` - Gateway API usage should not implicitly depend on the Ingress-shaped values. Point it at the same Issuer name as the Ingress path (e.g. `internal-issuer` when using the internal CA, see `internal.certificateIssuer`) to reuse that certificate, or at a different one to issue the Gateway its own. `gatewayApi.gateway.annotations` always takes precedence over the derived annotation, for full manual control. If you need more control over listeners than these opinionated defaults offer, use the bring-your-own path (`gatewayApi.parentRefs`) against a `Gateway` you manage yourself instead.
+
+The derived `parentRefs` (see step 3 above) always target the `https` listener while `gatewayApi.gateway.tls.enabled` is `true` (the default). The `http` listener is still created and its port is still exposed, but no `HTTPRoute` attaches to it automatically, and the chart does not configure an HTTP-to-HTTPS redirect. To route plain HTTP traffic for a service instead, set that service's own `<service>.httpRoute.parentRefs` with `sectionName: http` explicitly.
+
+| Value | Description |
+| --- | --- |
+| `gatewayApi.gateway.enabled` | Lets the chart create its own `Gateway` instead of requiring one to already exist. Disabled by default. |
+| `gatewayApi.gateway.name` | Name of the chart-created `Gateway`. Defaults to `<release-name>-gateway`. |
+| `gatewayApi.gateway.className` | `GatewayClass` name. Required when enabled. |
+| `gatewayApi.gateway.annotations` | Annotations added to the `Gateway` metadata. Takes precedence over the derived cert-manager annotation below. |
+| `gatewayApi.gateway.issuer` | Namespaced cert-manager `Issuer` name, annotated as `cert-manager.io/issuer`. Independent of `ingress.issuer`. |
+| `gatewayApi.gateway.clusterIssuer` | Cert-manager `ClusterIssuer` name, annotated as `cert-manager.io/cluster-issuer`. Independent of `ingress.clusterIssuer`. Ignored when `issuer` is also set. |
+| `gatewayApi.gateway.port` | Port for the fixed `http` listener. Defaults to `80`. |
+| `gatewayApi.gateway.tls.enabled` | Whether to also render the fixed `https` listener. Defaults to `true`. |
+| `gatewayApi.gateway.tls.port` | Port for the `https` listener. Defaults to `443`. |
+| `gatewayApi.gateway.tls.secretName` | TLS certificate secret for the `https` listener. Defaults to `tls.secretName` / `<release-name>-tls-secret`. |
 
 ### Additional CA Certificates
 
@@ -1781,6 +1854,7 @@ kubectl -n <namespace> debug -it pod/<pod-name> \
 | `no matches for kind "Certificate"` | cert-manager CRDs are missing. Install cert-manager with CRDs enabled. |
 | `no matches for kind "Cluster" in version "postgresql.cnpg.io/v1"` | CloudNativePG CRDs are missing. Install CloudNativePG. |
 | Ingress returns 404 | Check `host`, `paths.*`, ingress class and whether the service itself has a route for that path. |
+| HTTPRoute has no effect | Check `<service>.httpRoute.enabled`, that the Gateway API CRDs and the referenced `Gateway` exist in the cluster, and that `parentRefs` (service-local `<service>.httpRoute.parentRefs` or chart-wide `gatewayApi.parentRefs`) resolve to that `Gateway`. |
 | Pods cannot verify Keycloak TLS | Check the internal CA secret, custom CA mounts and `SSL_CERT_DIR`. |
 | `Token verification failed: expected audience ...` | Check Keycloak protocol mappers and `environment.common.OIDC_AUDIENCE`. |
 | `ABAC(model): NO_MATCH` | Check token claims, ABAC object definitions, route patterns and whether pods rolled after config changes. |
