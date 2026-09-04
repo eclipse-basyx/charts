@@ -74,7 +74,7 @@ keycloak:
       - update_digital_twin
       - delete_digital_twin
     clients:
-      - clientId: basyx-ui
+      - clientId: "{{ .Values.keycloak.webUiClientId }}"
         publicClient: true
         standardFlowEnabled: true
         implicitFlowEnabled: true
@@ -726,8 +726,8 @@ aasWebGui:
           type: oauth2
           config:
             flow: auth_code
-            issuer: "https://{{ .Values.host }}{{ .Values.paths.keycloak }}/realms/{{ .Values.keycloak.realm }}"
-            clientId: "{{ .Values.keycloak.secrets.client.name }}"
+            issuer: '{{ include "basyx.oidcIssuer" . }}'
+            clientId: "{{ .Values.keycloak.webUiClientId }}"
 
 companyLookup:
   enabled: true
