@@ -30,6 +30,13 @@ tests:
       - failedTemplate:
           errorPattern: "keycloak.issuer"
 
+  - it: fails when a structured OIDC provider issuer is not a URL
+    values:
+      - fixtures/invalid_oidc_provider_issuer.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "oidc.providers.0.issuer"
+
   - it: fails when the aas environment path does not start with a slash
     values:
       - fixtures/invalid_aas_environment_path.yaml
@@ -112,7 +119,7 @@ tests:
       - fixtures/invalid_backend_topology_spread.yaml
     asserts:
       - failedTemplate:
-          errorPattern: "maxSkew is required"
+          errorPattern: "maxSkew"
 
   - it: fails when autoscaling has no CPU request
     values:

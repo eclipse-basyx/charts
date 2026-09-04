@@ -492,6 +492,21 @@ keycloak:
   tolerations: []
   affinity: {}
 
+# Structured OIDC providers trusted by all secured BaSyx backend services.
+# Leave this list empty to preserve the default provider derived from
+# keycloak.issuer or the chart-managed Keycloak URL. Individual services can
+# replace this list through <service>.oidc.providers.
+oidc:
+  providers: []
+  # - issuer: https://login.example.org/realms/basyx
+  #   audience: basyx-api
+  #   scopes:
+  #     - email
+  #     - profile
+  #   discoveryUrl: ""
+  #   scopeClaims: []
+  #   claimMappings: []
+
 submodelRepository:
   enabled: false
   replicaCount: 1
@@ -555,6 +570,7 @@ submodelRepository:
   server: {}
   history: {}
   eventing: {}
+  oidc: {}
   resources: {}
     # limits:
     #   cpu: 500m
@@ -650,6 +666,7 @@ submodelRegistry:
   server: {}
   history: {}
   eventing: {}
+  oidc: {}
   resources: {}
     # limits:
     #   cpu: 500m
@@ -748,6 +765,7 @@ aasRegistry:
   server: {}
   history: {}
   eventing: {}
+  oidc: {}
 
   resources: {}
     # We usually recommend not to specify default resources and to leave this as a conscious
@@ -854,6 +872,7 @@ digitalTwinRegistry:
   server: {}
   history: {}
   eventing: {}
+  oidc: {}
 
   resources: {}
     # We usually recommend not to specify default resources and to leave this as a conscious
@@ -963,6 +982,7 @@ aasRepository:
   server: {}
   history: {}
   eventing: {}
+  oidc: {}
 
   resources: {}
     # limits:
@@ -1068,6 +1088,7 @@ aasEnvironment:
   server: {}
   history: {}
   eventing: {}
+  oidc: {}
 
   resources: {}
     # limits:
@@ -1180,6 +1201,7 @@ dppApi:
     integrityAnchor:
       provider: none
   eventing: {}
+  oidc: {}
 
   resources: {}
     # limits:
@@ -1270,6 +1292,7 @@ cdRepository:
   server: {}
   history: {}
   eventing: {}
+  oidc: {}
 
   resources: {}
     # limits:
@@ -1361,6 +1384,7 @@ companyLookup:
   server: {}
   history: {}
   eventing: {}
+  oidc: {}
   resources: {}
     # limits:
     #   cpu: 500m
@@ -1457,6 +1481,7 @@ aasDiscovery:
   server: {}
   history: {}
   eventing: {}
+  oidc: {}
   resources: {}
     # limits:
     #   cpu: 500m

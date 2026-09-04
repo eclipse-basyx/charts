@@ -1445,12 +1445,19 @@ annotations:
 {{- $root := .root -}}
 {{- $componentValues := get $root.Values .component | default dict -}}
 {{- $serviceConfig := get $componentValues "abac" | default dict -}}
+{{- $serviceOIDC := get $componentValues "oidc" | default dict -}}
+{{- $globalOIDC := $root.Values.oidc | default dict -}}
+{{- $globalProviders := get $globalOIDC "providers" | default list -}}
 {{- $legacyOverrides := $root.Values.abac.services | default dict -}}
 {{- $legacyConfig := get $legacyOverrides .component | default dict -}}
 {{- if hasKey $serviceConfig "trustList" -}}
 {{- tpl ($serviceConfig.trustList | toString) $root -}}
 {{- else if hasKey $legacyConfig "trustList" -}}
 {{- tpl ($legacyConfig.trustList | toString) $root -}}
+{{- else if hasKey $serviceOIDC "providers" -}}
+{{- tpl (toPrettyJson ($serviceOIDC.providers | default list)) $root -}}
+{{- else if gt (len $globalProviders) 0 -}}
+{{- tpl (toPrettyJson $globalProviders) $root -}}
 {{- else -}}
 {{- tpl (($root.Values.abac.trustList | default "[]") | toString) $root -}}
 {{- end -}}

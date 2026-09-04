@@ -1,0 +1,32 @@
+abac:
+  enabled: true
+
+oidc:
+  providers:
+    - issuer: https://identity-a.example.org/realms/basyx
+      audience: basyx-api-a
+      scopes:
+        - email
+        - profile
+    - issuer: https://identity-b.example.org/realms/basyx
+      audience: basyx-api-b
+      discoveryUrl: https://identity-b.example.org/custom/.well-known/openid-configuration
+      scopeClaims:
+        - /scope
+        - /scp
+      claimMappings:
+        - target: roles
+          mode: list
+          sources:
+            - /roles
+            - /realm_access/roles
+
+aasRepository:
+  enabled: true
+
+submodelRepository:
+  enabled: true
+  oidc:
+    providers:
+      - issuer: https://submodels.example.org/realms/basyx
+        audience: submodel-api

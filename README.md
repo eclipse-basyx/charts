@@ -1127,13 +1127,17 @@ environment:
     OIDC_AUDIENCE: basyx-api
 ```
 
-`keycloak.issuer` is used for the BaSyx backend `OIDC_ISSUER`, the Web UI OAuth2
-configuration and the default ABAC trust list. When it is empty, the chart keeps
-the existing behavior and derives the issuer from `host`, `paths.keycloak` and
-`keycloak.realm`. `keycloak.webUiClientId` identifies the public client configured
-for the Web UI. The external provider must supply this client, the configured API
-audience and all token claims referenced by the ABAC rules. If the provider uses a
-private CA, add that CA through `internal.CACertificates.trustStore`.
+`keycloak.issuer` selects the issuer used by the Web UI login, the legacy backend
+`OIDC_ISSUER` environment value and the default single-provider trust list. When
+it is empty, the chart keeps the existing behavior and derives the issuer from
+`host`, `paths.keycloak` and `keycloak.realm`. Backend token validation itself is
+driven by the mounted OIDC trust list. Use `oidc.providers` when the BaSyx services
+must accept tokens from more than one issuer.
+
+`keycloak.webUiClientId` identifies the public client configured for the Web UI.
+The external provider must supply this client, the configured API audience and all
+token claims referenced by the ABAC rules. If a provider uses a private CA, add
+that CA through `internal.CACertificates.trustStore`.
 
 | Value | Description |
 | --- | --- |
@@ -1142,6 +1146,122 @@ private CA, add that CA through `internal.CACertificates.trustStore`.
 | `keycloak.realm` | Realm used by the chart-managed Keycloak instance and by the derived issuer URL. |
 | `keycloak.webUiClientId` | OAuth2 client ID used by the AAS Web UI. |
 | `environment.common.OIDC_AUDIENCE` | Audience expected by BaSyx backend services and included in the default ABAC trust list. |
+| `oidc.providers` | Structured list of OIDC providers trusted by all secured BaSyx backend services. An empty list uses the default single-provider trust list. |
+| `<service>.oidc.providers` | Replaces the global provider list for one backend service. |
+
+#### Multiple OIDC issuers
+
+BaSyx Go always reads its accepted OIDC providers from the mounted
+`trustlist.json`. The chart offers two equivalent ways to generate that file:
+
+1. `oidc.providers` provides a structured YAML interface with Helm schema
+   validation.
+2. `abac.trustList` accepts the complete trust list as raw JSON and preserves
+   compatibility with existing or advanced configurations.
+
+Use one method per configuration scope. Both methods support multiple issuers.
+
+##### Structured provider configuration
+
+Define `oidc.providers` once for all secured backend services:
+
+```yaml
+abac:
+  enabled: true
+
+oidc:
+  providers:
+    - issuer: https://identity-a.example.org/realms/basyx
+      audience: basyx-api
+      scopes:
+        - email
+        - profile
+    - issuer: https://identity-b.example.org/realms/basyx
+      audience: basyx-api
+      scopes:
+        - email
+        - profile
+```
+
+Each service receives the global list unless it defines its own list. A
+service-local list replaces, rather than extends, the global list:
+
+```yaml
+aasEnvironment:
+  oidc:
+    providers:
+      - issuer: https://identity-a.example.org/realms/basyx
+        audience: basyx-api
+
+submodelRepository:
+  oidc:
+    providers:
+      - issuer: https://identity-b.example.org/realms/basyx
+        audience: submodel-repository
+      - issuer: https://identity-c.example.org/realms/basyx
+        audience: submodel-repository
+```
+
+##### Raw trust list configuration
+
+The equivalent global configuration can be supplied directly as the JSON
+content of `trustlist.json`:
+
+```yaml
+abac:
+  enabled: true
+  trustList: |-
+    [
+      {
+        "issuer": "https://identity-a.example.org/realms/basyx",
+        "audience": "basyx-api",
+        "scopes": ["email", "profile"]
+      },
+      {
+        "issuer": "https://identity-b.example.org/realms/basyx",
+        "audience": "basyx-api",
+        "scopes": ["email", "profile"]
+      }
+    ]
+```
+
+Override the raw trust list for an individual service under that service's
+`abac` block:
+
+```yaml
+aasEnvironment:
+  abac:
+    trustList: |-
+      [
+        {
+          "issuer": "https://identity-a.example.org/realms/basyx",
+          "audience": "basyx-api"
+        },
+        {
+          "issuer": "https://identity-b.example.org/realms/basyx",
+          "audience": "basyx-api"
+        }
+      ]
+```
+
+Supported provider properties are `issuer`, `audience`, `scopes`, `discoveryUrl`,
+`scopeClaims` and `claimMappings`. Issuer matching is exact. Omitting `audience`
+disables audience validation and is not recommended for production deployments.
+The Web UI still uses the single issuer configured through `keycloak.issuer` or
+its explicit infrastructure configuration; the provider list controls which
+tokens the backend services accept.
+
+If more than one method is configured, the chart uses the following precedence:
+
+1. `<service>.abac.trustList`
+2. Legacy `abac.services.<service>.trustList`
+3. `<service>.oidc.providers`
+4. Non-empty global `oidc.providers`
+5. Global `abac.trustList`
+6. The generated single-provider default based on the effective Keycloak issuer
+
+The first configured entry in this list supplies the complete trust list; lists
+from different levels are not merged.
 
 ### BaSyx Services
 
@@ -1726,7 +1846,12 @@ aasRepository:
       [ ]
 ```
 
-The default trust list uses the effective issuer (`keycloak.issuer` when set,
+The `trustList` value can contain one or multiple OIDC providers. See
+[Multiple OIDC issuers](#multiple-oidc-issuers) for the structured alternative,
+complete examples and configuration precedence.
+
+When no structured providers or service-specific raw trust list are configured,
+the default trust list uses the effective issuer (`keycloak.issuer` when set,
 otherwise the URL derived from `host`, `paths.keycloak` and `keycloak.realm`) and
 `environment.common.OIDC_AUDIENCE`.
 
