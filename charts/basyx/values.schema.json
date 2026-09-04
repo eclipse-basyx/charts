@@ -1151,6 +1151,10 @@
         "initialization"
       ],
       "properties": {
+        "issuer": {
+          "type": "string",
+          "pattern": "^$|^https?://[^\\s]+$"
+        },
         "realm": {
           "type": "string",
           "minLength": 1

@@ -60,6 +60,19 @@ tests:
           path: data["access-rules.json"]
           pattern: '"USEOBJECTS": \["public_description"\]'
 
+  - it: uses an external oidc issuer in the default trust list
+    set:
+      aasRepository.enabled: true
+      abac.enabled: true
+      keycloak.issuer: https://login.example.org/realms/external-basyx
+    documentSelector:
+      path: metadata.name
+      value: basyx-aas-repository-abac-config
+    asserts:
+      - matchRegex:
+          path: data["trustlist.json"]
+          pattern: '"issuer": "https://login\.example\.org/realms/external-basyx"'
+
   - it: prefers service-local ABAC overrides over global defaults
     values:
       - fixtures/service_local_abac_override.yaml

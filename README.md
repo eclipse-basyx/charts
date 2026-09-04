@@ -367,7 +367,7 @@ CloudNativePG database PVCs and manually created secrets may need separate clean
 | Value | Description |
 | --- | --- |
 | `instanceName` | Logical deployment name. Useful for templated certificate paths and UI labels. |
-| `host` | Public DNS host used by ingress, Keycloak issuer URLs and Web UI URLs. |
+| `host` | Public DNS host used by ingress, default chart-managed Keycloak issuer URLs and Web UI URLs. |
 | `nameOverride` | Overrides the chart name used in generated resource names. |
 | `fullnameOverride` | Overrides the generated release name. |
 | `paths.*` | Public URL paths for the services. All paths should start with `/`. |
@@ -1112,6 +1112,37 @@ The chart can also create roles, clients, protocol mappers and users through `ke
 The default chart values initialize a generic admin user named `basyx.admin` with the password `changeit`.
 Override `keycloak.initialization.users` and `keycloak.secrets.*` before using Keycloak in any shared or production environment.
 
+An externally managed Keycloak or compatible OIDC provider can be used without
+deploying Keycloak from this chart. Set `keycloak.enabled: false` and provide the
+complete issuer URL, including the realm or tenant path:
+
+```yaml
+keycloak:
+  enabled: false
+  issuer: https://login.example.org/realms/basyx
+  webUiClientId: basyx-ui
+
+environment:
+  common:
+    OIDC_AUDIENCE: basyx-api
+```
+
+`keycloak.issuer` is used for the BaSyx backend `OIDC_ISSUER`, the Web UI OAuth2
+configuration and the default ABAC trust list. When it is empty, the chart keeps
+the existing behavior and derives the issuer from `host`, `paths.keycloak` and
+`keycloak.realm`. `keycloak.webUiClientId` identifies the public client configured
+for the Web UI. The external provider must supply this client, the configured API
+audience and all token claims referenced by the ABAC rules. If the provider uses a
+private CA, add that CA through `internal.CACertificates.trustStore`.
+
+| Value | Description |
+| --- | --- |
+| `keycloak.enabled` | Deploys and initializes the chart-managed Keycloak instance when `true`. |
+| `keycloak.issuer` | Optional complete issuer URL for an external OIDC provider. An empty value uses the chart-derived Keycloak issuer. |
+| `keycloak.realm` | Realm used by the chart-managed Keycloak instance and by the derived issuer URL. |
+| `keycloak.webUiClientId` | OAuth2 client ID used by the AAS Web UI. |
+| `environment.common.OIDC_AUDIENCE` | Audience expected by BaSyx backend services and included in the default ABAC trust list. |
+
 ### BaSyx Services
 
 Each backend service has a similar values structure:
@@ -1695,7 +1726,9 @@ aasRepository:
       [ ]
 ```
 
-The default trust list is derived from `host`, `paths.keycloak`, `keycloak.realm` and `environment.common.OIDC_AUDIENCE`.
+The default trust list uses the effective issuer (`keycloak.issuer` when set,
+otherwise the URL derived from `host`, `paths.keycloak` and `keycloak.realm`) and
+`environment.common.OIDC_AUDIENCE`.
 
 ## Network Policies
 

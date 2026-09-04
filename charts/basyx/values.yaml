@@ -285,6 +285,9 @@ configurationService:
 
 keycloak:
   enabled: false
+  # Full OIDC issuer URL for an externally managed identity provider. When
+  # empty, the issuer is derived from host, paths.keycloak and realm.
+  issuer: ""
   realm: basyx
   webUiClientId: basyx-ui
   initJob:
@@ -310,7 +313,7 @@ keycloak:
 
     clients:
 
-      - clientId: basyx-ui
+      - clientId: "{{ .Values.keycloak.webUiClientId }}"
         publicClient: true
         standardFlowEnabled: true
         implicitFlowEnabled: true
@@ -1553,8 +1556,8 @@ aasWebGui:
           type: oauth2
           config:
             flow: auth_code
-            issuer: "https://{{ .Values.host }}{{ .Values.paths.keycloak }}/realms/{{ .Values.keycloak.realm }}"
-            clientId: "{{ .Values.keycloak.secrets.client.name }}"
+            issuer: '{{ include "basyx.oidcIssuer" . }}'
+            clientId: "{{ .Values.keycloak.webUiClientId }}"
   logos:
     light: BaSyx_Logo.svg
     dark: BaSyx_Logo.svg
@@ -1938,8 +1941,8 @@ abac:
   trustList: |
     [
       {
-        "issuer": "https://{{ .Values.host }}{{ .Values.paths.keycloak }}/realms/{{ .Values.keycloak.realm }}",
-        "audience": "{{ .Values.environment.common.OIDC_AUDIENCE | default .Values.keycloak.secrets.client.name }}",
+        "issuer": "{{ include "basyx.oidcIssuer" . }}",
+        "audience": "{{ .Values.environment.common.OIDC_AUDIENCE | default .Values.keycloak.webUiClientId }}",
         "scopes": ["email", "profile"]
       }
     ]

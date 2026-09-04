@@ -23,6 +23,18 @@ If release name contains chart name it will be used as a full name.
 {{- end }}
 {{- end }}
 
+{{/*
+Return the configured OIDC issuer. An explicit issuer supports externally
+managed identity providers; otherwise preserve the chart-managed Keycloak URL.
+*/}}
+{{- define "basyx.oidcIssuer" -}}
+{{- if .Values.keycloak.issuer -}}
+{{- .Values.keycloak.issuer -}}
+{{- else -}}
+{{- printf "https://%s%s/realms/%s" .Values.host .Values.paths.keycloak .Values.keycloak.realm -}}
+{{- end -}}
+{{- end }}
+
 {{- define "basyx-keycloak.fullname" -}}
 {{- printf "%s-keycloak" (include "basyx.fullname" .) | trunc 63 | trimSuffix "-" }}
 {{- end }}
@@ -1243,7 +1255,7 @@ annotations:
 {{- end }}
 
 {{- define "common.config.checksum" -}}
-{{- printf "%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n" (printf "https://%s%s/realms/%s" .Values.host .Values.paths.keycloak .Values.keycloak.realm) (include "common.certs.sslCertDir" .) (toYaml .Values.environment.common) (toYaml .Values.logging) (toYaml .Values.telemetry) (toYaml .Values.general) (toYaml .Values.server) (toYaml .Values.history) (toYaml .Values.eventing) (toYaml .Values.abac) | sha256sum -}}
+{{- printf "%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n" (include "basyx.oidcIssuer" . | trim) (include "common.certs.sslCertDir" .) (toYaml .Values.environment.common) (toYaml .Values.logging) (toYaml .Values.telemetry) (toYaml .Values.general) (toYaml .Values.server) (toYaml .Values.history) (toYaml .Values.eventing) (toYaml .Values.abac) | sha256sum -}}
 {{- end }}
 
 {{- define "common-database-config" -}}

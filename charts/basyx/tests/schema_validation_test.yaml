@@ -23,6 +23,13 @@ tests:
       - failedTemplate:
           errorPattern: "paths.keycloak"
 
+  - it: fails when the external keycloak issuer is not a URL
+    values:
+      - fixtures/invalid_keycloak_issuer.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "keycloak.issuer"
+
   - it: fails when the aas environment path does not start with a slash
     values:
       - fixtures/invalid_aas_environment_path.yaml
