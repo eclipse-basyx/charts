@@ -167,7 +167,7 @@ tests:
     asserts:
       - equal:
           path: spec.template.metadata.annotations["checksum/common-config"]
-          value: 9ffd8d421c6251e793cac77166cc94a2d39b064584c6f17b6aeb36f4fc2eee49
+          value: 1241e34ea4e4492244c6f1ad9040aa23796f51b2a5e0ed7f626c85baf2d70726
 
   - it: lets the common environment override configuration service logging
     template: templates/configuration-service-job.yaml

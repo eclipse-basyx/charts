@@ -38,6 +38,8 @@ Enabled components:
 {{- end }}
 {{- if .Values.keycloak.enabled }}
   - Keycloak:                   https://{{ .Values.host }}{{ .Values.paths.keycloak }}
+{{- else if .Values.keycloak.issuer }}
+  - External OIDC issuer:       {{ include "basyx.oidcIssuer" . }}
 {{- end }}
 {{- if .Values.abac.enabled }}
   - ABAC authorization:         enabled

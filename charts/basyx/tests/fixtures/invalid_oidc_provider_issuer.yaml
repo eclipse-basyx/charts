@@ -1,0 +1,3 @@
+oidc:
+  providers:
+    - issuer: not-a-url

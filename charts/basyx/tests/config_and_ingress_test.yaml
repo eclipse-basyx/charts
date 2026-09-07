@@ -66,6 +66,19 @@ tests:
           path: stringData.GENERAL_AASXMAXTHUMBNAILSIZEBYTES
           value: "16777216"
 
+  - it: renders an explicit external oidc issuer in the common secret
+    template: templates/secret.yaml
+    set:
+      aasDiscovery.enabled: true
+      keycloak.issuer: https://login.example.org/realms/external-basyx
+    documentSelector:
+      path: metadata.name
+      value: basyx-common-config
+    asserts:
+      - equal:
+          path: stringData.OIDC_ISSUER
+          value: https://login.example.org/realms/external-basyx
+
   - it: renders structured BaSyx runtime configuration into the common secret
     template: templates/secret.yaml
     documentSelector:
@@ -242,10 +255,27 @@ tests:
           pattern: "clientId: 'basyx-ui'"
       - matchRegex:
           path: data["basyx-infra.yml"]
-          pattern: 'issuer: https://basyx\.example\.com/identity-management/realms/basyx'
+          pattern: "issuer: '?https://basyx\\.example\\.com/identity-management/realms/basyx'?"
       - matchRegex:
           path: data["basyx-infra.yml"]
           pattern: 'baseUrl: https://basyx\.example\.com/aas-repository'
+
+  - it: renders external keycloak settings in the web ui infrastructure
+    template: templates/aas-web-gui/configmap-infrastructure.yaml
+    set:
+      aasWebGui.enabled: true
+      keycloak.issuer: https://login.example.org/realms/external-basyx
+      keycloak.webUiClientId: external-basyx-ui
+    documentSelector:
+      path: metadata.name
+      value: basyx-aas-web-ui-infrastructure
+    asserts:
+      - matchRegex:
+          path: data["basyx-infra.yml"]
+          pattern: "clientId: '?external-basyx-ui'?"
+      - matchRegex:
+          path: data["basyx-infra.yml"]
+          pattern: "issuer: '?https://login\\.example\\.org/realms/external-basyx'?"
 
   - it: renders Catena-X web ui infrastructure from example values
     template: templates/aas-web-gui/configmap-infrastructure.yaml

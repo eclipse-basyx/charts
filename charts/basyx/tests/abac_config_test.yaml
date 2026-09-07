@@ -60,6 +60,56 @@ tests:
           path: data["access-rules.json"]
           pattern: '"USEOBJECTS": \["public_description"\]'
 
+  - it: uses an external oidc issuer in the default trust list
+    set:
+      aasRepository.enabled: true
+      abac.enabled: true
+      keycloak.issuer: https://login.example.org/realms/external-basyx
+    documentSelector:
+      path: metadata.name
+      value: basyx-aas-repository-abac-config
+    asserts:
+      - matchRegex:
+          path: data["trustlist.json"]
+          pattern: '"issuer": "https://login\.example\.org/realms/external-basyx"'
+
+  - it: renders multiple global OIDC providers for a service
+    values:
+      - fixtures/multiple_oidc_providers.yaml
+    documentSelector:
+      path: metadata.name
+      value: basyx-aas-repository-abac-config
+    asserts:
+      - matchRegex:
+          path: data["trustlist.json"]
+          pattern: '"issuer": "https://identity-a\.example\.org/realms/basyx"'
+      - matchRegex:
+          path: data["trustlist.json"]
+          pattern: '"audience": "basyx-api-b"'
+      - matchRegex:
+          path: data["trustlist.json"]
+          pattern: '"discoveryUrl": "https://identity-b\.example\.org/custom/\.well-known/openid-configuration"'
+      - matchRegex:
+          path: data["trustlist.json"]
+          pattern: '"target": "roles"'
+
+  - it: replaces global OIDC providers with a service-local provider list
+    values:
+      - fixtures/multiple_oidc_providers.yaml
+    documentSelector:
+      path: metadata.name
+      value: basyx-submodel-repository-abac-config
+    asserts:
+      - matchRegex:
+          path: data["trustlist.json"]
+          pattern: '"issuer": "https://submodels\.example\.org/realms/basyx"'
+      - notMatchRegex:
+          path: data["trustlist.json"]
+          pattern: 'identity-a\.example\.org'
+      - notMatchRegex:
+          path: data["trustlist.json"]
+          pattern: 'identity-b\.example\.org'
+
   - it: prefers service-local ABAC overrides over global defaults
     values:
       - fixtures/service_local_abac_override.yaml
