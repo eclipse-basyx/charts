@@ -35,6 +35,11 @@ managed identity providers; otherwise preserve the chart-managed Keycloak URL.
 {{- end -}}
 {{- end }}
 
+{{/* Preserve the legacy client name unless an explicit UI client ID is set. */}}
+{{- define "basyx.webUiClientId" -}}
+{{- .Values.keycloak.webUiClientId | default .Values.keycloak.secrets.client.name -}}
+{{- end }}
+
 {{- define "basyx-keycloak.fullname" -}}
 {{- printf "%s-keycloak" (include "basyx.fullname" .) | trunc 63 | trimSuffix "-" }}
 {{- end }}

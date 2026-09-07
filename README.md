@@ -1134,7 +1134,15 @@ it is empty, the chart keeps the existing behavior and derives the issuer from
 driven by the mounted OIDC trust list. Use `oidc.providers` when the BaSyx services
 must accept tokens from more than one issuer.
 
-`keycloak.webUiClientId` identifies the public client configured for the Web UI.
+`keycloak.webUiClientId` optionally overrides the public client ID configured for
+the Web UI. When omitted or empty, it uses `keycloak.secrets.client.name`, which
+defaults to `basyx-ui`. Existing deployments that customize the legacy client name
+therefore continue to use it without adding a new value. An explicitly set
+`keycloak.webUiClientId` takes precedence, including an explicit `basyx-ui` value.
+The resolved ID is also used by the default chart-managed Keycloak client and as
+the default trust list's audience fallback when `environment.common.OIDC_AUDIENCE`
+is empty. An explicit audience or custom trust list keeps its configured value.
+
 The external provider must supply this client, the configured API audience and all
 token claims referenced by the ABAC rules. If a provider uses a private CA, add
 that CA through `internal.CACertificates.trustStore`.
@@ -1144,7 +1152,8 @@ that CA through `internal.CACertificates.trustStore`.
 | `keycloak.enabled` | Deploys and initializes the chart-managed Keycloak instance when `true`. |
 | `keycloak.issuer` | Optional complete issuer URL for an external OIDC provider. An empty value uses the chart-derived Keycloak issuer. |
 | `keycloak.realm` | Realm used by the chart-managed Keycloak instance and by the derived issuer URL. |
-| `keycloak.webUiClientId` | OAuth2 client ID used by the AAS Web UI. |
+| `keycloak.webUiClientId` | Optional OAuth2 client ID override. Empty (the default) uses `keycloak.secrets.client.name`. |
+| `keycloak.secrets.client.name` | Legacy client name and fallback for the UI client ID; defaults to `basyx-ui`. |
 | `environment.common.OIDC_AUDIENCE` | Audience expected by BaSyx backend services and included in the default ABAC trust list. |
 | `oidc.providers` | Structured list of OIDC providers trusted by all secured BaSyx backend services. An empty list uses the default single-provider trust list. |
 | `<service>.oidc.providers` | Replaces the global provider list for one backend service. |

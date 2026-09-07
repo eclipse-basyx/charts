@@ -74,7 +74,7 @@ keycloak:
       - update_digital_twin
       - delete_digital_twin
     clients:
-      - clientId: "{{ .Values.keycloak.webUiClientId }}"
+      - clientId: '{{ include `basyx.webUiClientId` . }}'
         publicClient: true
         standardFlowEnabled: true
         implicitFlowEnabled: true
@@ -727,7 +727,7 @@ aasWebGui:
           config:
             flow: auth_code
             issuer: '{{ include "basyx.oidcIssuer" . }}'
-            clientId: "{{ .Values.keycloak.webUiClientId }}"
+            clientId: '{{ include "basyx.webUiClientId" . }}'
 
 companyLookup:
   enabled: true

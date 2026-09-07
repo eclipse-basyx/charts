@@ -1087,7 +1087,7 @@
           "properties": {
             "OIDC_AUDIENCE": {
               "type": "string",
-              "minLength": 1
+              "description": "Expected audience; empty uses the resolved UI client ID in the default trust list."
             }
           }
         }
@@ -1200,7 +1200,6 @@
       "type": "object",
       "required": [
         "realm",
-        "webUiClientId",
         "service",
         "secrets",
         "initialization"
@@ -1215,8 +1214,7 @@
           "minLength": 1
         },
         "webUiClientId": {
-          "type": "string",
-          "minLength": 1
+          "type": "string"
         },
         "initJob": {
           "type": "object",

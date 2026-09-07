@@ -1,0 +1,107 @@
+suite: OIDC client ID compatibility
+release:
+  name: basyx
+templates:
+  - templates/keycloak-init-config.yaml
+  - templates/aas-web-gui/configmap-infrastructure.yaml
+  - templates/abac-configmap.yaml
+tests:
+  - it: preserves the legacy custom client name in the UI when the override is omitted
+    template: templates/aas-web-gui/configmap-infrastructure.yaml
+    set:
+      aasWebGui.enabled: true
+      keycloak.secrets.client.name: legacy-ui
+    asserts:
+      - matchRegex:
+          path: data["basyx-infra.yml"]
+          pattern: "clientId: '?legacy-ui'?"
+
+  - it: creates the managed client using the legacy custom client name
+    template: templates/keycloak-init-config.yaml
+    set:
+      keycloak.enabled: true
+      keycloak.secrets.client.name: legacy-ui
+    asserts:
+      - matchRegex:
+          path: data["clients.json"]
+          pattern: '"clientId":"legacy-ui"'
+
+  - it: preserves the legacy audience fallback when the audience is empty
+    template: templates/abac-configmap.yaml
+    set:
+      aasEnvironment.enabled: true
+      abac.enabled: true
+      keycloak.secrets.client.name: legacy-ui
+      environment.common.OIDC_AUDIENCE: ""
+    documentSelector:
+      path: metadata.name
+      value: basyx-aas-environment-abac-config
+    asserts:
+      - matchRegex:
+          path: data["trustlist.json"]
+          pattern: '"audience": "legacy-ui"'
+
+  - it: uses an explicit UI client ID even when it equals the old default
+    template: templates/aas-web-gui/configmap-infrastructure.yaml
+    set:
+      aasWebGui.enabled: true
+      keycloak.secrets.client.name: legacy-ui
+      keycloak.webUiClientId: basyx-ui
+    asserts:
+      - matchRegex:
+          path: data["basyx-infra.yml"]
+          pattern: "clientId: '?basyx-ui'?"
+
+  - it: uses the explicit override for the managed client
+    template: templates/keycloak-init-config.yaml
+    set:
+      keycloak.enabled: true
+      keycloak.secrets.client.name: legacy-ui
+      keycloak.webUiClientId: explicit-ui
+    asserts:
+      - matchRegex:
+          path: data["clients.json"]
+          pattern: '"clientId":"explicit-ui"'
+
+  - it: uses the explicit client ID as the audience fallback
+    template: templates/abac-configmap.yaml
+    set:
+      aasEnvironment.enabled: true
+      abac.enabled: true
+      keycloak.secrets.client.name: legacy-ui
+      keycloak.webUiClientId: explicit-ui
+      environment.common.OIDC_AUDIENCE: ""
+    documentSelector:
+      path: metadata.name
+      value: basyx-aas-environment-abac-config
+    asserts:
+      - matchRegex:
+          path: data["trustlist.json"]
+          pattern: '"audience": "explicit-ui"'
+
+  - it: preserves an explicitly configured audience regardless of client ID
+    template: templates/abac-configmap.yaml
+    set:
+      aasEnvironment.enabled: true
+      abac.enabled: true
+      keycloak.secrets.client.name: legacy-ui
+      keycloak.webUiClientId: explicit-ui
+      environment.common.OIDC_AUDIENCE: dedicated-api
+    documentSelector:
+      path: metadata.name
+      value: basyx-aas-environment-abac-config
+    asserts:
+      - matchRegex:
+          path: data["trustlist.json"]
+          pattern: '"audience": "dedicated-api"'
+
+  - it: accepts an explicitly empty UI client override and uses the legacy name
+    template: templates/aas-web-gui/configmap-infrastructure.yaml
+    set:
+      aasWebGui.enabled: true
+      keycloak.secrets.client.name: legacy-ui
+      keycloak.webUiClientId: ""
+    asserts:
+      - matchRegex:
+          path: data["basyx-infra.yml"]
+          pattern: "clientId: '?legacy-ui'?"
