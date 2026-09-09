@@ -1301,8 +1301,11 @@
           "properties": {
             "userProfile": { "type": "object" },
             "roles": { "type": "array" },
+            "extraRoles": { "type": "array" },
             "clients": { "type": "array" },
-            "users": { "type": "array" }
+            "extraClients": { "type": "array" },
+            "users": { "type": "array" },
+            "extraUsers": { "type": "array" }
           }
         }
       }
