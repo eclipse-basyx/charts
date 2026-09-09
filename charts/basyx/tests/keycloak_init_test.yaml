@@ -43,6 +43,41 @@ tests:
           path: data["clients.json"]
           pattern: '"clientId":"custom-basyx-ui"'
 
+  - it: appends extraClients, extraRoles and extraUsers to the defaults
+    template: templates/keycloak-init-config.yaml
+    set:
+      keycloak.enabled: true
+      keycloak.initialization.extraClients:
+        - clientId: my-service
+          serviceAccountsEnabled: true
+      keycloak.initialization.extraRoles:
+        - operator
+      keycloak.initialization.extraUsers:
+        - username: extra.user
+          enabled: true
+    documentSelector:
+      path: metadata.name
+      value: basyx-keycloak-init-config
+    asserts:
+      - matchRegex:
+          path: data["clients.json"]
+          pattern: '"clientId":"basyx-ui"'
+      - matchRegex:
+          path: data["clients.json"]
+          pattern: '"clientId":"discovery-service"'
+      - matchRegex:
+          path: data["clients.json"]
+          pattern: '"clientId":"my-service"'
+      - matchRegex:
+          path: data["roles.json"]
+          pattern: '\["admin","viewer","operator"\]'
+      - matchRegex:
+          path: data["users.json"]
+          pattern: '"username":"basyx\.admin"'
+      - matchRegex:
+          path: data["users.json"]
+          pattern: '"username":"extra\.user"'
+
   - it: renders Catena-X demo client and users for marker data loading
     template: templates/keycloak-init-config.yaml
     values:

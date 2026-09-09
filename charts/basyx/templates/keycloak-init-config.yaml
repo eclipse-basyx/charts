@@ -9,11 +9,11 @@ data:
 {{ .Values.keycloak.initialization.userProfile | default (dict) | toJson | indent 4 }}
 
   roles.json: |
-{{ .Values.keycloak.initialization.roles | default (list) | toJson | indent 4 }}
+{{ concat (.Values.keycloak.initialization.roles | default (list)) (.Values.keycloak.initialization.extraRoles | default (list)) | toJson | indent 4 }}
 
   clients.json: |
-{{ tpl (.Values.keycloak.initialization.clients | default (list) | toJson) . | indent 4 }}
+{{ tpl (concat (.Values.keycloak.initialization.clients | default (list)) (.Values.keycloak.initialization.extraClients | default (list)) | toJson) . | indent 4 }}
 
   users.json: |
-{{ .Values.keycloak.initialization.users | default (list) | toJson | indent 4 }}
+{{ concat (.Values.keycloak.initialization.users | default (list)) (.Values.keycloak.initialization.extraUsers | default (list)) | toJson | indent 4 }}
 {{- end }}
