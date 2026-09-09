@@ -1116,6 +1116,28 @@ At installation time, the chart provides `keycloak.initialization.users` to the
 initialization Job as the `users.json` entry in the Secret selected by
 `keycloak.secrets.name`. Existing values files do not require any changes.
 
+To add realm clients, roles or users without re-declaring the chart defaults,
+use `keycloak.initialization.extraClients`, `keycloak.initialization.extraRoles`
+and `keycloak.initialization.extraUsers`. Helm replaces lists instead of merging
+them, so overriding `keycloak.initialization.clients` would require copying the
+default `basyx-ui` and `discovery-service` definitions verbatim (and likewise for
+`roles` and `users`). The `extra*` values each default to `[]` and are appended
+to the corresponding default list, so existing releases render unchanged:
+
+```yaml
+keycloak:
+  initialization:
+    extraClients:
+      - clientId: my-service
+        serviceAccountsEnabled: true
+        secret: "..."
+    extraRoles:
+      - operator
+    extraUsers:
+      - username: extra.user
+        enabled: true
+```
+
 An externally managed Keycloak or compatible OIDC provider can be used without
 deploying Keycloak from this chart. Set `keycloak.enabled: false` and provide the
 complete issuer URL, including the realm or tenant path:
