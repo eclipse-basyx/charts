@@ -1,0 +1,172 @@
+# Example values for a BaSyx Go deployment where the chart creates its own
+# Gateway API `Gateway` resource, instead of requiring one to already exist
+# (see values.gatewayapi.example.yaml for that bring-your-own alternative,
+# which remains the recommended path for anything beyond a standalone/demo
+# deployment - a Gateway is normally shared cluster infrastructure, and each
+# self-created Gateway typically provisions its own LoadBalancer).
+#
+# Prerequisite: the target cluster must already have the Gateway API CRDs
+# and a Gateway API controller (e.g. Envoy Gateway, Traefik, Contour)
+# installed, with a matching GatewayClass. This chart still does not create
+# the GatewayClass or the controller itself - only the Gateway.
+#
+# Copy this file and adapt it for your own cluster:
+#
+#   cp values/values.gatewayapi-managed.example.yaml values/values.my-environment.yaml
+#
+# Do not commit real passwords, client secrets or private certificate material.
+
+instanceName: example
+host: basyx.example.com
+
+fullnameOverride: basyx
+
+tls:
+  enabled: true
+  hosts:
+    - basyx.example.com
+
+internal:
+  CACertificates:
+    trustStore:
+      useDefaultCAs: true
+      chartFileDirectory: ""
+      additionalCACertificates: ""
+  certificateIssuer:
+    name: internal-issuer
+    autocreateCa: true
+    autocreateCaSecretName: internal-issuer-ca
+    spec:
+      ca:
+        secretName: internal-issuer-ca
+
+ingress:
+  # Use this issuer when the chart should create and use its own internal CA.
+  issuer: internal-issuer
+
+  # For a production setup with an existing cert-manager ClusterIssuer, use this instead:
+  # clusterIssuer: letsencrypt-prod
+  # issuer: ""
+
+# The chart creates its own Gateway (named "basyx-gateway" here, defaults to
+# "<release-name>-gateway" if `name` is left empty) with a fixed `http`
+# listener and an `https` listener. No `gatewayApi.parentRefs` needed - it is
+# derived automatically to point at this Gateway.
+gatewayApi:
+  gateway:
+    enabled: true
+    name: basyx-gateway
+    className: envoy-gateway # GatewayClass name - matches your installed Gateway API controller
+    # Independent of ingress.issuer - point at the same Issuer name ("internal-issuer"
+    # here, matching internal.certificateIssuer below) to reuse that certificate,
+    # or at a different Issuer/ClusterIssuer to issue the Gateway its own.
+    issuer: internal-issuer
+
+database:
+  clusterName: basyx-database
+  instances: 1
+  storage:
+    size: 10Gi
+
+keycloak:
+  enabled: false
+
+abac:
+  enabled: false
+
+aasDiscovery:
+  enabled: true
+  ingress:
+    enabled: false
+  httpRoute:
+    enabled: true
+
+
+aasRegistry:
+  enabled: true
+  ingress:
+    enabled: false
+  httpRoute:
+    enabled: true
+
+
+aasRepository:
+  enabled: true
+  ingress:
+    enabled: false
+  httpRoute:
+    enabled: true
+
+
+aasEnvironment:
+  enabled: false
+
+
+dppApi:
+  enabled: false
+
+
+submodelRegistry:
+  enabled: true
+  ingress:
+    enabled: false
+  httpRoute:
+    enabled: true
+
+
+submodelRepository:
+  enabled: true
+  ingress:
+    enabled: false
+  httpRoute:
+    enabled: true
+
+
+cdRepository:
+  enabled: true
+  ingress:
+    enabled: false
+  httpRoute:
+    enabled: true
+
+
+aasWebGui:
+  enabled: true
+  ingress:
+    enabled: false
+  httpRoute:
+    enabled: true
+  infrastructureConfig:
+    infrastructures:
+      default: main
+      main:
+        name: "BaSyx Go {{ .Values.instanceName }}"
+        components:
+          aasDiscovery:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.aasDiscovery }}"
+          aasRegistry:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.aasRegistry }}"
+          submodelRegistry:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.submodelRegistry }}"
+          aasRepository:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.aasRepository }}"
+          submodelRepository:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.submodelRepository }}"
+          conceptDescriptionRepository:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.cdRepository }}"
+          companyLookup:
+            baseUrl: "https://{{ .Values.host }}{{ .Values.paths.companyLookup }}"
+        security:
+          type: None
+          config: null
+
+companyLookup:
+  enabled: true
+  ingress:
+    enabled: false
+  httpRoute:
+    enabled: true
+
+
+digitalTwinRegistry:
+  enabled: false
