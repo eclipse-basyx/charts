@@ -1282,7 +1282,7 @@ aasRepository:
   replicaCount: 1
   image:
     repository: eclipsebasyx/aasrepository-go
-    tag: "1.0.11"
+    tag: "1.0.12"
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
@@ -1809,7 +1809,7 @@ Enable the Web UI with:
 aasWebGui:
   enabled: true
   image:
-    tag: v2-260801
+    tag: v2-260910
 ```
 
 The Web UI infrastructure is rendered from `aasWebGui.infrastructureConfig`. The defaults derive service URLs from `host` and `paths.*`.
