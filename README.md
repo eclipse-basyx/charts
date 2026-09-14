@@ -209,6 +209,8 @@ Collector. It does not deploy an observability backend.
 
 Do not publish production passwords or client secrets. For public examples, use placeholders and inject real credentials through your deployment pipeline or an external secret management solution.
 
+Initial Keycloak users are configured through `keycloak.initialization.users` as before. The chart stores the complete user payload, including `credentials`, in the `keycloak.secrets.name` Kubernetes Secret and mounts it only into the Keycloak initialization Job. User passwords are not stored in the initialization ConfigMap.
+
 ## Render Before Installing
 
 Always render the chart before the first install. This catches schema errors and missing CRDs early:
