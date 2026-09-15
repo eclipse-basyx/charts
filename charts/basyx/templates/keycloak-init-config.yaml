@@ -13,7 +13,4 @@ data:
 
   clients.json: |
 {{ tpl (.Values.keycloak.initialization.clients | default (list) | toJson) . | indent 4 }}
-
-  users.json: |
-{{ .Values.keycloak.initialization.users | default (list) | toJson | indent 4 }}
 {{- end }}

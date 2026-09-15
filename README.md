@@ -1112,6 +1112,10 @@ The chart can also create roles, clients, protocol mappers and users through `ke
 The default chart values initialize a generic admin user named `basyx.admin` with the password `changeit`.
 Override `keycloak.initialization.users` and `keycloak.secrets.*` before using Keycloak in any shared or production environment.
 
+At installation time, the chart provides `keycloak.initialization.users` to the
+initialization Job as the `users.json` entry in the Secret selected by
+`keycloak.secrets.name`. Existing values files do not require any changes.
+
 An externally managed Keycloak or compatible OIDC provider can be used without
 deploying Keycloak from this chart. Set `keycloak.enabled: false` and provide the
 complete issuer URL, including the realm or tenant path:

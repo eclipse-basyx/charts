@@ -41,12 +41,21 @@ spec:
           volumeMounts:
             - name: config
               mountPath: /config
+            - name: users
+              mountPath: /credentials
+              readOnly: true
             - name: scripts
               mountPath: /scripts
       volumes:
         - name: config
           configMap:
             name: {{ include "basyx-keycloakInit.configName" . }}
+        - name: users
+          secret:
+            secretName: {{ required ".Values.keycloak.secrets.name must be set" .Values.keycloak.secrets.name }}
+            items:
+              - key: users.json
+                path: users.json
         - name: scripts
           configMap:
             name: {{ include "basyx-keycloakInit.scriptName" . }}

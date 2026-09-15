@@ -207,7 +207,7 @@ data:
 
     echo "Creating or updating users"
 
-    jq -c '.[]?' /config/users.json | while read USER
+    jq -c '.[]?' /credentials/users.json | while read USER
     do
       [ -z "$USER" ] && continue
 

@@ -5,6 +5,7 @@ templates:
   - templates/keycloak-init-config.yaml
   - templates/keycloak-init-job.yaml
   - templates/keycloak-init-script.yaml
+  - templates/keycloak/secret.yaml
   - templates/tests/keycloak-realm-test.yaml
 tests:
   - it: renders keycloak init config as json payloads
@@ -23,12 +24,28 @@ tests:
       - matchRegex:
           path: data["clients.json"]
           pattern: '"clientId":"basyx-ui"'
-      - matchRegex:
+      - notExists:
           path: data["users.json"]
-          pattern: '"username":"basyx\.admin"'
       - matchRegex:
           path: data["user-profile.json"]
           pattern: '"unmanagedAttributePolicy":"ADMIN_EDIT"'
+
+  - it: stores keycloak initialization users in a secret
+    template: templates/keycloak/secret.yaml
+    set:
+      keycloak.enabled: true
+    documentSelector:
+      path: metadata.name
+      value: keycloak-credentials
+    asserts:
+      - isKind:
+          of: Secret
+      - matchRegex:
+          path: stringData["users.json"]
+          pattern: '"username":"basyx\.admin"'
+      - matchRegex:
+          path: stringData["users.json"]
+          pattern: '"value":"changeit"'
 
   - it: uses the configured web ui client id for managed keycloak
     template: templates/keycloak-init-config.yaml
@@ -43,7 +60,7 @@ tests:
           path: data["clients.json"]
           pattern: '"clientId":"custom-basyx-ui"'
 
-  - it: renders Catena-X demo client and users for marker data loading
+  - it: renders Catena-X demo client for marker data loading
     template: templates/keycloak-init-config.yaml
     values:
       - ../../../values/values.catena-x.example.yaml
@@ -60,20 +77,33 @@ tests:
       - matchRegex:
           path: data["clients.json"]
           pattern: '"multivalued":"false"'
-      - matchRegex:
+      - notExists:
           path: data["users.json"]
+
+  - it: stores Catena-X demo users in a secret
+    template: templates/keycloak/secret.yaml
+    values:
+      - ../../../values/values.catena-x.example.yaml
+    documentSelector:
+      path: metadata.name
+      value: keycloak-credentials
+    asserts:
+      - isKind:
+          of: Secret
+      - matchRegex:
+          path: stringData["users.json"]
           pattern: '"username":"catena-x\.provider"'
       - matchRegex:
-          path: data["users.json"]
+          path: stringData["users.json"]
           pattern: '"role":\["view_digital_twin add_digital_twin update_digital_twin delete_digital_twin"\]'
       - matchRegex:
-          path: data["users.json"]
+          path: stringData["users.json"]
           pattern: '"value":"change-me"'
       - matchRegex:
-          path: data["users.json"]
+          path: stringData["users.json"]
           pattern: '"temporary":false'
       - matchRegex:
-          path: data["users.json"]
+          path: stringData["users.json"]
           pattern: '"Edc-Bpn":\["BPN_COMPANY_001"\]'
 
   - it: renders keycloak init job with release-scoped resources and secret refs
@@ -112,6 +142,23 @@ tests:
               name: basyx-keycloak-init-config
           count: 1
       - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: users
+            mountPath: /credentials
+            readOnly: true
+          count: 1
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: users
+            secret:
+              secretName: keycloak-credentials
+              items:
+                - key: users.json
+                  path: users.json
+          count: 1
+      - contains:
           path: spec.template.spec.volumes
           content:
             name: scripts
@@ -119,6 +166,18 @@ tests:
               name: basyx-keycloak-init-script
               defaultMode: 493
           count: 1
+
+  - it: reads keycloak users from the mounted secret
+    template: templates/keycloak-init-script.yaml
+    set:
+      keycloak.enabled: true
+    asserts:
+      - matchRegex:
+          path: data["init.sh"]
+          pattern: '/credentials/users\.json'
+      - notMatchRegex:
+          path: data["init.sh"]
+          pattern: '/config/users\.json'
 
   - it: renders a helm test hook that checks the keycloak realm endpoint
     template: templates/tests/keycloak-realm-test.yaml
