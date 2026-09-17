@@ -1,0 +1,33 @@
+{{- if .Values.aasDiscovery.enabled -}}
+{{- if .Values.aasDiscovery.httpRoute.enabled }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "basyx-aasDiscovery.fullname" . }}
+  labels:
+    {{- include "basyx-aasDiscovery.labels" . | nindent 4 }}
+  {{- with .Values.aasDiscovery.httpRoute.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  parentRefs:
+    {{- include "common.httpRoute.parentRefs" (dict "root" $ "parentRefs" .Values.aasDiscovery.httpRoute.parentRefs) | nindent 4 }}
+  hostnames:
+    {{- range .Values.aasDiscovery.httpRoute.hosts }}
+    - {{ tpl .host $ | quote }}
+    {{- end }}
+  rules:
+    {{- range .Values.aasDiscovery.httpRoute.hosts }}
+    {{- range .paths }}
+    - matches:
+        - path:
+            type: {{ .pathType }}
+            value: {{ tpl .path $ | quote }}
+      backendRefs:
+        - name: {{ include "basyx-aasDiscovery.fullname" $ }}
+          port: {{ $.Values.aasDiscovery.service.port }}
+    {{- end }}
+    {{- end }}
+{{- end }}
+{{- end }}
