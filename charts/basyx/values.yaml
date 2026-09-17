@@ -312,6 +312,10 @@ keycloak:
       - admin
       - viewer
 
+    # Extra roles appended to the defaults above. Helm cannot merge lists, so
+    # this lets deployments add realm roles without re-declaring the defaults.
+    extraRoles: []
+
     clients:
 
       - clientId: '{{ include `basyx.webUiClientId` . }}'
@@ -374,6 +378,10 @@ keycloak:
       - clientId: discovery-service
         serviceAccountsEnabled: true
 
+    # Extra clients appended to the defaults above. Helm cannot merge lists, so
+    # this lets deployments add realm clients without re-declaring the defaults.
+    extraClients: []
+
     users:
       - username: basyx.admin
         enabled: true
@@ -392,6 +400,10 @@ keycloak:
           - type: password
             value: changeit
             temporary: false
+
+    # Extra users appended to the defaults above. Helm cannot merge lists, so
+    # this lets deployments add realm users without re-declaring the defaults.
+    extraUsers: []
   environment:
     KC_PROXY: edge
     jgroups_dns_query: keycloak
