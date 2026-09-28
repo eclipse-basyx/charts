@@ -290,3 +290,79 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "administrators.0"
+
+  - it: honors a raw environment.common override that disables rebac
+    template: templates/aas-repository/deployment.yaml
+    set:
+      aasRepository.enabled: true
+      rebac.enabled: true
+      environment.common.REBAC_ENABLED: false
+    asserts:
+      - isKind:
+          of: Deployment
+
+  - it: validates a raw service environment override that enables rebac
+    template: templates/aas-repository/deployment.yaml
+    set:
+      aasRepository.enabled: true
+      aasRepository.environment.REBAC_ENABLED: "true"
+    asserts:
+      - failedTemplate:
+          errorPattern: "aasRepository: ReBAC requires ABAC"
+
+  - it: includes rebac values in the backend rollout checksum
+    template: templates/aas-repository/deployment.yaml
+    set:
+      aasRepository.enabled: true
+      telemetry.metricsExporter: console
+      rebac.groupClaim: roles
+    asserts:
+      - notEqual:
+          path: spec.template.metadata.annotations["checksum/common-config"]
+          value: 84bc0c810bc6c1d4cdd37031077dd251d091e02be6250122b9383876b70e2d6f
+
+  - it: lets an empty service-local list clear a global list
+    template: templates/aas-repository/deployment.yaml
+    set:
+      aasRepository.enabled: true
+      aasRepository.abac.enabled: true
+      rebac.administrators: ["https://idp.example.com|group:operators"]
+      aasRepository.rebac.administrators: []
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: REBAC_ADMINISTRATORS
+            value: ""
+          count: 1
+
+  - it: defaults the MQTT client ID when a raw sinks override enables mqtt
+    template: templates/aas-repository/deployment.yaml
+    set:
+      aasRepository.enabled: true
+      eventing.sinks: [kafka]
+      environment.common.BASYX_EVENTING_SINKS: "kafka, mqtt"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BASYX_EVENTING_MQTT_CLIENT_ID
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          count: 1
+
+  - it: does not set an MQTT client ID when a raw sinks override removes mqtt
+    template: templates/aas-repository/deployment.yaml
+    set:
+      aasRepository.enabled: true
+      eventing.sinks: [mqtt]
+      aasRepository.environment.BASYX_EVENTING_SINKS: kafka
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BASYX_EVENTING_MQTT_CLIENT_ID
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name

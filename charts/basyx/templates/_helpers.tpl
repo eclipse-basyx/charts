@@ -398,9 +398,51 @@ Only keys present in the values are rendered, so values.yaml holds the defaults.
 {{- end }}
 
 {{/*
+Resolve a nested runtime section of a values map as YAML; missing sections
+resolve to an empty map.
+*/}}
+{{- define "basyx.runtimeEnv.lookupSection" -}}
+{{- $config := .values | default dict -}}
+{{- range $segment := .path }}
+{{- $config = get $config $segment | default dict -}}
+{{- end }}
+{{- toYaml $config -}}
+{{- end }}
+
+{{/*
+Resolve the effective value of a runtime setting for a backend service with
+the precedence of the rendered environment: raw service environment,
+structured service value, raw environment.common, structured global value.
+Lists resolve to their comma-separated form.
+*/}}
+{{- define "basyx.runtimeEnv.effectiveValue" -}}
+{{- $root := .root -}}
+{{- $values := .values | default dict -}}
+{{- $serviceEnv := $values.environment | default dict -}}
+{{- $commonEnv := $root.Values.environment.common | default dict -}}
+{{- $service := include "basyx.runtimeEnv.lookupSection" (dict "values" $values "path" .path) | fromYaml -}}
+{{- $global := include "basyx.runtimeEnv.lookupSection" (dict "values" $root.Values "path" .path) | fromYaml -}}
+{{- $value := get $global .key -}}
+{{- if hasKey $serviceEnv .name -}}
+{{- $value = get $serviceEnv .name -}}
+{{- else if hasKey $service .key -}}
+{{- $value = get $service .key -}}
+{{- else if hasKey $commonEnv .name -}}
+{{- $value = get $commonEnv .name -}}
+{{- end -}}
+{{- if kindIs "slice" $value -}}
+{{- join "," $value -}}
+{{- else if not (kindIs "invalid" $value) -}}
+{{- toString $value -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Render the nested runtime sections of a values map, either as common-config
 Secret entries or as container env entries. Keys already present in the raw
-overrides map are skipped; lists are comma-separated and omitted when empty.
+overrides map are skipped and lists are comma-separated. Empty lists are
+omitted from the common-config Secret but rendered as empty container
+overrides, so a service can clear a global list.
 */}}
 {{- define "basyx.runtimeEnv.sectionEntries" -}}
 {{- $root := .root -}}
@@ -408,14 +450,11 @@ overrides map are skipped; lists are comma-separated and omitted when empty.
 {{- $overrides := .overrides | default dict -}}
 {{- $container := .container -}}
 {{- range $mapping := include "basyx.runtimeEnv.sectionMappings" $root | fromYamlArray }}
-{{- $config := $values -}}
-{{- range $segment := $mapping.path }}
-{{- $config = get $config $segment | default dict -}}
-{{- end }}
+{{- $config := include "basyx.runtimeEnv.lookupSection" (dict "values" $values "path" $mapping.path) | fromYaml -}}
 {{- range $key, $name := $mapping.env }}
 {{- if and (hasKey $config $key) (not (hasKey $overrides $name)) }}
 {{- $value := get $config $key }}
-{{- if not (and (kindIs "slice" $value) (empty $value)) }}
+{{- if or $container (not (and (kindIs "slice" $value) (empty $value))) }}
 {{- $rendered := "" }}
 {{- if kindIs "slice" $value }}
 {{- $rendered = join "," $value }}
@@ -440,16 +479,11 @@ service connects with a unique ID. An explicit clientId or raw environment
 override disables this default.
 */}}
 {{- define "basyx.eventing.mqttClientIdEnv" -}}
-{{- $root := .root -}}
-{{- $values := .values | default dict -}}
-{{- $environment := $values.environment | default dict -}}
-{{- $common := $root.Values.environment.common | default dict -}}
-{{- $global := $root.Values.eventing | default dict -}}
-{{- $service := $values.eventing | default dict -}}
-{{- $sinks := ternary (get $service "sinks") (get $global "sinks") (hasKey $service "sinks") -}}
-{{- $clientId := dig "mqtt" "clientId" (dig "mqtt" "clientId" "" $global) $service -}}
-{{- $overridden := or (hasKey $environment "BASYX_EVENTING_MQTT_CLIENT_ID") (hasKey $common "BASYX_EVENTING_MQTT_CLIENT_ID") -}}
-{{- if and (has "mqtt" ($sinks | default list)) (empty $clientId) (not $overridden) }}
+{{- $environment := .values.environment | default dict -}}
+{{- $sinks := include "basyx.runtimeEnv.effectiveValue" (dict "root" .root "values" .values "path" (list "eventing") "key" "sinks" "name" "BASYX_EVENTING_SINKS") -}}
+{{- $clientId := include "basyx.runtimeEnv.effectiveValue" (dict "root" .root "values" .values "path" (list "eventing" "mqtt") "key" "clientId" "name" "BASYX_EVENTING_MQTT_CLIENT_ID") -}}
+{{- $mqttEnabled := has "mqtt" (splitList "," (nospace $sinks)) -}}
+{{- if and $mqttEnabled (empty (trim $clientId)) (not (hasKey $environment "BASYX_EVENTING_MQTT_CLIENT_ID")) }}
 - name: BASYX_EVENTING_MQTT_CLIENT_ID
   valueFrom:
     fieldRef:
@@ -465,10 +499,10 @@ Registry do not support ReBAC and ignore the setting.
 {{- define "basyx.rebac.validate" -}}
 {{- $root := .root -}}
 {{- if not (has .component (list "companyLookup" "digitalTwinRegistry")) -}}
-{{- $service := get (get $root.Values .component | default dict) "rebac" | default dict -}}
-{{- $enabled := ternary (get $service "enabled") ($root.Values.rebac | default dict).enabled (hasKey $service "enabled") -}}
-{{- if and $enabled (ne (include "basyx.abac.enabled" (dict "root" $root "component" .component)) "true") -}}
-{{- fail (printf "%s: ReBAC requires ABAC; enable abac.enabled or %s.abac.enabled, or disable %s.rebac.enabled" .component .component .component) -}}
+{{- $values := get $root.Values .component | default dict -}}
+{{- $enabled := include "basyx.runtimeEnv.effectiveValue" (dict "root" $root "values" $values "path" (list "rebac") "key" "enabled" "name" "REBAC_ENABLED") | trim -}}
+{{- if and (has $enabled (list "1" "t" "T" "true" "TRUE" "True")) (ne (include "basyx.abac.enabled" (dict "root" $root "component" .component)) "true") -}}
+{{- fail (printf "%s: ReBAC requires ABAC; enable abac.enabled or %s.abac.enabled, or disable ReBAC for %s" .component .component .component) -}}
 {{- end -}}
 {{- end -}}
 {{- end }}
@@ -1488,7 +1522,7 @@ alone is enough without also duplicating parentRefs.
 {{- end }}
 
 {{- define "common.config.checksum" -}}
-{{- printf "%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n" (include "basyx.oidcIssuer" . | trim) (include "common.certs.sslCertDir" .) (toYaml .Values.environment.common) (toYaml .Values.logging) (toYaml .Values.telemetry) (toYaml .Values.general) (toYaml .Values.server) (toYaml .Values.history) (toYaml .Values.eventing) (toYaml .Values.abac) | sha256sum -}}
+{{- printf "%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n" (include "basyx.oidcIssuer" . | trim) (include "common.certs.sslCertDir" .) (toYaml .Values.environment.common) (toYaml .Values.logging) (toYaml .Values.telemetry) (toYaml .Values.general) (toYaml .Values.server) (toYaml .Values.history) (toYaml .Values.eventing) (toYaml .Values.abac) (toYaml .Values.rebac) | sha256sum -}}
 {{- end }}
 
 {{- define "common-database-config" -}}
