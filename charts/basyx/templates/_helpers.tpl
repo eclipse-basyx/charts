@@ -324,7 +324,18 @@ Render service-local BaSyx runtime overrides as explicit container env values.
 {{- include "basyx.serviceRuntimeEnv.listEntry" (dict "environment" $environment "config" $eventing "key" "sinks" "name" "BASYX_EVENTING_SINKS") }}
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $eventing "key" "outboxEnabled" "name" "BASYX_EVENTING_OUTBOX_ENABLED") }}
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $eventing "key" "topicPrefix" "name" "BASYX_EVENTING_TOPIC_PREFIX") }}
-{{- include "basyx.runtimeEnv.sectionEntries" (dict "root" $root "values" $values "overrides" $environment "container" true) }}
+{{- $mqttClientIdFallback := include "basyx.eventing.mqttClientIdFallback" (dict "root" $root "values" $values) -}}
+{{- $sectionOverrides := $environment -}}
+{{- if $mqttClientIdFallback -}}
+{{- $sectionOverrides = merge (dict "BASYX_EVENTING_MQTT_CLIENT_ID" "") $environment -}}
+{{- end }}
+{{- include "basyx.runtimeEnv.sectionEntries" (dict "root" $root "values" $values "overrides" $sectionOverrides "container" true) }}
+{{- if $mqttClientIdFallback }}
+- name: BASYX_EVENTING_MQTT_CLIENT_ID
+  valueFrom:
+    fieldRef:
+      fieldPath: metadata.name
+{{- end }}
 {{- end }}
 
 {{/*
@@ -413,7 +424,8 @@ resolve to an empty map.
 Resolve the effective value of a runtime setting for a backend service with
 the precedence of the rendered environment: raw service environment,
 structured service value, raw environment.common, structured global value.
-Lists resolve to their comma-separated form.
+Scalars are rendered like the emitted environment, including templates; lists
+resolve to their comma-separated form.
 */}}
 {{- define "basyx.runtimeEnv.effectiveValue" -}}
 {{- $root := .root -}}
@@ -433,8 +445,16 @@ Lists resolve to their comma-separated form.
 {{- if kindIs "slice" $value -}}
 {{- join "," $value -}}
 {{- else if not (kindIs "invalid" $value) -}}
-{{- toString $value -}}
+{{- include "basyx.configValue" (dict "root" $root "value" $value) -}}
 {{- end -}}
+{{- end }}
+
+{{/*
+Return "true" when a rendered value is a true boolean for BaSyx Go
+(strconv.ParseBool semantics).
+*/}}
+{{- define "basyx.runtimeEnv.isTrue" -}}
+{{- if has (trim .) (list "1" "t" "T" "true" "TRUE" "True") -}}true{{- end -}}
 {{- end }}
 
 {{/*
@@ -474,21 +494,15 @@ overrides, so a service can clear a global list.
 {{- end }}
 
 {{/*
-Default the MQTT client ID to the pod name so that every replica of every
-service connects with a unique ID. An explicit clientId or raw environment
-override disables this default.
+Return "true" when a service publishes to MQTT without an effective client ID.
+The pod name is then used so that every replica of every service connects with
+a unique ID. A raw service environment override disables this default.
 */}}
-{{- define "basyx.eventing.mqttClientIdEnv" -}}
+{{- define "basyx.eventing.mqttClientIdFallback" -}}
 {{- $environment := .values.environment | default dict -}}
 {{- $sinks := include "basyx.runtimeEnv.effectiveValue" (dict "root" .root "values" .values "path" (list "eventing") "key" "sinks" "name" "BASYX_EVENTING_SINKS") -}}
 {{- $clientId := include "basyx.runtimeEnv.effectiveValue" (dict "root" .root "values" .values "path" (list "eventing" "mqtt") "key" "clientId" "name" "BASYX_EVENTING_MQTT_CLIENT_ID") -}}
-{{- $mqttEnabled := has "mqtt" (splitList "," (nospace $sinks)) -}}
-{{- if and $mqttEnabled (empty (trim $clientId)) (not (hasKey $environment "BASYX_EVENTING_MQTT_CLIENT_ID")) }}
-- name: BASYX_EVENTING_MQTT_CLIENT_ID
-  valueFrom:
-    fieldRef:
-      fieldPath: metadata.name
-{{- end }}
+{{- if and (has "mqtt" (splitList "," (nospace $sinks))) (empty (trim $clientId)) (not (hasKey $environment "BASYX_EVENTING_MQTT_CLIENT_ID")) -}}true{{- end -}}
 {{- end }}
 
 {{/*
@@ -500,10 +514,31 @@ Registry do not support ReBAC and ignore the setting.
 {{- $root := .root -}}
 {{- if not (has .component (list "companyLookup" "digitalTwinRegistry")) -}}
 {{- $values := get $root.Values .component | default dict -}}
-{{- $enabled := include "basyx.runtimeEnv.effectiveValue" (dict "root" $root "values" $values "path" (list "rebac") "key" "enabled" "name" "REBAC_ENABLED") | trim -}}
-{{- if and (has $enabled (list "1" "t" "T" "true" "TRUE" "True")) (ne (include "basyx.abac.enabled" (dict "root" $root "component" .component)) "true") -}}
+{{- $enabled := include "basyx.runtimeEnv.effectiveValue" (dict "root" $root "values" $values "path" (list "rebac") "key" "enabled" "name" "REBAC_ENABLED") -}}
+{{- if and (include "basyx.runtimeEnv.isTrue" $enabled) (not (include "basyx.abac.effectiveEnabled" (dict "root" $root "component" .component "values" $values))) -}}
 {{- fail (printf "%s: ReBAC requires ABAC; enable abac.enabled or %s.abac.enabled, or disable ReBAC for %s" .component .component .component) -}}
 {{- end -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+Return "true" when a backend container effectively runs with ABAC: the chart
+emits ABAC_ENABLED=true for structured ABAC, otherwise the raw service
+environment or environment.common decides.
+*/}}
+{{- define "basyx.abac.effectiveEnabled" -}}
+{{- if eq (include "basyx.abac.enabled" (dict "root" .root "component" .component)) "true" -}}
+true
+{{- else -}}
+{{- $serviceEnv := .values.environment | default dict -}}
+{{- $commonEnv := .root.Values.environment.common | default dict -}}
+{{- $raw := "" -}}
+{{- if hasKey $serviceEnv "ABAC_ENABLED" -}}
+{{- $raw = get $serviceEnv "ABAC_ENABLED" -}}
+{{- else if hasKey $commonEnv "ABAC_ENABLED" -}}
+{{- $raw = get $commonEnv "ABAC_ENABLED" -}}
+{{- end -}}
+{{- include "basyx.runtimeEnv.isTrue" (include "basyx.configValue" (dict "root" .root "value" $raw)) -}}
 {{- end -}}
 {{- end }}
 
@@ -636,7 +671,6 @@ spec:
             - name: SERVER_CONTEXTPATH
               value: {{ index $root.Values.paths .component | quote }}
             {{- include "basyx.serviceRuntimeEnv" (dict "root" $root "values" $values) | nindent 12 }}
-            {{- include "basyx.eventing.mqttClientIdEnv" (dict "root" $root "values" $values) | nindent 12 }}
             {{- range $key, $value := $values.environment | default dict }}
             - name: {{ $key }}
               value: {{ tpl (print $value) $root | quote }}

@@ -366,3 +366,70 @@ tests:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.name
+
+  - it: emits a single MQTT client ID entry for an empty service-local client ID
+    template: templates/aas-repository/deployment.yaml
+    set:
+      aasRepository.enabled: true
+      eventing.sinks: [mqtt]
+      aasRepository.eventing.mqtt.clientId: ""
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BASYX_EVENTING_MQTT_CLIENT_ID
+            value: ""
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BASYX_EVENTING_MQTT_CLIENT_ID
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          count: 1
+
+  - it: evaluates templates in raw sink overrides for the MQTT client ID default
+    template: templates/aas-repository/deployment.yaml
+    set:
+      aasRepository.enabled: true
+      environment.common.BASYX_EVENTING_SINKS: '{{ "mqtt" }}'
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BASYX_EVENTING_MQTT_CLIENT_ID
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          count: 1
+
+  - it: accepts rebac with abac enabled through environment.common
+    template: templates/aas-repository/deployment.yaml
+    set:
+      aasRepository.enabled: true
+      rebac.enabled: true
+      environment.common.ABAC_ENABLED: true
+    asserts:
+      - isKind:
+          of: Deployment
+
+  - it: accepts rebac with abac enabled through the service environment
+    template: templates/aas-repository/deployment.yaml
+    set:
+      aasRepository.enabled: true
+      rebac.enabled: true
+      aasRepository.environment.ABAC_ENABLED: "True"
+    asserts:
+      - isKind:
+          of: Deployment
+
+  - it: rejects rebac when a raw service override disables abac
+    template: templates/aas-repository/deployment.yaml
+    set:
+      aasRepository.enabled: true
+      rebac.enabled: true
+      environment.common.ABAC_ENABLED: true
+      aasRepository.environment.ABAC_ENABLED: false
+    asserts:
+      - failedTemplate:
+          errorPattern: "aasRepository: ReBAC requires ABAC"
