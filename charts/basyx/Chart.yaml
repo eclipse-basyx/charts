@@ -3,10 +3,10 @@ name: basyx
 description: >
   Helm chart for deploying Eclipse BaSyx Go Components on Kubernetes,
   including AAS registries, repositories, discovery service, and optional
-  Keycloak authentication with ABAC authorization.
+  Keycloak authentication with ABAC and ReBAC authorization.
 type: application
-version: 3.14.0
-appVersion: "1.0.12"
+version: 3.15.0
+appVersion: "1.1.0"
 home: https://github.com/eclipse-basyx/charts
 sources:
   - https://github.com/eclipse-basyx/charts

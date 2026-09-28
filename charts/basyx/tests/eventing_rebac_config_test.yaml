@@ -1,0 +1,435 @@
+suite: eventing and rebac config
+release:
+  name: basyx
+templates:
+  - templates/secret.yaml
+  - templates/aas-repository/deployment.yaml
+  - templates/company-lookup/deployment.yaml
+tests:
+  - it: renders eventing transports, feed and rebac into the common secret
+    template: templates/secret.yaml
+    set:
+      aasRepository.enabled: true
+      general.delegatedOperationResponseMaxSizeBytes: 4194304
+      eventing.enabled: true
+      eventing.outboxEnabled: true
+      eventing.sinks: [mqtt, kafka, amqp]
+      eventing.sourceBaseUrl: https://basyx.example.com/aas-repository
+      eventing.mqtt.broker: tls://mosquitto:8883
+      eventing.mqtt.qos: 2
+      eventing.mqtt.passwordFile: /eventing/mqtt/password
+      eventing.kafka.brokers: [kafka-0:9092, kafka-1:9092]
+      eventing.kafka.saslMechanism: SCRAM-SHA-512
+      eventing.kafka.producerBatchMaxBytes: 2097152
+      eventing.amqp.broker: amqps://rabbitmq:5671
+      eventing.amqp.address: /queues/basyx.events
+      eventing.amqp.hostName: vhost:basyx
+      eventing.feed.enabled: true
+      eventing.feed.maxAgeDays: 7
+      abac.enabled: true
+      rebac.enabled: true
+      rebac.subjectClaim: oid
+      rebac.groupClaim: basyx.groups
+      rebac.administrators:
+        - https://idp.example.com|group:operators
+        - https://idp.example.com|alice
+    asserts:
+      - equal:
+          path: stringData.GENERAL_DELEGATEDOPERATIONRESPONSEMAXSIZEBYTES
+          value: "4194304"
+      - equal:
+          path: stringData.BASYX_EVENTING_SINKS
+          value: mqtt,kafka,amqp
+      - equal:
+          path: stringData.BASYX_EVENTING_SOURCE_BASE_URL
+          value: https://basyx.example.com/aas-repository
+      - equal:
+          path: stringData.BASYX_EVENTING_MQTT_BROKER
+          value: tls://mosquitto:8883
+      - equal:
+          path: stringData.BASYX_EVENTING_MQTT_QOS
+          value: "2"
+      - equal:
+          path: stringData.BASYX_EVENTING_MQTT_SINK_ID
+          value: mqtt
+      - equal:
+          path: stringData.BASYX_EVENTING_MQTT_PASSWORD_FILE
+          value: /eventing/mqtt/password
+      - equal:
+          path: stringData.BASYX_EVENTING_KAFKA_BROKERS
+          value: kafka-0:9092,kafka-1:9092
+      - equal:
+          path: stringData.BASYX_EVENTING_KAFKA_TOPIC
+          value: basyx.events
+      - equal:
+          path: stringData.BASYX_EVENTING_KAFKA_SASL_MECHANISM
+          value: SCRAM-SHA-512
+      - equal:
+          path: stringData.BASYX_EVENTING_KAFKA_PRODUCER_BATCH_MAX_BYTES
+          value: "2097152"
+      - equal:
+          path: stringData.BASYX_EVENTING_AMQP_BROKER
+          value: amqps://rabbitmq:5671
+      - equal:
+          path: stringData.BASYX_EVENTING_AMQP_ADDRESS
+          value: /queues/basyx.events
+      - equal:
+          path: stringData.BASYX_EVENTING_AMQP_HOST_NAME
+          value: vhost:basyx
+      - equal:
+          path: stringData.BASYX_EVENTING_FEED_ENABLED
+          value: "true"
+      - equal:
+          path: stringData.BASYX_EVENTING_FEED_MAX_AGE_DAYS
+          value: "7"
+      - equal:
+          path: stringData.BASYX_EVENTING_FEED_PUBLISH_INTERVAL_MILLIS
+          value: "250"
+      - equal:
+          path: stringData.REBAC_ENABLED
+          value: "true"
+      - equal:
+          path: stringData.REBAC_SUBJECT_CLAIM
+          value: oid
+      - equal:
+          path: stringData.REBAC_GROUP_CLAIM
+          value: basyx.groups
+      - equal:
+          path: stringData.REBAC_ADMINISTRATORS
+          value: https://idp.example.com|group:operators,https://idp.example.com|alice
+
+  - it: renders defaults and omits empty lists
+    template: templates/secret.yaml
+    set:
+      aasRepository.enabled: true
+    asserts:
+      - equal:
+          path: stringData.GENERAL_DELEGATEDOPERATIONRESPONSEMAXSIZEBYTES
+          value: "1048576"
+      - equal:
+          path: stringData.REBAC_ENABLED
+          value: "false"
+      - equal:
+          path: stringData.REBAC_SUBJECT_CLAIM
+          value: sub
+      - equal:
+          path: stringData.BASYX_EVENTING_FEED_ENABLED
+          value: "false"
+      - notExists:
+          path: stringData.REBAC_ADMINISTRATORS
+      - notExists:
+          path: stringData.BASYX_EVENTING_KAFKA_BROKERS
+
+  - it: lets environment.common override structured eventing and rebac values
+    template: templates/secret.yaml
+    set:
+      aasRepository.enabled: true
+      eventing.mqtt.broker: mqtt://structured:1883
+      rebac.subjectClaim: sub
+      environment.common.BASYX_EVENTING_MQTT_BROKER: mqtt://raw:1883
+      environment.common.REBAC_SUBJECT_CLAIM: oid
+    asserts:
+      - equal:
+          path: stringData.BASYX_EVENTING_MQTT_BROKER
+          value: mqtt://raw:1883
+      - equal:
+          path: stringData.REBAC_SUBJECT_CLAIM
+          value: oid
+
+  - it: defaults the MQTT client ID to the pod name when the mqtt sink is enabled
+    template: templates/aas-repository/deployment.yaml
+    set:
+      aasRepository.enabled: true
+      eventing.enabled: true
+      eventing.outboxEnabled: true
+      eventing.sinks: [mqtt]
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BASYX_EVENTING_MQTT_CLIENT_ID
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          count: 1
+
+  - it: keeps an explicit MQTT client ID
+    template: templates/aas-repository/deployment.yaml
+    set:
+      aasRepository.enabled: true
+      eventing.sinks: [mqtt]
+      aasRepository.eventing.mqtt.clientId: aas-repository-1
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BASYX_EVENTING_MQTT_CLIENT_ID
+            value: aas-repository-1
+          count: 1
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BASYX_EVENTING_MQTT_CLIENT_ID
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+
+  - it: does not set an MQTT client ID without the mqtt sink
+    template: templates/aas-repository/deployment.yaml
+    set:
+      aasRepository.enabled: true
+      eventing.sinks: [kafka]
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BASYX_EVENTING_MQTT_CLIENT_ID
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+
+  - it: renders service-local eventing and rebac overrides
+    template: templates/aas-repository/deployment.yaml
+    set:
+      aasRepository.enabled: true
+      aasRepository.abac.enabled: true
+      aasRepository.rebac.enabled: true
+      aasRepository.rebac.administrators[0]: https://idp.example.com|group:aas-admins
+      aasRepository.eventing.feed.enabled: true
+      aasRepository.eventing.kafka.topic: aas.events
+      aasRepository.general.delegatedOperationResponseMaxSizeBytes: 2097152
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: REBAC_ENABLED
+            value: "true"
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: REBAC_ADMINISTRATORS
+            value: https://idp.example.com|group:aas-admins
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BASYX_EVENTING_FEED_ENABLED
+            value: "true"
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BASYX_EVENTING_KAFKA_TOPIC
+            value: aas.events
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GENERAL_DELEGATEDOPERATIONRESPONSEMAXSIZEBYTES
+            value: "2097152"
+          count: 1
+
+  - it: lets the raw service environment override structured rebac values
+    template: templates/aas-repository/deployment.yaml
+    set:
+      aasRepository.enabled: true
+      aasRepository.abac.enabled: true
+      aasRepository.rebac.groupClaim: roles
+      aasRepository.environment.REBAC_GROUP_CLAIM: basyx.groups
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: REBAC_GROUP_CLAIM
+            value: basyx.groups
+          count: 1
+
+  - it: fails when rebac is enabled without abac
+    template: templates/aas-repository/deployment.yaml
+    set:
+      aasRepository.enabled: true
+      rebac.enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: "aasRepository: ReBAC requires ABAC"
+
+  - it: accepts rebac when a service-local abac override enables abac
+    template: templates/aas-repository/deployment.yaml
+    set:
+      aasRepository.enabled: true
+      aasRepository.abac.enabled: true
+      rebac.enabled: true
+    asserts:
+      - isKind:
+          of: Deployment
+
+  - it: ignores rebac for company lookup, which does not support it
+    template: templates/company-lookup/deployment.yaml
+    set:
+      companyLookup.enabled: true
+      rebac.enabled: true
+    asserts:
+      - isKind:
+          of: Deployment
+
+  - it: rejects unsupported eventing sinks
+    template: templates/secret.yaml
+    set:
+      aasRepository.enabled: true
+      eventing.sinks: [nats]
+    asserts:
+      - failedTemplate:
+          errorPattern: "eventing.sinks.0"
+
+  - it: rejects malformed rebac administrators
+    template: templates/secret.yaml
+    set:
+      aasRepository.enabled: true
+      rebac.administrators: [alice]
+    asserts:
+      - failedTemplate:
+          errorPattern: "administrators.0"
+
+  - it: honors a raw environment.common override that disables rebac
+    template: templates/aas-repository/deployment.yaml
+    set:
+      aasRepository.enabled: true
+      rebac.enabled: true
+      environment.common.REBAC_ENABLED: false
+    asserts:
+      - isKind:
+          of: Deployment
+
+  - it: validates a raw service environment override that enables rebac
+    template: templates/aas-repository/deployment.yaml
+    set:
+      aasRepository.enabled: true
+      aasRepository.environment.REBAC_ENABLED: "true"
+    asserts:
+      - failedTemplate:
+          errorPattern: "aasRepository: ReBAC requires ABAC"
+
+  - it: includes rebac values in the backend rollout checksum
+    template: templates/aas-repository/deployment.yaml
+    set:
+      aasRepository.enabled: true
+      telemetry.metricsExporter: console
+      rebac.groupClaim: roles
+    asserts:
+      - notEqual:
+          path: spec.template.metadata.annotations["checksum/common-config"]
+          value: 84bc0c810bc6c1d4cdd37031077dd251d091e02be6250122b9383876b70e2d6f
+
+  - it: lets an empty service-local list clear a global list
+    template: templates/aas-repository/deployment.yaml
+    set:
+      aasRepository.enabled: true
+      aasRepository.abac.enabled: true
+      rebac.administrators: ["https://idp.example.com|group:operators"]
+      aasRepository.rebac.administrators: []
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: REBAC_ADMINISTRATORS
+            value: ""
+          count: 1
+
+  - it: defaults the MQTT client ID when a raw sinks override enables mqtt
+    template: templates/aas-repository/deployment.yaml
+    set:
+      aasRepository.enabled: true
+      eventing.sinks: [kafka]
+      environment.common.BASYX_EVENTING_SINKS: "kafka, mqtt"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BASYX_EVENTING_MQTT_CLIENT_ID
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          count: 1
+
+  - it: does not set an MQTT client ID when a raw sinks override removes mqtt
+    template: templates/aas-repository/deployment.yaml
+    set:
+      aasRepository.enabled: true
+      eventing.sinks: [mqtt]
+      aasRepository.environment.BASYX_EVENTING_SINKS: kafka
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BASYX_EVENTING_MQTT_CLIENT_ID
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+
+  - it: emits a single MQTT client ID entry for an empty service-local client ID
+    template: templates/aas-repository/deployment.yaml
+    set:
+      aasRepository.enabled: true
+      eventing.sinks: [mqtt]
+      aasRepository.eventing.mqtt.clientId: ""
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BASYX_EVENTING_MQTT_CLIENT_ID
+            value: ""
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BASYX_EVENTING_MQTT_CLIENT_ID
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          count: 1
+
+  - it: evaluates templates in raw sink overrides for the MQTT client ID default
+    template: templates/aas-repository/deployment.yaml
+    set:
+      aasRepository.enabled: true
+      environment.common.BASYX_EVENTING_SINKS: '{{ "mqtt" }}'
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BASYX_EVENTING_MQTT_CLIENT_ID
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          count: 1
+
+  - it: accepts rebac with abac enabled through environment.common
+    template: templates/aas-repository/deployment.yaml
+    set:
+      aasRepository.enabled: true
+      rebac.enabled: true
+      environment.common.ABAC_ENABLED: true
+    asserts:
+      - isKind:
+          of: Deployment
+
+  - it: accepts rebac with abac enabled through the service environment
+    template: templates/aas-repository/deployment.yaml
+    set:
+      aasRepository.enabled: true
+      rebac.enabled: true
+      aasRepository.environment.ABAC_ENABLED: "True"
+    asserts:
+      - isKind:
+          of: Deployment
+
+  - it: rejects rebac when a raw service override disables abac
+    template: templates/aas-repository/deployment.yaml
+    set:
+      aasRepository.enabled: true
+      rebac.enabled: true
+      environment.common.ABAC_ENABLED: true
+      aasRepository.environment.ABAC_ENABLED: false
+    asserts:
+      - failedTemplate:
+          errorPattern: "aasRepository: ReBAC requires ABAC"

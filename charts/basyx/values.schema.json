@@ -756,6 +756,7 @@
         "server": { "$ref": "#/properties/server" },
         "history": { "$ref": "#/properties/history" },
         "eventing": { "$ref": "#/properties/eventing" },
+        "rebac": { "$ref": "#/properties/rebac" },
         "database": { "$ref": "#/definitions/serviceDatabase" },
         "oidc": { "$ref": "#/definitions/oidcConfig" },
         "abac": {
@@ -1393,6 +1394,7 @@
           "items": { "type": "string" }
         },
         "uploadMaxSizeBytes": { "type": "integer", "minimum": 1 },
+        "delegatedOperationResponseMaxSizeBytes": { "type": "integer", "minimum": 1 },
         "aasxMaxPartCount": { "type": "integer", "minimum": 1 },
         "aasxMaxOPCMetadataSizeBytes": { "type": "integer", "minimum": 1 },
         "aasxMaxPartExpandedSizeBytes": { "type": "integer", "minimum": 1 },
@@ -1463,10 +1465,98 @@
         "format": { "type": "string" },
         "sinks": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1 }
+          "uniqueItems": true,
+          "items": { "type": "string", "enum": ["mqtt", "kafka", "amqp"] }
         },
         "outboxEnabled": { "type": "boolean" },
-        "topicPrefix": { "type": "string" }
+        "topicPrefix": { "type": "string" },
+        "sourceBaseUrl": { "type": "string" },
+        "schemaBaseUrl": { "type": "string" },
+        "mqtt": {
+          "type": "object",
+          "properties": {
+            "broker": { "type": "string", "pattern": "^$|^(mqtt|tls)://" },
+            "clientId": { "type": "string" },
+            "sinkId": { "type": "string", "minLength": 1 },
+            "qos": { "type": "integer", "enum": [0, 1, 2] },
+            "retained": { "type": "boolean" },
+            "username": { "type": "string" },
+            "password": { "type": "string" },
+            "usernameFile": { "type": "string" },
+            "passwordFile": { "type": "string" },
+            "caFile": { "type": "string" },
+            "certificateFile": { "type": "string" },
+            "keyFile": { "type": "string" }
+          }
+        },
+        "kafka": {
+          "type": "object",
+          "properties": {
+            "brokers": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "topic": { "type": "string", "minLength": 1 },
+            "sinkId": { "type": "string", "minLength": 1 },
+            "clientId": { "type": "string", "minLength": 1 },
+            "producerBatchMaxBytes": {
+              "oneOf": [
+                { "type": "integer", "const": 0 },
+                { "type": "integer", "minimum": 512, "maximum": 1073741824 }
+              ]
+            },
+            "tlsEnabled": { "type": "boolean" },
+            "caFile": { "type": "string" },
+            "certificateFile": { "type": "string" },
+            "keyFile": { "type": "string" },
+            "saslMechanism": { "type": "string", "enum": ["", "PLAIN", "SCRAM-SHA-256", "SCRAM-SHA-512"] },
+            "username": { "type": "string" },
+            "password": { "type": "string" },
+            "usernameFile": { "type": "string" },
+            "passwordFile": { "type": "string" }
+          }
+        },
+        "amqp": {
+          "type": "object",
+          "properties": {
+            "broker": { "type": "string", "pattern": "^$|^amqps?://" },
+            "address": { "type": "string" },
+            "sinkId": { "type": "string", "minLength": 1 },
+            "hostName": { "type": "string" },
+            "username": { "type": "string" },
+            "password": { "type": "string" },
+            "usernameFile": { "type": "string" },
+            "passwordFile": { "type": "string" },
+            "caFile": { "type": "string" },
+            "certificateFile": { "type": "string" },
+            "keyFile": { "type": "string" }
+          }
+        },
+        "feed": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "maxAgeDays": { "type": "integer", "minimum": 0 },
+            "hardDeleteGraceDays": { "type": "integer", "minimum": 0 },
+            "maxPageSize": { "type": "integer", "minimum": 0 },
+            "sourceBaseUrl": { "type": "string" },
+            "schemaBaseUrl": { "type": "string" },
+            "cleanupIntervalHours": { "type": "integer", "minimum": 0 },
+            "publishIntervalMillis": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    },
+    "rebac": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "subjectClaim": { "type": "string", "minLength": 1 },
+        "groupClaim": { "type": "string", "minLength": 1 },
+        "administrators": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[^|,]+\\|[^|,]+$" }
+        }
       }
     },
     "proxy": {
