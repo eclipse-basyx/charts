@@ -210,6 +210,7 @@ The environment.common map remains the escape hatch and takes precedence.
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_TRUSTPROXYHEADERS" "value" (dig "trustProxyHeaders" false $general)) }}
 {{- include "basyx.commonConfig.listEntry" (dict "common" $common "name" "GENERAL_TRUSTEDPROXYCIDRS" "value" (dig "trustedProxyCIDRs" (list) $general)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_UPLOADMAXSIZEBYTES" "value" (dig "uploadMaxSizeBytes" 134217728 $general)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_DELEGATEDOPERATIONRESPONSEMAXSIZEBYTES" "value" (dig "delegatedOperationResponseMaxSizeBytes" 1048576 $general)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_AASXMAXPARTCOUNT" "value" (dig "aasxMaxPartCount" 10000 $general)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_AASXMAXOPCMETADATASIZEBYTES" "value" (dig "aasxMaxOPCMetadataSizeBytes" 16777216 $general)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "GENERAL_AASXMAXPARTEXPANDEDSIZEBYTES" "value" (dig "aasxMaxPartExpandedSizeBytes" 134217728 $general)) }}
@@ -251,6 +252,7 @@ The environment.common map remains the escape hatch and takes precedence.
 {{- include "basyx.commonConfig.listEntry" (dict "common" $common "name" "BASYX_EVENTING_SINKS" "value" (dig "sinks" (list) $eventing)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "BASYX_EVENTING_OUTBOX_ENABLED" "value" (dig "outboxEnabled" false $eventing)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "BASYX_EVENTING_TOPIC_PREFIX" "value" (dig "topicPrefix" "basyx" $eventing)) }}
+{{- include "basyx.runtimeEnv.sectionEntries" (dict "root" $root "values" .Values "overrides" $common "container" false) }}
 {{- end }}
 
 {{/*
@@ -280,6 +282,7 @@ Render service-local BaSyx runtime overrides as explicit container env values.
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "trustProxyHeaders" "name" "GENERAL_TRUSTPROXYHEADERS") }}
 {{- include "basyx.serviceRuntimeEnv.listEntry" (dict "environment" $environment "config" $general "key" "trustedProxyCIDRs" "name" "GENERAL_TRUSTEDPROXYCIDRS") }}
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "uploadMaxSizeBytes" "name" "GENERAL_UPLOADMAXSIZEBYTES") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "delegatedOperationResponseMaxSizeBytes" "name" "GENERAL_DELEGATEDOPERATIONRESPONSEMAXSIZEBYTES") }}
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "aasxMaxPartCount" "name" "GENERAL_AASXMAXPARTCOUNT") }}
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "aasxMaxOPCMetadataSizeBytes" "name" "GENERAL_AASXMAXOPCMETADATASIZEBYTES") }}
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $general "key" "aasxMaxPartExpandedSizeBytes" "name" "GENERAL_AASXMAXPARTEXPANDEDSIZEBYTES") }}
@@ -321,6 +324,153 @@ Render service-local BaSyx runtime overrides as explicit container env values.
 {{- include "basyx.serviceRuntimeEnv.listEntry" (dict "environment" $environment "config" $eventing "key" "sinks" "name" "BASYX_EVENTING_SINKS") }}
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $eventing "key" "outboxEnabled" "name" "BASYX_EVENTING_OUTBOX_ENABLED") }}
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $eventing "key" "topicPrefix" "name" "BASYX_EVENTING_TOPIC_PREFIX") }}
+{{- include "basyx.runtimeEnv.sectionEntries" (dict "root" $root "values" $values "overrides" $environment "container" true) }}
+{{- end }}
+
+{{/*
+Nested BaSyx runtime sections and the environment variables of their keys.
+Only keys present in the values are rendered, so values.yaml holds the defaults.
+*/}}
+{{- define "basyx.runtimeEnv.sectionMappings" -}}
+- path: [eventing]
+  env:
+    sourceBaseUrl: BASYX_EVENTING_SOURCE_BASE_URL
+    schemaBaseUrl: BASYX_EVENTING_SCHEMA_BASE_URL
+- path: [eventing, mqtt]
+  env:
+    broker: BASYX_EVENTING_MQTT_BROKER
+    clientId: BASYX_EVENTING_MQTT_CLIENT_ID
+    sinkId: BASYX_EVENTING_MQTT_SINK_ID
+    qos: BASYX_EVENTING_MQTT_QOS
+    retained: BASYX_EVENTING_MQTT_RETAINED
+    username: BASYX_EVENTING_MQTT_USERNAME
+    password: BASYX_EVENTING_MQTT_PASSWORD
+    usernameFile: BASYX_EVENTING_MQTT_USERNAME_FILE
+    passwordFile: BASYX_EVENTING_MQTT_PASSWORD_FILE
+    caFile: BASYX_EVENTING_MQTT_CA_FILE
+    certificateFile: BASYX_EVENTING_MQTT_CERTIFICATE_FILE
+    keyFile: BASYX_EVENTING_MQTT_KEY_FILE
+- path: [eventing, kafka]
+  env:
+    brokers: BASYX_EVENTING_KAFKA_BROKERS
+    topic: BASYX_EVENTING_KAFKA_TOPIC
+    sinkId: BASYX_EVENTING_KAFKA_SINK_ID
+    clientId: BASYX_EVENTING_KAFKA_CLIENT_ID
+    producerBatchMaxBytes: BASYX_EVENTING_KAFKA_PRODUCER_BATCH_MAX_BYTES
+    tlsEnabled: BASYX_EVENTING_KAFKA_TLS_ENABLED
+    caFile: BASYX_EVENTING_KAFKA_CA_FILE
+    certificateFile: BASYX_EVENTING_KAFKA_CERTIFICATE_FILE
+    keyFile: BASYX_EVENTING_KAFKA_KEY_FILE
+    saslMechanism: BASYX_EVENTING_KAFKA_SASL_MECHANISM
+    username: BASYX_EVENTING_KAFKA_USERNAME
+    password: BASYX_EVENTING_KAFKA_PASSWORD
+    usernameFile: BASYX_EVENTING_KAFKA_USERNAME_FILE
+    passwordFile: BASYX_EVENTING_KAFKA_PASSWORD_FILE
+- path: [eventing, amqp]
+  env:
+    broker: BASYX_EVENTING_AMQP_BROKER
+    address: BASYX_EVENTING_AMQP_ADDRESS
+    sinkId: BASYX_EVENTING_AMQP_SINK_ID
+    hostName: BASYX_EVENTING_AMQP_HOST_NAME
+    username: BASYX_EVENTING_AMQP_USERNAME
+    password: BASYX_EVENTING_AMQP_PASSWORD
+    usernameFile: BASYX_EVENTING_AMQP_USERNAME_FILE
+    passwordFile: BASYX_EVENTING_AMQP_PASSWORD_FILE
+    caFile: BASYX_EVENTING_AMQP_CA_FILE
+    certificateFile: BASYX_EVENTING_AMQP_CERTIFICATE_FILE
+    keyFile: BASYX_EVENTING_AMQP_KEY_FILE
+- path: [eventing, feed]
+  env:
+    enabled: BASYX_EVENTING_FEED_ENABLED
+    maxAgeDays: BASYX_EVENTING_FEED_MAX_AGE_DAYS
+    hardDeleteGraceDays: BASYX_EVENTING_FEED_HARD_DELETE_GRACE_DAYS
+    maxPageSize: BASYX_EVENTING_FEED_MAX_PAGE_SIZE
+    sourceBaseUrl: BASYX_EVENTING_FEED_SOURCE_BASE_URL
+    schemaBaseUrl: BASYX_EVENTING_FEED_SCHEMA_BASE_URL
+    cleanupIntervalHours: BASYX_EVENTING_FEED_CLEANUP_INTERVAL_HOURS
+    publishIntervalMillis: BASYX_EVENTING_FEED_PUBLISH_INTERVAL_MILLIS
+- path: [rebac]
+  env:
+    enabled: REBAC_ENABLED
+    subjectClaim: REBAC_SUBJECT_CLAIM
+    groupClaim: REBAC_GROUP_CLAIM
+    administrators: REBAC_ADMINISTRATORS
+{{- end }}
+
+{{/*
+Render the nested runtime sections of a values map, either as common-config
+Secret entries or as container env entries. Keys already present in the raw
+overrides map are skipped; lists are comma-separated and omitted when empty.
+*/}}
+{{- define "basyx.runtimeEnv.sectionEntries" -}}
+{{- $root := .root -}}
+{{- $values := .values | default dict -}}
+{{- $overrides := .overrides | default dict -}}
+{{- $container := .container -}}
+{{- range $mapping := include "basyx.runtimeEnv.sectionMappings" $root | fromYamlArray }}
+{{- $config := $values -}}
+{{- range $segment := $mapping.path }}
+{{- $config = get $config $segment | default dict -}}
+{{- end }}
+{{- range $key, $name := $mapping.env }}
+{{- if and (hasKey $config $key) (not (hasKey $overrides $name)) }}
+{{- $value := get $config $key }}
+{{- if not (and (kindIs "slice" $value) (empty $value)) }}
+{{- $rendered := "" }}
+{{- if kindIs "slice" $value }}
+{{- $rendered = join "," $value }}
+{{- else }}
+{{- $rendered = include "basyx.configValue" (dict "root" $root "value" $value) }}
+{{- end }}
+{{- if $container }}
+- name: {{ $name }}
+  value: {{ $rendered | quote }}
+{{- else }}
+{{ $name }}: {{ $rendered | quote }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{/*
+Default the MQTT client ID to the pod name so that every replica of every
+service connects with a unique ID. An explicit clientId or raw environment
+override disables this default.
+*/}}
+{{- define "basyx.eventing.mqttClientIdEnv" -}}
+{{- $root := .root -}}
+{{- $values := .values | default dict -}}
+{{- $environment := $values.environment | default dict -}}
+{{- $common := $root.Values.environment.common | default dict -}}
+{{- $global := $root.Values.eventing | default dict -}}
+{{- $service := $values.eventing | default dict -}}
+{{- $sinks := ternary (get $service "sinks") (get $global "sinks") (hasKey $service "sinks") -}}
+{{- $clientId := dig "mqtt" "clientId" (dig "mqtt" "clientId" "" $global) $service -}}
+{{- $overridden := or (hasKey $environment "BASYX_EVENTING_MQTT_CLIENT_ID") (hasKey $common "BASYX_EVENTING_MQTT_CLIENT_ID") -}}
+{{- if and (has "mqtt" ($sinks | default list)) (empty $clientId) (not $overridden) }}
+- name: BASYX_EVENTING_MQTT_CLIENT_ID
+  valueFrom:
+    fieldRef:
+      fieldPath: metadata.name
+{{- end }}
+{{- end }}
+
+{{/*
+ReBAC extends ABAC, so BaSyx Go refuses to start a service with ReBAC but
+without ABAC. Fail at render time instead. Company Lookup and Digital Twin
+Registry do not support ReBAC and ignore the setting.
+*/}}
+{{- define "basyx.rebac.validate" -}}
+{{- $root := .root -}}
+{{- if not (has .component (list "companyLookup" "digitalTwinRegistry")) -}}
+{{- $service := get (get $root.Values .component | default dict) "rebac" | default dict -}}
+{{- $enabled := ternary (get $service "enabled") ($root.Values.rebac | default dict).enabled (hasKey $service "enabled") -}}
+{{- if and $enabled (ne (include "basyx.abac.enabled" (dict "root" $root "component" .component)) "true") -}}
+{{- fail (printf "%s: ReBAC requires ABAC; enable abac.enabled or %s.abac.enabled, or disable %s.rebac.enabled" .component .component .component) -}}
+{{- end -}}
+{{- end -}}
 {{- end }}
 
 {{/*
@@ -380,6 +530,7 @@ It also renders the service HPA when autoscaling is enabled.
 {{- $values := index $root.Values .component -}}
 {{- $autoscaling := $values.autoscaling | default dict -}}
 {{- $abac := dict "root" $root "component" .component "nameSuffix" .nameSuffix -}}
+{{- include "basyx.rebac.validate" (dict "root" $root "component" .component) -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -451,6 +602,7 @@ spec:
             - name: SERVER_CONTEXTPATH
               value: {{ index $root.Values.paths .component | quote }}
             {{- include "basyx.serviceRuntimeEnv" (dict "root" $root "values" $values) | nindent 12 }}
+            {{- include "basyx.eventing.mqttClientIdEnv" (dict "root" $root "values" $values) | nindent 12 }}
             {{- range $key, $value := $values.environment | default dict }}
             - name: {{ $key }}
               value: {{ tpl (print $value) $root | quote }}

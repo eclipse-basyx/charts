@@ -335,6 +335,15 @@ helm diff upgrade basyx charts/basyx \
   -f values/values.example.yaml
 ```
 
+### Upgrading to chart 3.15.0
+
+Chart 3.15.0 uses BaSyx Go 1.1.0 by default. It adds the `rebac` values for
+experimental relationship-based access control and models all eventing settings,
+including MQTT, Kafka, AMQP and the REST Event Feed. ReBAC and eventing stay
+disabled by default. The BaSyx Configuration Service job migrates the database
+schema before the updated services start. See
+[Eventing Values](#eventing-values) and [ReBAC Authorization](#rebac-authorization).
+
 ### Upgrading to chart 3.6.0
 
 Chart 3.6.0 changes the BaSyx Go per-pod PostgreSQL pool defaults from 500 open and idle connections to 50 open and 25 idle connections. This prevents a small number of replicas from exhausting a typical PostgreSQL connection budget, but workloads that relied on the previous limits can see more request queuing after the upgrade.
@@ -1381,7 +1390,7 @@ aasRepository:
   replicaCount: 1
   image:
     repository: eclipsebasyx/aasrepository-go
-    tag: "1.0.12"
+    tag: "1.1.0"
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
@@ -1403,7 +1412,7 @@ Supported service blocks:
 - `companyLookup`
 - `digitalTwinRegistry`
 
-Most service blocks support `enabled`, `replicaCount`, `autoscaling`, `image.*`, `imagePullSecrets`, `service.*`, `ingress.*`, `resources`, `nodeSelector`, `tolerations`, `affinity`, `topologySpreadConstraints`, `podAnnotations`, `podLabels`, `podSecurityContext`, `securityContext`, `volumes`, `volumeMounts` and optional service-local `server`, `history`, `eventing`, `general` and `abac` overrides.
+Most service blocks support `enabled`, `replicaCount`, `autoscaling`, `image.*`, `imagePullSecrets`, `service.*`, `ingress.*`, `resources`, `nodeSelector`, `tolerations`, `affinity`, `topologySpreadConstraints`, `podAnnotations`, `podLabels`, `podSecurityContext`, `securityContext`, `volumes`, `volumeMounts` and optional service-local `server`, `history`, `eventing`, `general`, `abac` and `rebac` overrides.
 
 Use topology spread constraints to distribute replicas across nodes or zones. A
 dedicated pod label keeps the selector independent of the Helm release name:
@@ -1821,6 +1830,7 @@ Raw environment maps are the escape hatch and take precedence over structured va
 | `general.trustProxyHeaders` | `GENERAL_TRUSTPROXYHEADERS` | Trusts forwarded proxy headers. Only enable behind trusted reverse proxies. |
 | `general.trustedProxyCIDRs` | `GENERAL_TRUSTEDPROXYCIDRS` | Comma-separated trusted proxy CIDR list. |
 | `general.uploadMaxSizeBytes` | `GENERAL_UPLOADMAXSIZEBYTES` | Maximum compressed HTTP request size, including multipart overhead, in bytes. Must be greater than `0`. |
+| `general.delegatedOperationResponseMaxSizeBytes` | `GENERAL_DELEGATEDOPERATIONRESPONSEMAXSIZEBYTES` | Maximum JSON response size in bytes from a delegated Submodel Operation in the Submodel Repository and AAS Environment. Defaults to `1048576`. Responses are buffered in memory. |
 | `general.aasxMaxPartCount` | `GENERAL_AASXMAXPARTCOUNT` | Maximum number of non-directory entries in an AASX package. |
 | `general.aasxMaxOPCMetadataSizeBytes` | `GENERAL_AASXMAXOPCMETADATASIZEBYTES` | Maximum combined expanded size of AASX OPC metadata. |
 | `general.aasxMaxPartExpandedSizeBytes` | `GENERAL_AASXMAXPARTEXPANDEDSIZEBYTES` | Maximum expanded size of one AASX payload part. |
@@ -1882,15 +1892,124 @@ aasRepository:
 
 #### Eventing Values
 
+BaSyx Go can publish AAS, asset, Submodel and PCN changes as CloudEvents over
+MQTT 5, Kafka and AMQP 1.0, and serve them through the REST Event Feed. Eventing
+is experimental, disabled by default and supported by `aasRepository`,
+`submodelRepository` and `aasEnvironment`.
+
+A broker transport requires `eventing.enabled: true`, `eventing.outboxEnabled: true`
+and the transport in `eventing.sinks`. Several transports can run at the same
+time. Pending events are stored in PostgreSQL and delivered at least once.
+
+```yaml
+general:
+  externalUrl: https://basyx.example.com/aas-environment
+
+eventing:
+  enabled: true
+  outboxEnabled: true
+  sinks: [mqtt]
+  mqtt:
+    broker: tls://mosquitto.messaging.svc:8883
+    usernameFile: /eventing/mqtt/username
+    passwordFile: /eventing/mqtt/password
+
+aasEnvironment:
+  volumes:
+    - name: mqtt-credentials
+      secret:
+        secretName: basyx-mqtt-credentials
+  volumeMounts:
+    - name: mqtt-credentials
+      mountPath: /eventing/mqtt
+      readOnly: true
+```
+
+Event sources and schema links default to `general.externalUrl`. Set it, or
+`eventing.sourceBaseUrl`, to the public API base URL of the service.
+
+Credentials set directly in the values are stored in the chart's
+`<release>-common-config` Secret. For externally managed Secrets, mount them
+with service `volumes` and `volumeMounts` and use the `*File` settings as shown
+above.
+
 | Value | Rendered environment variable | Description |
 | --- | --- | --- |
 | `eventing.enabled` | `BASYX_EVENTING_ENABLED` | Enables event publishing. |
-| `eventing.format` | `BASYX_EVENTING_FORMAT` | Event payload format, default `cloudevents`. |
-| `eventing.sinks` | `BASYX_EVENTING_SINKS` | Comma-separated sink list. |
-| `eventing.outboxEnabled` | `BASYX_EVENTING_OUTBOX_ENABLED` | Enables outbox processing. |
-| `eventing.topicPrefix` | `BASYX_EVENTING_TOPIC_PREFIX` | Event topic prefix. |
+| `eventing.format` | `BASYX_EVENTING_FORMAT` | Event payload format. Only `cloudevents` is supported. |
+| `eventing.sinks` | `BASYX_EVENTING_SINKS` | Comma-separated transports: `mqtt`, `kafka`, `amqp`. |
+| `eventing.outboxEnabled` | `BASYX_EVENTING_OUTBOX_ENABLED` | Enables the transactional outbox. Required for every transport. |
+| `eventing.topicPrefix` | `BASYX_EVENTING_TOPIC_PREFIX` | MQTT topic prefix. Default `basyx`. |
+| `eventing.sourceBaseUrl` | `BASYX_EVENTING_SOURCE_BASE_URL` | Optional event source base URL. Defaults to `general.externalUrl`. |
+| `eventing.schemaBaseUrl` | `BASYX_EVENTING_SCHEMA_BASE_URL` | Optional base URL of the hosted event schemas. |
 
-The current BaSyx Go implementation may fail fast when event publishing or outbox processing is enabled before a matching implementation is available. Keep `eventing.enabled: false` unless you intentionally deploy a compatible eventing setup.
+MQTT settings under `eventing.mqtt` (environment prefix `BASYX_EVENTING_MQTT_`):
+
+| Value | Environment suffix | Default | Description |
+| --- | --- | --- | --- |
+| `broker` | `BROKER` | `""` | Required. `mqtt://host:port` or `tls://host:port` without credentials. |
+| `clientId` | `CLIENT_ID` | `""` | Must be unique per connecting process. Empty uses the pod name, so every replica gets its own ID. |
+| `sinkId` | `SINK_ID` | `mqtt` | Stable delivery queue identifier. Must differ from the other transports' sink IDs. |
+| `qos` | `QOS` | `1` | MQTT QoS `0`, `1` or `2`. |
+| `retained` | `RETAINED` | `false` | Publishes retained messages. |
+| `username`, `password` | `USERNAME`, `PASSWORD` | `""` | Optional credentials. |
+| `usernameFile`, `passwordFile` | `USERNAME_FILE`, `PASSWORD_FILE` | `""` | Mounted credential files. Use either a value or its file. |
+| `caFile` | `CA_FILE` | `""` | Optional PEM CA bundle. Requires a `tls://` broker. |
+| `certificateFile`, `keyFile` | `CERTIFICATE_FILE`, `KEY_FILE` | `""` | Optional client certificate and key for mutual TLS. Set both. |
+
+Kafka settings under `eventing.kafka` (environment prefix `BASYX_EVENTING_KAFKA_`):
+
+| Value | Environment suffix | Default | Description |
+| --- | --- | --- | --- |
+| `brokers` | `BROKERS` | `[]` | Required bootstrap brokers as `host:port`. |
+| `topic` | `TOPIC` | `basyx.events` | Topic for all event families. Create it before enabling the sink. |
+| `sinkId` | `SINK_ID` | `kafka` | Stable delivery queue identifier. |
+| `clientId` | `CLIENT_ID` | `basyx` | Client name reported to Kafka. |
+| `producerBatchMaxBytes` | `PRODUCER_BATCH_MAX_BYTES` | `0` | `0` uses the client default; otherwise `512` to `1073741824`. |
+| `tlsEnabled` | `TLS_ENABLED` | `false` | Enables TLS 1.2 or later with certificate verification. |
+| `caFile` | `CA_FILE` | `""` | Optional PEM CA bundle. Requires `tlsEnabled`. |
+| `certificateFile`, `keyFile` | `CERTIFICATE_FILE`, `KEY_FILE` | `""` | Optional client certificate and key for mutual TLS. Set both. |
+| `saslMechanism` | `SASL_MECHANISM` | `""` | Empty disables SASL; otherwise `PLAIN`, `SCRAM-SHA-256` or `SCRAM-SHA-512`. |
+| `username`, `password` | `USERNAME`, `PASSWORD` | `""` | SASL credentials. |
+| `usernameFile`, `passwordFile` | `USERNAME_FILE`, `PASSWORD_FILE` | `""` | Mounted SASL credential files. |
+
+AMQP 1.0 settings under `eventing.amqp` (environment prefix `BASYX_EVENTING_AMQP_`):
+
+| Value | Environment suffix | Default | Description |
+| --- | --- | --- | --- |
+| `broker` | `BROKER` | `""` | Required. `amqp://host[:port]` or `amqps://host[:port]` without credentials. |
+| `address` | `ADDRESS` | `""` | Required target address, e.g. `/queues/basyx.events` for RabbitMQ 4. BaSyx does not create queues or exchanges. |
+| `sinkId` | `SINK_ID` | `amqp` | Stable delivery queue identifier. |
+| `hostName` | `HOST_NAME` | `""` | Optional AMQP connection hostname, e.g. `vhost:<name>` for RabbitMQ. |
+| `username`, `password` | `USERNAME`, `PASSWORD` | `""` | Optional SASL PLAIN credentials. Set both. |
+| `usernameFile`, `passwordFile` | `USERNAME_FILE`, `PASSWORD_FILE` | `""` | Mounted credential files. |
+| `caFile` | `CA_FILE` | `""` | Optional PEM CA bundle. Requires `amqps`. |
+| `certificateFile`, `keyFile` | `CERTIFICATE_FILE`, `KEY_FILE` | `""` | Optional client certificate and key for mutual TLS. Requires `amqps`. |
+
+REST Event Feed settings under `eventing.feed` (environment prefix `BASYX_EVENTING_FEED_`).
+The feed works without `eventing.enabled` and adds `GET /events` and
+`/.well-known/event-feed.json` to the service:
+
+| Value | Environment suffix | Default | Description |
+| --- | --- | --- | --- |
+| `enabled` | `ENABLED` | `false` | Enables the REST Event Feed. |
+| `maxAgeDays` | `MAX_AGE_DAYS` | `30` | Visible retention window in days. |
+| `hardDeleteGraceDays` | `HARD_DELETE_GRACE_DAYS` | `10` | Additional days before physical deletion. `0` disables the delay. |
+| `maxPageSize` | `MAX_PAGE_SIZE` | `100` | Default and maximum page size. |
+| `sourceBaseUrl` | `SOURCE_BASE_URL` | `""` | Legacy alias of `eventing.sourceBaseUrl`. If both are set, they must match. |
+| `schemaBaseUrl` | `SCHEMA_BASE_URL` | `""` | Legacy alias of `eventing.schemaBaseUrl`. If both are set, they must match. |
+| `cleanupIntervalHours` | `CLEANUP_INTERVAL_HOURS` | `24` | Physical cleanup interval. |
+| `publishIntervalMillis` | `PUBLISH_INTERVAL_MILLIS` | `250` | Interval for publishing committed events to the feed. |
+
+All eventing values can be overridden per service, for example to enable the
+feed only on the AAS Environment:
+
+```yaml
+aasEnvironment:
+  eventing:
+    feed:
+      enabled: true
+```
 
 #### ABAC Runtime Values
 
@@ -1899,6 +2018,15 @@ The current BaSyx Go implementation may fail fast when event publishing or outbo
 | `abac.policyFileImport` | `ABAC_POLICY_FILE_IMPORT` | Controls startup import behavior for ABAC policy files, e.g. `always`, `if_missing` or `never`. Empty value keeps the service default. |
 | `abac.policyScope` | `ABAC_POLICY_SCOPE` | Optional database namespace for stored ABAC policies. Empty value keeps the service default scope. Use different scopes to isolate deployments that share a database. |
 | `abac.managementApi.enabled` | `ABAC_MANAGEMENT_API_ENABLED` | Enables the ABAC management API where supported. |
+
+#### ReBAC Runtime Values
+
+| Value | Rendered environment variable | Default | Description |
+| --- | --- | --- | --- |
+| `rebac.enabled` | `REBAC_ENABLED` | `false` | Enables relationship-based access control. Requires ABAC. |
+| `rebac.subjectClaim` | `REBAC_SUBJECT_CLAIM` | `sub` | Access token claim with a stable user identifier. |
+| `rebac.groupClaim` | `REBAC_GROUP_CLAIM` | `groups` | Access token claim with group names. Use `basyx.<target>` for claims mapped in the trust list. |
+| `rebac.administrators` | `REBAC_ADMINISTRATORS` | `[]` | Bootstrap and recovery administrators as `issuer\|subject` or `issuer\|group:<name>`. Rendered comma-separated. |
 
 ### AAS Web UI
 
@@ -1962,6 +2090,43 @@ When no structured providers or service-specific raw trust list are configured,
 the default trust list uses the effective issuer (`keycloak.issuer` when set,
 otherwise the URL derived from `host`, `paths.keycloak` and `keycloak.realm`) and
 `environment.common.OIDC_AUDIENCE`.
+
+### ReBAC Authorization
+
+Relationship-based access control (ReBAC) lets users share their own shells,
+Submodels, Concept Descriptions, descriptors, discovery entries and DPPs with
+other users or groups without editing the ABAC policy. ReBAC is experimental
+and runs as a strict union with ABAC: a request is allowed when ABAC or ReBAC
+allows it. A ReBAC grant is not limited by ABAC filters or masks on the shared
+resource.
+
+ReBAC requires ABAC on every service where it is enabled. The chart fails to
+render otherwise. Relationships are stored in the shared BaSyx database, so
+enable ReBAC consistently on all services using it:
+
+```yaml
+abac:
+  enabled: true
+
+rebac:
+  enabled: true
+  subjectClaim: sub
+  groupClaim: groups
+  administrators:
+    - "https://basyx.example.com/identity-management/realms/basyx|group:basyx-admins"
+```
+
+`rebac.enabled` applies to `aasDiscovery`, `aasRegistry`, `aasRepository`,
+`aasEnvironment`, `dppApi`, `submodelRegistry`, `submodelRepository` and
+`cdRepository`. `companyLookup` and `digitalTwinRegistry` do not support ReBAC
+and ignore it. Services can override the global settings via `<service>.rebac`.
+
+The access token must be a JWT that carries the subject and group claims. The
+chart's Keycloak realm provides `sub`; add a *Group Membership* mapper named
+`groups` (with **Full group path** off) to use group grants and group
+administrators. The default ABAC rules already allow `/description` for
+everyone, which clients use to detect ReBAC. The BaSyx Configuration Service
+applies the ReBAC database schema before the services start.
 
 ## Network Policies
 

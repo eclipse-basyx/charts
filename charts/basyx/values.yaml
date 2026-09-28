@@ -197,6 +197,9 @@ general:
   trustProxyHeaders: false
   trustedProxyCIDRs: []
   uploadMaxSizeBytes: 134217728
+  # Maximum JSON response size from a delegated Submodel Operation. Used by the
+  # Submodel Repository and AAS Environment; responses are buffered in memory.
+  delegatedOperationResponseMaxSizeBytes: 1048576
   aasxMaxPartCount: 10000
   aasxMaxOPCMetadataSizeBytes: 16777216
   aasxMaxPartExpandedSizeBytes: 134217728
@@ -243,15 +246,97 @@ history:
   integrityAnchor:
     provider: "none"
 
-# Future-compatible eventing settings. BaSyx Go currently fails fast when
-# event publishing or outbox processing is enabled before an implementation is
-# available.
+# Experimental CloudEvents eventing for the AAS Repository, Submodel
+# Repository and AAS Environment. Broker transports need enabled: true,
+# outboxEnabled: true and at least one sink (mqtt, kafka, amqp). The REST Event
+# Feed is enabled independently through eventing.feed.enabled. Set
+# general.externalUrl (or sourceBaseUrl) to the public API base URL so event
+# sources and schema links resolve for consumers. Credentials set here are
+# stored in the chart's common-config Secret; prefer the *File settings with
+# service volumes for externally managed Secrets.
 eventing:
   enabled: false
   format: cloudevents
+  # Any of: mqtt, kafka, amqp.
   sinks: []
   outboxEnabled: false
   topicPrefix: basyx
+  # Optional overrides of the event source and schema base URLs.
+  sourceBaseUrl: ""
+  schemaBaseUrl: ""
+  mqtt:
+    # mqtt://host:port or tls://host:port without credentials.
+    broker: ""
+    # Must be unique per connecting process. Empty uses the pod name.
+    clientId: ""
+    sinkId: mqtt
+    qos: 1
+    retained: false
+    username: ""
+    password: ""
+    usernameFile: ""
+    passwordFile: ""
+    caFile: ""
+    certificateFile: ""
+    keyFile: ""
+  kafka:
+    # Bootstrap brokers as host:port.
+    brokers: []
+    topic: basyx.events
+    sinkId: kafka
+    clientId: basyx
+    # 0 uses the client default; otherwise 512 to 1073741824.
+    producerBatchMaxBytes: 0
+    tlsEnabled: false
+    caFile: ""
+    certificateFile: ""
+    keyFile: ""
+    # Empty disables SASL; otherwise PLAIN, SCRAM-SHA-256 or SCRAM-SHA-512.
+    saslMechanism: ""
+    username: ""
+    password: ""
+    usernameFile: ""
+    passwordFile: ""
+  amqp:
+    # amqp://host[:port] or amqps://host[:port] without credentials.
+    broker: ""
+    # Target address, e.g. /queues/basyx.events for RabbitMQ 4.
+    address: ""
+    sinkId: amqp
+    # Optional AMQP connection hostname, e.g. vhost:<name> for RabbitMQ.
+    hostName: ""
+    username: ""
+    password: ""
+    usernameFile: ""
+    passwordFile: ""
+    caFile: ""
+    certificateFile: ""
+    keyFile: ""
+  # REST Event Feed (GET /events).
+  feed:
+    enabled: false
+    maxAgeDays: 30
+    hardDeleteGraceDays: 10
+    maxPageSize: 100
+    sourceBaseUrl: ""
+    schemaBaseUrl: ""
+    cleanupIntervalHours: 24
+    publishIntervalMillis: 250
+
+# Experimental relationship-based access control (ReBAC). ReBAC extends ABAC
+# as a strict union (ABAC allows OR ReBAC allows), so every service with ReBAC
+# enabled also needs ABAC enabled. Relationships are stored in the BaSyx
+# database and shared by all services using it; enable ReBAC consistently on
+# all services. Company Lookup and Digital Twin Registry do not support ReBAC.
+# Individual services can override these settings via <service>.rebac.*
+rebac:
+  enabled: false
+  # Access token claim with a stable user identifier (e.g. oid for Entra ID).
+  subjectClaim: sub
+  # Access token claim with group names; use basyx.<target> for mapped claims.
+  groupClaim: groups
+  # Bootstrap administrators as "issuer|subject" or "issuer|group:<name>".
+  administrators: []
 
 
 # HTTP proxy settings for outbound connections from all services.
@@ -652,6 +737,7 @@ submodelRepository:
   server: {}
   history: {}
   eventing: {}
+  rebac: {}
   oidc: {}
   resources: {}
     # limits:
@@ -759,6 +845,7 @@ submodelRegistry:
   server: {}
   history: {}
   eventing: {}
+  rebac: {}
   oidc: {}
   resources: {}
     # limits:
@@ -868,6 +955,7 @@ aasRegistry:
   server: {}
   history: {}
   eventing: {}
+  rebac: {}
   oidc: {}
 
   resources: {}
@@ -1105,6 +1193,7 @@ aasRepository:
   server: {}
   history: {}
   eventing: {}
+  rebac: {}
   oidc: {}
 
   resources: {}
@@ -1221,6 +1310,7 @@ aasEnvironment:
   server: {}
   history: {}
   eventing: {}
+  rebac: {}
   oidc: {}
 
   resources: {}
@@ -1344,6 +1434,7 @@ dppApi:
     integrityAnchor:
       provider: none
   eventing: {}
+  rebac: {}
   oidc: {}
 
   resources: {}
@@ -1445,6 +1536,7 @@ cdRepository:
   server: {}
   history: {}
   eventing: {}
+  rebac: {}
   oidc: {}
 
   resources: {}
@@ -1655,6 +1747,7 @@ aasDiscovery:
   server: {}
   history: {}
   eventing: {}
+  rebac: {}
   oidc: {}
   resources: {}
     # limits:
