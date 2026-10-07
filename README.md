@@ -335,6 +335,20 @@ helm diff upgrade basyx charts/basyx \
   -f values/values.example.yaml
 ```
 
+### Upgrading to chart 3.15.1
+
+Chart 3.15.1 uses BaSyx Go 1.1.1 by default. BaSyx Go 1.1.1 applies one page size
+policy to all paginated endpoints. The new `server.pagination.defaultLimit`
+(default `100`) is used when a request omits `limit`, and
+`server.pagination.maxLimit` (default `1000`) is the largest accepted `limit`;
+larger values are rejected with HTTP `400`. The AAS Repository list endpoints no
+longer return unbounded pages when `limit` is omitted. The value
+`eventing.feed.maxPageSize` and its environment variable were removed; the REST
+Event Feed uses the `server.pagination` values and ignores a leftover
+`maxPageSize`. Clients that request a `limit` above `1000` must page with
+cursors or you must raise `server.pagination.maxLimit`. See
+[Server Values](#server-runtime-values).
+
 ### Upgrading to chart 3.15.0
 
 Chart 3.15.0 uses BaSyx Go 1.1.0 by default. It adds the `rebac` values for
@@ -1390,7 +1404,7 @@ aasRepository:
   replicaCount: 1
   image:
     repository: eclipsebasyx/aasrepository-go
-    tag: "1.1.0"
+    tag: "1.1.1"
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
@@ -1722,6 +1736,9 @@ server:
   writeTimeoutSeconds: 300
   idleTimeoutSeconds: 60
   shutdownTimeoutSeconds: 10
+  pagination:
+    defaultLimit: 100
+    maxLimit: 1000
 
 history:
   mode: "off"
@@ -1843,7 +1860,7 @@ Raw environment maps are the escape hatch and take precedence over structured va
 
 #### Server Runtime Values
 
-The `server` block controls BaSyx Go HTTP server timeouts. All timeout values are configured in seconds and must be greater than `0`.
+The `server` block controls BaSyx Go HTTP server timeouts and the page size limits of all paginated endpoints. All timeout values are configured in seconds and must be greater than `0`.
 
 | Value | Rendered environment variable | Default | Description |
 | --- | --- | --- | --- |
@@ -1852,6 +1869,8 @@ The `server` block controls BaSyx Go HTTP server timeouts. All timeout values ar
 | `server.writeTimeoutSeconds` | `SERVER_WRITE_TIMEOUT_SECONDS` | `300` | Maximum time to write an HTTP response. |
 | `server.idleTimeoutSeconds` | `SERVER_IDLE_TIMEOUT_SECONDS` | `60` | Maximum keep-alive idle time before waiting for the next request ends. |
 | `server.shutdownTimeoutSeconds` | `SERVER_SHUTDOWN_TIMEOUT_SECONDS` | `10` | Maximum graceful shutdown time for in-flight requests after the service receives a termination signal. |
+| `server.pagination.defaultLimit` | `SERVER_PAGINATION_DEFAULT_LIMIT` | `100` | Page size used when a request omits `limit`. Also applies to the REST Event Feed. |
+| `server.pagination.maxLimit` | `SERVER_PAGINATION_MAX_LIMIT` | `1000` | Largest accepted `limit`. Larger values are rejected with HTTP `400`. Must not be smaller than the default limit. |
 
 As with `general`, `history`, `eventing` and `abac`, these values can be set globally or overridden per backend service:
 
@@ -1988,14 +2007,14 @@ AMQP 1.0 settings under `eventing.amqp` (environment prefix `BASYX_EVENTING_AMQP
 
 REST Event Feed settings under `eventing.feed` (environment prefix `BASYX_EVENTING_FEED_`).
 The feed works without `eventing.enabled` and adds `GET /events` and
-`/.well-known/event-feed.json` to the service:
+`/.well-known/event-feed.json` to the service. Its page size follows
+`server.pagination.defaultLimit` and `server.pagination.maxLimit`:
 
 | Value | Environment suffix | Default | Description |
 | --- | --- | --- | --- |
 | `enabled` | `ENABLED` | `false` | Enables the REST Event Feed. |
 | `maxAgeDays` | `MAX_AGE_DAYS` | `30` | Visible retention window in days. |
 | `hardDeleteGraceDays` | `HARD_DELETE_GRACE_DAYS` | `10` | Additional days before physical deletion. `0` disables the delay. |
-| `maxPageSize` | `MAX_PAGE_SIZE` | `100` | Default and maximum page size. |
 | `sourceBaseUrl` | `SOURCE_BASE_URL` | `""` | Legacy alias of `eventing.sourceBaseUrl`. If both are set, they must match. |
 | `schemaBaseUrl` | `SCHEMA_BASE_URL` | `""` | Legacy alias of `eventing.schemaBaseUrl`. If both are set, they must match. |
 | `cleanupIntervalHours` | `CLEANUP_INTERVAL_HOURS` | `24` | Physical cleanup interval. |

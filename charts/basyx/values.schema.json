@@ -1414,7 +1414,14 @@
         "readTimeoutSeconds": { "type": "integer", "minimum": 1 },
         "writeTimeoutSeconds": { "type": "integer", "minimum": 1 },
         "idleTimeoutSeconds": { "type": "integer", "minimum": 1 },
-        "shutdownTimeoutSeconds": { "type": "integer", "minimum": 1 }
+        "shutdownTimeoutSeconds": { "type": "integer", "minimum": 1 },
+        "pagination": {
+          "type": "object",
+          "properties": {
+            "defaultLimit": { "type": "integer", "minimum": 1 },
+            "maxLimit": { "type": "integer", "minimum": 1, "maximum": 2147483647 }
+          }
+        }
       }
     },
     "history": {
@@ -1538,7 +1545,6 @@
             "enabled": { "type": "boolean" },
             "maxAgeDays": { "type": "integer", "minimum": 0 },
             "hardDeleteGraceDays": { "type": "integer", "minimum": 0 },
-            "maxPageSize": { "type": "integer", "minimum": 0 },
             "sourceBaseUrl": { "type": "string" },
             "schemaBaseUrl": { "type": "string" },
             "cleanupIntervalHours": { "type": "integer", "minimum": 0 },

@@ -133,6 +133,7 @@ tests:
       aasRepository.general.bulkBatchLimit: 250
       aasRepository.server.readTimeoutSeconds: 120
       aasRepository.server.shutdownTimeoutSeconds: 20
+      aasRepository.server.pagination.maxLimit: 500
       aasRepository.abac.policyFileImport: if_missing
       aasRepository.abac.policyScope: aas-repository-scope
       aasRepository.abac.managementApi.enabled: true
@@ -190,6 +191,12 @@ tests:
           content:
             name: SERVER_SHUTDOWN_TIMEOUT_SECONDS
             value: "20"
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SERVER_PAGINATION_MAX_LIMIT
+            value: "500"
           count: 1
       - contains:
           path: spec.template.spec.containers[0].env
