@@ -260,19 +260,73 @@ tests:
     template: templates/aas-web-gui/configmap-infrastructure.yaml
     set:
       aasWebGui.enabled: true
+      aasRepository.enabled: true
     documentSelector:
       path: metadata.name
       value: basyx-aas-web-ui-infrastructure
     asserts:
       - matchRegex:
           path: data["basyx-infra.yml"]
-          pattern: "clientId: 'basyx-ui'"
+          pattern: "clientId: '?basyx-ui'?"
       - matchRegex:
           path: data["basyx-infra.yml"]
           pattern: "issuer: '?https://basyx\\.example\\.com/identity-management/realms/basyx'?"
       - matchRegex:
           path: data["basyx-infra.yml"]
           pattern: 'baseUrl: https://basyx\.example\.com/aas-repository'
+
+  - it: omits disabled chart-managed components from the web ui infrastructure
+    template: templates/aas-web-gui/configmap-infrastructure.yaml
+    values:
+      - ../../../values/values.example.yaml
+    set:
+      aasDiscovery.enabled: false
+    documentSelector:
+      path: metadata.name
+      value: basyx-aas-web-ui-infrastructure
+    asserts:
+      - notMatchRegex:
+          path: data["basyx-infra.yml"]
+          pattern: 'aasDiscovery:'
+      - notMatchRegex:
+          path: data["basyx-infra.yml"]
+          pattern: '/aas-discovery'
+      - matchRegex:
+          path: data["basyx-infra.yml"]
+          pattern: 'baseUrl: https://basyx\.example\.com/aas-registry'
+      - matchRegex:
+          path: data["basyx-infra.yml"]
+          pattern: 'baseUrl: https://basyx\.example\.com/cd-repository'
+
+  - it: keeps web ui components of disabled services that point elsewhere
+    template: templates/aas-web-gui/configmap-infrastructure.yaml
+    values:
+      - ../../../values/values.example.yaml
+    set:
+      aasDiscovery.enabled: false
+      aasWebGui.infrastructureConfig.infrastructures.main.components.aasDiscovery.baseUrl: https://discovery.example.org/lookup
+    documentSelector:
+      path: metadata.name
+      value: basyx-aas-web-ui-infrastructure
+    asserts:
+      - matchRegex:
+          path: data["basyx-infra.yml"]
+          pattern: 'baseUrl: https://discovery\.example\.org/lookup'
+
+  - it: keeps AAS Environment web ui components from the minimal example values
+    template: templates/aas-web-gui/configmap-infrastructure.yaml
+    values:
+      - ../../../values/values.minimal.yaml
+    documentSelector:
+      path: metadata.name
+      value: basyx-aas-web-ui-infrastructure
+    asserts:
+      - matchRegex:
+          path: data["basyx-infra.yml"]
+          pattern: 'baseUrl: https://basyx\.example\.com/aas-environment/lookup/shells'
+      - matchRegex:
+          path: data["basyx-infra.yml"]
+          pattern: 'baseUrl: https://basyx\.example\.com/aas-environment/shells'
 
   - it: renders external keycloak settings in the web ui infrastructure
     template: templates/aas-web-gui/configmap-infrastructure.yaml

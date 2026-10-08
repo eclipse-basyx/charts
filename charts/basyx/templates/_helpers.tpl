@@ -1029,6 +1029,40 @@ Create the name of the service account to use
 {{- end }}
 {{- end }}
 
+{{/*
+Render the Web UI infrastructure configuration. A component is removed when its
+chart service is disabled and its baseUrl still points at that service's
+chart-managed route, so the UI is not handed URLs this release does not serve.
+Components pointing anywhere else, such as an external service or the AAS
+Environment, are kept.
+*/}}
+{{- define "basyx-aasWebGui.infrastructureConfig" -}}
+{{- $root := . }}
+{{- $config := fromYaml (tpl (toYaml .Values.aasWebGui.infrastructureConfig) .) }}
+{{- if hasKey $config "Error" }}
+{{- fail (printf "aasWebGui.infrastructureConfig must render to valid YAML: %s" $config.Error) }}
+{{- end }}
+{{- $services := dict "aasDiscovery" "aasDiscovery" "aasRegistry" "aasRegistry" "submodelRegistry" "submodelRegistry" "aasRepository" "aasRepository" "submodelRepository" "submodelRepository" "submodelService" "submodelRepository" "conceptDescriptionRepository" "cdRepository" "digitalTwinRegistry" "digitalTwinRegistry" "companyLookup" "companyLookup" }}
+{{- range $infrastructure := (get $config "infrastructures" | default dict) }}
+{{- if kindIs "map" $infrastructure }}
+{{- $components := get $infrastructure "components" }}
+{{- if kindIs "map" $components }}
+{{- range $component, $service := $services }}
+{{- $settings := get $components $component }}
+{{- if and (kindIs "map" $settings) (not (get (index $root.Values $service) "enabled")) }}
+{{- $baseUrl := get $settings "baseUrl" | toString | trimSuffix "/" }}
+{{- $chartUrl := printf "https://%s%s" $root.Values.host (index $root.Values.paths $service) | trimSuffix "/" }}
+{{- if eq $baseUrl $chartUrl }}
+{{- $_ := unset $components $component }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- toYaml $config }}
+{{- end }}
+
 {{- define "database-secret" -}}
 {{- if eq (include "database.managed" .) "false" -}}
 {{- if .Values.database.existingSecret -}}

@@ -335,6 +335,17 @@ helm diff upgrade basyx charts/basyx \
   -f values/values.example.yaml
 ```
 
+### Upgrading to chart 3.15.2
+
+Chart 3.15.2 stops listing disabled BaSyx services in the AAS Web UI
+infrastructure. Previously, `aasWebGui.infrastructureConfig` passed every
+component URL to the UI, so a disabled service such as `aasDiscovery` still
+appeared and its requests failed. The chart now removes a component when its
+service is disabled and its `baseUrl` still points at the chart-managed route.
+Components that point at an external service or the AAS Environment are kept.
+Overrides that only set a disabled component to `null` can be removed. See
+[AAS Web UI](#aas-web-ui).
+
 ### Upgrading to chart 3.15.1
 
 Chart 3.15.1 uses BaSyx Go 1.1.1 by default. BaSyx Go 1.1.1 applies one page size
@@ -2059,6 +2070,20 @@ aasWebGui:
 ```
 
 The Web UI infrastructure is rendered from `aasWebGui.infrastructureConfig`. The defaults derive service URLs from `host` and `paths.*`.
+
+The chart removes a component from every infrastructure when both conditions
+hold, so the UI does not try to reach services this release does not deploy:
+
+- the matching service (`aasDiscovery`, `aasRegistry`, `submodelRegistry`,
+  `aasRepository`, `submodelRepository`/`submodelService`, `cdRepository` for
+  `conceptDescriptionRepository`, `digitalTwinRegistry` or `companyLookup`)
+  has `enabled: false`
+- the component's `baseUrl` is `https://<host><paths.<service>>`, the route the
+  chart would create for that service
+
+To use a service that runs outside this release, set the component's `baseUrl`
+to its URL. The chart keeps the component even when the matching chart service
+is disabled.
 
 Logo files are read from the chart-local `config-files/logos` directory.
 
