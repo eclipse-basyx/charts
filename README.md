@@ -347,7 +347,7 @@ longer return unbounded pages when `limit` is omitted. The value
 Event Feed uses the `server.pagination` values and ignores a leftover
 `maxPageSize`. Clients that request a `limit` above `1000` must page with
 cursors or you must raise `server.pagination.maxLimit`. See
-[Server Values](#server-runtime-values).
+[Server Values](#server-runtime-values). The AAS Web UI image is updated to `v2-260924`.
 
 ### Upgrading to chart 3.15.0
 
@@ -2055,7 +2055,7 @@ Enable the Web UI with:
 aasWebGui:
   enabled: true
   image:
-    tag: v2-260910
+    tag: v2-260924
 ```
 
 The Web UI infrastructure is rendered from `aasWebGui.infrastructureConfig`. The defaults derive service URLs from `host` and `paths.*`.
