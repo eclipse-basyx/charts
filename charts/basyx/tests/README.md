@@ -20,6 +20,7 @@ The suites cover stable chart contracts such as:
 - optional DPP API deployment, ingress and ABAC wiring
 - Catena-X example values and marker-based ABAC wiring
 - common OIDC and ingress configuration
+- Web UI infrastructure pruning of disabled chart-managed components
 - structured logging, optional OTLP traces and metrics, telemetry Secret wiring, and CloudNativePG PodMonitors
 - additional custom CA certificate mounts and trust-store wiring
 - runtime `helm test` hook for custom CA mount checks
