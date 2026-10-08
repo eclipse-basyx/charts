@@ -223,6 +223,8 @@ The environment.common map remains the escape hatch and takes precedence.
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "SERVER_WRITE_TIMEOUT_SECONDS" "value" (dig "writeTimeoutSeconds" 300 $server)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "SERVER_IDLE_TIMEOUT_SECONDS" "value" (dig "idleTimeoutSeconds" 60 $server)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "SERVER_SHUTDOWN_TIMEOUT_SECONDS" "value" (dig "shutdownTimeoutSeconds" 10 $server)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "SERVER_PAGINATION_DEFAULT_LIMIT" "value" (dig "pagination" "defaultLimit" 100 $server)) }}
+{{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "SERVER_PAGINATION_MAX_LIMIT" "value" (dig "pagination" "maxLimit" 1000 $server)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "ABAC_POLICY_FILE_IMPORT" "value" (dig "policyFileImport" "" $abac)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "ABAC_POLICY_SCOPE" "value" (dig "policyScope" "" $abac)) }}
 {{- include "basyx.commonConfig.entry" (dict "root" $root "common" $common "name" "ABAC_MANAGEMENT_API_ENABLED" "value" (dig "managementApi" "enabled" false $abac)) }}
@@ -264,6 +266,7 @@ Render service-local BaSyx runtime overrides as explicit container env values.
 {{- $environment := $values.environment | default dict -}}
 {{- $general := $values.general | default dict -}}
 {{- $server := $values.server | default dict -}}
+{{- $serverPagination := $server.pagination | default dict -}}
 {{- $history := $values.history | default dict -}}
 {{- $evidence := $history.evidence | default dict -}}
 {{- $signing := $evidence.signing | default dict -}}
@@ -295,6 +298,8 @@ Render service-local BaSyx runtime overrides as explicit container env values.
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $server "key" "writeTimeoutSeconds" "name" "SERVER_WRITE_TIMEOUT_SECONDS") }}
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $server "key" "idleTimeoutSeconds" "name" "SERVER_IDLE_TIMEOUT_SECONDS") }}
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $server "key" "shutdownTimeoutSeconds" "name" "SERVER_SHUTDOWN_TIMEOUT_SECONDS") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $serverPagination "key" "defaultLimit" "name" "SERVER_PAGINATION_DEFAULT_LIMIT") }}
+{{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $serverPagination "key" "maxLimit" "name" "SERVER_PAGINATION_MAX_LIMIT") }}
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $abac "key" "policyFileImport" "name" "ABAC_POLICY_FILE_IMPORT") }}
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $abac "key" "policyScope" "name" "ABAC_POLICY_SCOPE") }}
 {{- include "basyx.serviceRuntimeEnv.entry" (dict "root" $root "environment" $environment "config" $abacManagementApi "key" "enabled" "name" "ABAC_MANAGEMENT_API_ENABLED") }}
@@ -395,7 +400,6 @@ Only keys present in the values are rendered, so values.yaml holds the defaults.
     enabled: BASYX_EVENTING_FEED_ENABLED
     maxAgeDays: BASYX_EVENTING_FEED_MAX_AGE_DAYS
     hardDeleteGraceDays: BASYX_EVENTING_FEED_HARD_DELETE_GRACE_DAYS
-    maxPageSize: BASYX_EVENTING_FEED_MAX_PAGE_SIZE
     sourceBaseUrl: BASYX_EVENTING_FEED_SOURCE_BASE_URL
     schemaBaseUrl: BASYX_EVENTING_FEED_SCHEMA_BASE_URL
     cleanupIntervalHours: BASYX_EVENTING_FEED_CLEANUP_INTERVAL_HOURS

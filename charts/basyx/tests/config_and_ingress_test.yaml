@@ -48,6 +48,12 @@ tests:
           path: stringData.SERVER_SHUTDOWN_TIMEOUT_SECONDS
           value: "10"
       - equal:
+          path: stringData.SERVER_PAGINATION_DEFAULT_LIMIT
+          value: "100"
+      - equal:
+          path: stringData.SERVER_PAGINATION_MAX_LIMIT
+          value: "1000"
+      - equal:
           path: stringData.GENERAL_UPLOADMAXSIZEBYTES
           value: "134217728"
       - equal:
@@ -100,6 +106,8 @@ tests:
       server.writeTimeoutSeconds: 700
       server.idleTimeoutSeconds: 80
       server.shutdownTimeoutSeconds: 30
+      server.pagination.defaultLimit: 25
+      server.pagination.maxLimit: 250
       abac.policyFileImport: if_missing
       abac.policyScope: shared-policy-scope
       abac.managementApi.enabled: true
@@ -159,6 +167,12 @@ tests:
       - equal:
           path: stringData.SERVER_SHUTDOWN_TIMEOUT_SECONDS
           value: "30"
+      - equal:
+          path: stringData.SERVER_PAGINATION_DEFAULT_LIMIT
+          value: "25"
+      - equal:
+          path: stringData.SERVER_PAGINATION_MAX_LIMIT
+          value: "250"
       - equal:
           path: stringData.ABAC_POLICY_FILE_IMPORT
           value: if_missing

@@ -428,3 +428,17 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "database.reader.pooler.enabled"
+
+  - it: fails when the maximum page size is below one
+    set:
+      server.pagination.maxLimit: 0
+    asserts:
+      - failedTemplate:
+          errorPattern: "server.pagination.maxLimit"
+
+  - it: fails when the maximum page size leaves no room for the lookahead row
+    set:
+      server.pagination.maxLimit: 2147483647
+    asserts:
+      - failedTemplate:
+          errorPattern: "server.pagination.maxLimit"
