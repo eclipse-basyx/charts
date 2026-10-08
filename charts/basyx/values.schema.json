@@ -1419,7 +1419,7 @@
           "type": "object",
           "properties": {
             "defaultLimit": { "type": "integer", "minimum": 1 },
-            "maxLimit": { "type": "integer", "minimum": 1, "maximum": 2147483647 }
+            "maxLimit": { "type": "integer", "minimum": 1, "maximum": 2147483646 }
           }
         }
       }

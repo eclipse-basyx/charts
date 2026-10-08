@@ -435,3 +435,10 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "server.pagination.maxLimit"
+
+  - it: fails when the maximum page size leaves no room for the lookahead row
+    set:
+      server.pagination.maxLimit: 2147483647
+    asserts:
+      - failedTemplate:
+          errorPattern: "server.pagination.maxLimit"
