@@ -335,6 +335,10 @@ helm diff upgrade basyx charts/basyx \
   -f values/values.example.yaml
 ```
 
+### Upgrading to chart 3.15.3
+
+Chart 3.15.3 updates the default AAS Web UI image to `v2-261013`.
+
 ### Upgrading to chart 3.15.2
 
 Chart 3.15.2 stops listing disabled BaSyx services in the AAS Web UI
@@ -2066,7 +2070,7 @@ Enable the Web UI with:
 aasWebGui:
   enabled: true
   image:
-    tag: v2-260924
+    tag: v2-261013
 ```
 
 The Web UI infrastructure is rendered from `aasWebGui.infrastructureConfig`. The defaults derive service URLs from `host` and `paths.*`.
