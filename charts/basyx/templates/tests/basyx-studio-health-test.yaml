@@ -1,0 +1,42 @@
+{{- if .Values.basyxStudio.enabled }}
+{{- $image := .Values.basyxStudio.tests.image }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "basyx-studio.fullname" . }}-health-test
+  labels:
+    {{- include "basyx-studio.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: health-check
+      image: {{ include "basyx.image" (dict "image" $image "root" .) | quote }}
+      imagePullPolicy: {{ $image.pullPolicy }}
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+            - ALL
+      command:
+        - curl
+      args:
+        - --fail
+        - --silent
+        - --show-error
+        - --retry
+        - "10"
+        - --retry-delay
+        - "3"
+        - --retry-all-errors
+        - {{ printf "http://%s:%v%shealth/ready" (include "basyx-studio.fullname" .) .Values.basyxStudio.service.port (include "basyx-studio.basePath" .) | quote }}
+{{- end }}

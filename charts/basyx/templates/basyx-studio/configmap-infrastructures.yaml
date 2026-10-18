@@ -1,0 +1,13 @@
+{{- if and .Values.basyxStudio.enabled (not .Values.basyxStudio.infrastructures.existingConfigMap) }}
+{{- with include "basyx-studio.infrastructuresFile" . }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "basyx-studio.infrastructuresConfigMapName" $ }}
+  labels:
+    {{- include "basyx-studio.labels" $ | nindent 4 }}
+data:
+  {{ $.Values.basyxStudio.infrastructures.existingConfigMapKey }}: |
+    {{- . | nindent 4 }}
+{{- end }}
+{{- end }}

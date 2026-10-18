@@ -131,6 +131,8 @@ paths:
   confSubmodelRepository: /conf-submodel-repo
   aasWebUi: /aas-gui/
   aasWebUiBasePath: /aas-gui
+  # Path BaSyx Studio is served under; also its STUDIO_BASE_PATH.
+  basyxStudio: /studio
   keycloak: /identity-management
   digitalTwinRegistry: /digital-twin-registry
 
@@ -1939,6 +1941,277 @@ aasWebGui:
   #   - name: logo
   #     mountPath: /usr/src/app/dist/Logo
   #     readOnly: true
+
+
+# BaSyx Studio, a web workbench for the services of this release and others.
+# It can run instead of or next to the AAS Web UI. Every setting maps to an
+# environment variable of the Studio image, see
+# https://github.com/eclipse-basyx/basyx-studio/blob/main/docs/deployment/README.md.
+# Empty strings leave the variable unset, so Studio's own default applies.
+basyxStudio:
+  enabled: false
+  image:
+    repository: eclipsebasyx/basyx-studio
+    # SNAPSHOT is a moving tag; pin a release or a
+    # SNAPSHOT-<yyyymmdd-hhmmss>-<sha> tag for production.
+    tag: SNAPSHOT
+    # Takes precedence over tag when set, e.g. sha256:...
+    digest: ""
+    pullPolicy: Always
+  imagePullSecrets: []
+
+  # URL under which users reach Studio (STUDIO_PUBLIC_URL). Defaults to
+  # https://<host><paths.basyxStudio>; its path must equal paths.basyxStudio.
+  publicUrl: ""
+  # Lifetime of a Studio session in hours (STUDIO_SESSION_TTL_HOURS).
+  sessionTtlHours: ""
+  # Largest file users may upload, in bytes (STUDIO_UPLOAD_MAX_BYTES).
+  uploadMaxBytes: ""
+  # "allow" lets infrastructures on private or loopback addresses be used,
+  # each with allowPrivateNetwork (STUDIO_PRIVATE_NETWORK_TARGETS). The
+  # infrastructure derived from this release sets allowPrivateNetwork, since
+  # host often resolves to a private address inside the cluster.
+  privateNetworkTargets: allow
+
+  auth:
+    # "oidc" or "none" (STUDIO_AUTH_MODE). Empty selects "oidc" when the
+    # release has an identity provider (keycloak.enabled or keycloak.issuer)
+    # and "none" otherwise. With "none" every visitor is the shared user
+    # "anonymous"; use it for demos, closed networks or behind an
+    # authenticating proxy.
+    mode: ""
+    # Roles of the anonymous user with mode "none" (STUDIO_ANONYMOUS_ROLES).
+    # Adding adminRole lets every visitor manage infrastructures and apps.
+    anonymousRoles: []
+    # Role that may manage infrastructures and apps (STUDIO_ADMIN_ROLE). The
+    # chart's Keycloak realm has the realm roles admin and viewer.
+    adminRole: admin
+    oidc:
+      # STUDIO_OIDC_ISSUER; defaults to the issuer of the BaSyx services
+      # (keycloak.issuer or the chart-managed Keycloak realm).
+      issuer: ""
+      # STUDIO_OIDC_CLIENT_ID. With keycloak.enabled and keycloakClient.create,
+      # the chart adds this client to the realm.
+      clientId: basyx-studio
+      # STUDIO_OIDC_SCOPES, default "openid profile email".
+      scopes: ""
+      # Claim of the ID token with the user's roles; a JSON pointer such as
+      # /realm_access/roles for nested claims (STUDIO_OIDC_ROLES_CLAIM,
+      # default "roles"). The chart-managed client maps the realm roles to
+      # "roles".
+      rolesClaim: ""
+      # Secret of a confidential client, mounted as
+      # STUDIO_OIDC_CLIENT_SECRET_FILE. The chart-managed client is public;
+      # set value to store a secret in the Studio Secret, or reference an
+      # existing one.
+      clientSecret:
+        value: ""
+        existingSecret: ""
+        existingSecretKey: oidc-client-secret
+
+  keycloakClient:
+    # Add auth.oidc.clientId as a public client to the chart-managed realm
+    # (keycloak.enabled). It gets the Studio redirect URIs, a realm-role
+    # mapper to the "roles" ID token claim, and the protocol mappers of the
+    # Web UI client, so the tokens Studio sends to the BaSyx services carry
+    # the same claims as the Web UI's.
+    create: true
+
+  # 32 random bytes, base64url, that encrypt tokens and stored secrets at
+  # rest, mounted as STUDIO_DATA_KEY_FILE. Without value or existingSecret,
+  # the chart generates a key once and keeps it across upgrades and
+  # uninstalls. A new key cannot read data encrypted with the old one: back
+  # it up.
+  #   openssl rand -base64 32 | tr '+/' '-_' | tr -d '='
+  dataKey:
+    value: ""
+    existingSecret: ""
+    existingSecretKey: data-key
+
+  # PostgreSQL for Studio's metadata (STUDIO_DATABASE_URL), e.g.
+  # postgres://studio:password@postgres:5432/studio. Without it, Studio embeds
+  # PGlite in its persistent volume. Either way, one replica only.
+  database:
+    url: ""
+    existingSecret: ""
+    existingSecretKey: database-url
+
+  # Infrastructures declared by the deployment (STUDIO_INFRASTRUCTURES_FILE).
+  # They are applied at every start (created, updated, and removed when they
+  # leave the list) and are read-only in Studio.
+  infrastructures:
+    # One infrastructure for the services of this release, with their public
+    # URLs https://<host><paths.*>. The template follows the enabled
+    # services: separate repositories or registries give "full", the AAS
+    # Environment alone "mono-all", and the AAS Environment with registries
+    # or discovery "mono-repo". The Digital Twin Registry stands in for the
+    # AAS registry and discovery when those are disabled.
+    derived:
+      enabled: true
+      key: basyx
+      name: "BaSyx Go {{ .Values.instanceName }}"
+      # "delegated_user" (the signed-in user's token) or "unsecured". Empty
+      # selects "delegated_user" when the release has an identity provider.
+      securityMode: ""
+    # Further entries in the format Studio exports (Infrastructures -> Export
+    # all), without the surrounding "version" and "infrastructures" keys.
+    # Secrets are references only, e.g. { ref: env:NAME } with NAME set
+    # through extraEnv. Rendered with tpl.
+    declared: []
+    # An existing ConfigMap with the complete YAML document instead of the
+    # derived and declared entries.
+    existingConfigMap: ""
+    existingConfigMapKey: infrastructures.yaml
+    # false keeps administrators from adding, changing, removing or importing
+    # infrastructures (STUDIO_INFRASTRUCTURES_EDITABLE).
+    editable: true
+
+  apps:
+    # Separate origin app files are served from (STUDIO_APPS_URL), e.g.
+    # https://apps.basyx.example.com. It must be another host than host; the
+    # ingress and HTTPRoute route it to Studio too. Add it to tls.hosts.
+    # Without it, apps are off.
+    url: ""
+    # Developer-mode installs of unsigned packages (STUDIO_APPS_ALLOW_UNSIGNED).
+    allowUnsigned: false
+    # false keeps administrators from installing or removing apps; bundled
+    # apps stay (STUDIO_APPS_ALLOW_INSTALL).
+    allowInstall: true
+
+  branding:
+    # Window title and app bar (STUDIO_PRODUCT_NAME).
+    productName: ""
+    # An http(s) URL, or an absolute path to an SVG, PNG, WebP or JPEG file
+    # mounted with extraVolumes (STUDIO_LOGO, STUDIO_LOGO_LIGHT, STUDIO_LOGO_DARK).
+    logo: ""
+    logoLight: ""
+    logoDark: ""
+    # Default accent as #RRGGBB (STUDIO_PRIMARY_COLOR, ..._LIGHT, ..._DARK).
+    primaryColor: ""
+    primaryColorLight: ""
+    primaryColorDark: ""
+    # Shown in Settings -> About (STUDIO_COPYRIGHT_NAME).
+    copyrightName: ""
+
+  legal:
+    # Links on the sign-in page and in Settings -> About
+    # (STUDIO_LEGAL_NOTICE_URL, STUDIO_PRIVACY_POLICY_URL).
+    legalNoticeUrl: ""
+    privacyPolicyUrl: ""
+
+  # Switches only narrow what roles allow; they never grant anything.
+  switches:
+    # Refuse every change to any target and hide editing (STUDIO_READ_ONLY).
+    readOnly: false
+    # File uploads to targets (STUDIO_ALLOW_UPLOADS).
+    allowUploads: true
+
+  # Additional environment variables, e.g. secrets referenced by declared
+  # infrastructures as env:NAME, or settings this chart has no value for.
+  extraEnv: []
+  #  - name: FACTORY_A_CLIENT_SECRET
+  #    valueFrom:
+  #      secretKeyRef:
+  #        name: factory-a-client
+  #        key: client-secret
+  extraEnvFrom: []
+  extraVolumes: []
+  extraVolumeMounts: []
+
+  # Volume on /data for the PGlite database and backend app files.
+  persistence:
+    enabled: true
+    # Use an existing PersistentVolumeClaim instead of creating one.
+    existingClaim: ""
+    storageClass: ""
+    accessModes:
+      - ReadWriteOnce
+    size: 2Gi
+    annotations: {}
+    # Keep the claim when the release is uninstalled
+    # (helm.sh/resource-policy: keep).
+    keepOnUninstall: true
+
+  serviceAccount:
+    create: true
+    automount: false
+    annotations: {}
+    # Generated from the fullname when empty.
+    name: ""
+  podAnnotations: {}
+  podLabels: {}
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+    fsGroupChangePolicy: OnRootMismatch
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  # Size limit of the emptyDir mounted on /tmp.
+  tmpSizeLimit: 1Gi
+  service:
+    type: ClusterIP
+    port: 3000
+  # The ingress controller must keep the original Host header and must not add
+  # X-Frame-Options or a Content-Security-Policy on the apps host.
+  ingress:
+    enabled: true
+    className: ""
+    annotations: {}
+    hosts:
+      - host: "{{ .Values.host }}"
+        paths:
+          - path: "{{ .Values.paths.basyxStudio }}"
+            pathType: Prefix
+  httpRoute:
+    enabled: false
+    parentRefs: []
+    annotations: {}
+    hosts:
+      - host: "{{ .Values.host }}"
+        paths:
+          - path: "{{ .Values.paths.basyxStudio }}"
+            pathType: PathPrefix
+  resources: {}
+  #  requests:
+  #    cpu: 250m
+  #    memory: 512Mi
+  #  limits:
+  #    memory: 2Gi
+  # Probe timings; the paths are <paths.basyxStudio>/health/live and
+  # <paths.basyxStudio>/health/ready.
+  livenessProbe:
+    periodSeconds: 15
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe:
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  # Gives migrations on the first start time before the liveness probe applies.
+  startupProbe:
+    periodSeconds: 5
+    timeoutSeconds: 5
+    failureThreshold: 60
+  # Studio stops gracefully on SIGTERM.
+  terminationGracePeriodSeconds: 30
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  tests:
+    # Image of the `helm test` pod that checks the readiness endpoint.
+    image:
+      repository: curlimages/curl
+      tag: "8.21.0"
+      digest: ""
+      pullPolicy: IfNotPresent
 
 
 database:

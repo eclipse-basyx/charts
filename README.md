@@ -2,7 +2,7 @@
 
 This repository contains a Helm chart for deploying an Eclipse BaSyx Go based environment on Kubernetes.
 
-The chart installs the BaSyx Go backend services, a PostgreSQL database, optional Keycloak-based authentication, optional ABAC authorization, ingress resources (or Gateway API `HTTPRoute` resources as an opt-in alternative), certificates, the AAS Web UI and optional supporting runtime tests.
+The chart installs the BaSyx Go backend services, a PostgreSQL database, optional Keycloak-based authentication, optional ABAC authorization, ingress resources (or Gateway API `HTTPRoute` resources as an opt-in alternative), certificates, the AAS Web UI or BaSyx Studio and optional supporting runtime tests.
 
 The repository follows the common Helm multi-chart layout:
 
@@ -32,6 +32,7 @@ The `basyx` chart can deploy these components:
 | `companyLookup` | Company endpoint directory for dataspace participants |
 | `digitalTwinRegistry` | Digital twin registry |
 | `aasWebGui` | Web UI for browsing and uploading AAS data |
+| `basyxStudio` | BaSyx Studio, a web workbench for the services of the release and others; instead of or next to the Web UI |
 | `database` | PostgreSQL cluster managed by CloudNativePG |
 | `configurationService` | One-shot BaSyx Go job that initializes and migrates the PostgreSQL schema |
 
@@ -56,6 +57,7 @@ values/values.minimal.yaml
 values/values.observability.example.yaml
 values/values.autoscaling.example.yaml
 values/values.secured.example.yaml
+values/values.studio.example.yaml
 ```
 
 A custom values file usually defines the public host, enabled services, image tags, TLS settings, and optional security settings such as Keycloak users or ABAC rules.
@@ -139,6 +141,9 @@ cp values/values.observability.example.yaml values/values.my-observability.yaml
 
 # Optional HPA overlay for a BaSyx Go backend.
 cp values/values.autoscaling.example.yaml values/values.my-autoscaling.yaml
+
+# Optional BaSyx Studio overlay.
+cp values/values.studio.example.yaml values/values.my-studio.yaml
 ```
 
 The unsecured example enables the core BaSyx Go services and the Web UI:
@@ -299,6 +304,7 @@ With the default paths, services are exposed below one host:
 | Service | URL pattern |
 | --- | --- |
 | AAS Web UI | `https://<host>/aas-gui/` |
+| BaSyx Studio | `https://<host>/studio/` |
 | Keycloak | `https://<host>/identity-management` |
 | AAS Discovery | `https://<host>/aas-discovery` |
 | AAS Registry | `https://<host>/aas-registry` |
@@ -334,6 +340,14 @@ helm diff upgrade basyx charts/basyx \
   -n basyx-custom \
   -f values/values.example.yaml
 ```
+
+### Upgrading to chart 3.16.0
+
+Chart 3.16.0 adds BaSyx Studio as the optional `basyxStudio` component; see
+[BaSyx Studio](#basyx-studio). It is disabled by default, so existing
+deployments are unchanged. `paths.basyxStudio` (`/studio`) is new; with
+Keycloak and Studio enabled, the Keycloak initialization adds the client
+`basyx-studio` to the realm.
 
 ### Upgrading to chart 3.15.3
 
@@ -2091,6 +2105,73 @@ is disabled.
 
 Logo files are read from the chart-local `config-files/logos` directory.
 
+### BaSyx Studio
+
+[BaSyx Studio](https://github.com/eclipse-basyx/basyx-studio) is a web
+workbench for AAS. The chart deploys the hosted Studio image
+(`eclipsebasyx/basyx-studio`) as `basyxStudio`, either instead of the AAS Web
+UI or next to it:
+
+```yaml
+basyxStudio:
+  enabled: true
+  image:
+    tag: SNAPSHOT  # pin a release or SNAPSHOT-<timestamp>-<sha> tag for production
+# Optional, once Studio replaces the Web UI:
+aasWebGui:
+  enabled: false
+```
+
+[`values/values.studio.example.yaml`](values/values.studio.example.yaml) is an
+overlay for any of the example values files.
+
+The chart wires Studio to the release:
+
+| Aspect | What the chart does | Override |
+| --- | --- | --- |
+| URL | Studio is served at `https://<host><paths.basyxStudio>/`, by default `https://<host>/studio/`, through the chart's Ingress settings and TLS, or an `HTTPRoute` with `basyxStudio.httpRoute.enabled`. | `paths.basyxStudio`, `basyxStudio.publicUrl`, `basyxStudio.ingress`, `basyxStudio.httpRoute` |
+| Login | With `keycloak.enabled` or `keycloak.issuer`, users log in with that issuer (`STUDIO_AUTH_MODE=oidc`); without an identity provider, Studio runs without login and every visitor is the shared user `anonymous`. Members of `basyxStudio.auth.adminRole` (`admin`) manage infrastructures and apps. | `basyxStudio.auth.*` |
+| Keycloak client | With `keycloak.enabled`, the Keycloak initialization adds the public client `basyx-studio` with Studio's redirect URIs, PKCE, a mapper of the realm roles to the `roles` ID token claim, and the protocol mappers of the Web UI client. | `basyxStudio.keycloakClient.create`, or a client with the same ID in `keycloak.initialization.extraClients` |
+| Infrastructure | The enabled services become one read-only infrastructure in Studio (see below). With an identity provider, Studio calls them with the signed-in user's token (`delegated_user`), so ABAC rules apply per user as with the Web UI. | `basyxStudio.infrastructures.*` |
+| Internal CA | With `tls.enabled`, Studio trusts the internal CA like the BaSyx services (`NODE_EXTRA_CA_CERTS`). | `basyxStudio.extraEnv`, `basyxStudio.extraVolumes` |
+
+The derived infrastructure uses the public URLs `https://<host><paths.*>`, like
+the Web UI. Its template follows the enabled services:
+
+| Enabled services | Studio template | Endpoints |
+| --- | --- | --- |
+| Separate repositories or registries | `full` | every enabled registry, discovery and repository |
+| `aasEnvironment` with registries or discovery | `mono-repo` | the AAS Environment and the registries and discovery |
+| `aasEnvironment` alone | `mono-all` | the AAS Environment |
+
+The Digital Twin Registry stands in for the AAS registry and discovery when
+those are disabled. The infrastructure sets `allowPrivateNetwork`, and
+`basyxStudio.privateNetworkTargets` defaults to `allow`, because `host` often
+resolves to a private address inside the cluster. Further infrastructures go
+to `basyxStudio.infrastructures.declared` in the format Studio exports;
+`basyxStudio.infrastructures.existingConfigMap` replaces the derived and
+declared entries with a complete file.
+
+Studio keeps its metadata in an embedded PGlite database on a
+`ReadWriteOnce` volume (`basyxStudio.persistence`), or in PostgreSQL with
+`basyxStudio.database.url` or `basyxStudio.database.existingSecret`. It runs as
+one replica with the `Recreate` strategy. Its data key encrypts stored tokens
+and secrets; without `basyxStudio.dataKey`, the chart generates one, reuses it
+on upgrades and keeps its Secret (`<release>-studio`) and the data volume on
+uninstall. Back the key up: data encrypted with it cannot be read with a new
+one.
+
+Apps are served from a separate origin: set `basyxStudio.apps.url`, for
+example `https://apps.basyx.example.com`, and add its host to `tls.hosts`. The
+Ingress and the `HTTPRoute` route that host to Studio. The ingress controller
+must keep the original `Host` header and must not add `X-Frame-Options` or a
+`Content-Security-Policy` on the apps host.
+
+`basyxStudio.branding`, `basyxStudio.legal` and `basyxStudio.switches` set the
+product name, logos, colors, legal links, read-only mode and uploads. The
+[Studio deployment guide](https://github.com/eclipse-basyx/basyx-studio/blob/main/docs/deployment/README.md)
+describes every setting; `values.yaml` names the variable for each value.
+
 ### ABAC Authorization
 
 ABAC is controlled globally with:
@@ -2235,6 +2316,7 @@ helm lint charts/basyx -f values/values.example.yaml
 helm lint charts/basyx -f values/values.minimal.yaml
 helm lint charts/basyx -f values/values.secured.example.yaml
 helm lint charts/basyx -f values/values.catena-x.example.yaml
+helm lint charts/basyx -f values/values.secured.example.yaml -f values/values.studio.example.yaml
 ```
 
 Runtime smoke tests after deployment:

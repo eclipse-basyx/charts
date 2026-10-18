@@ -1,0 +1,30 @@
+{{- $persistence := .Values.basyxStudio.persistence }}
+{{- if and .Values.basyxStudio.enabled $persistence.enabled (not $persistence.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "basyx-studio.fullname" . }}-data
+  labels:
+    {{- include "basyx-studio.labels" . | nindent 4 }}
+  {{- $annotations := $persistence.annotations | default dict | deepCopy }}
+  {{- if $persistence.keepOnUninstall }}
+  {{- $_ := set $annotations "helm.sh/resource-policy" "keep" }}
+  {{- end }}
+  {{- with $annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  accessModes:
+    {{- toYaml $persistence.accessModes | nindent 4 }}
+  {{- with $persistence.storageClass }}
+  {{- if eq . "-" }}
+  storageClassName: ""
+  {{- else }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ $persistence.size | quote }}
+{{- end }}

@@ -1,0 +1,43 @@
+{{- if .Values.basyxStudio.enabled }}
+{{- if .Values.basyxStudio.ingress.enabled }}
+{{- $appsHost := include "basyx-studio.appsHost" . }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "basyx-studio.fullname" . }}
+  labels:
+    {{- include "basyx-studio.labels" . | nindent 4 }}
+  {{- include "common.ingress.metadataAnnotations" (dict "root" . "ingress" .Values.basyxStudio.ingress) | nindent 2 }}
+spec:
+  {{- include "common.ingress.className" (dict "root" . "ingress" .Values.basyxStudio.ingress) | nindent 2 }}
+  {{ include "common.ingressTLS" . | nindent 2 }}
+  rules:
+    {{- range .Values.basyxStudio.ingress.hosts }}
+    - host: {{ tpl .host $ | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ tpl .path $ | quote }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                name: {{ include "basyx-studio.fullname" $ }}
+                port:
+                  number: {{ $.Values.basyxStudio.service.port }}
+          {{- end }}
+    {{- end }}
+    {{- if $appsHost }}
+    # Apps origin: every path of its host goes to Studio.
+    - host: {{ $appsHost | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "basyx-studio.fullname" . }}
+                port:
+                  number: {{ .Values.basyxStudio.service.port }}
+    {{- end }}
+{{- end }}
+{{- end }}

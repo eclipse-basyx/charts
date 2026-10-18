@@ -1,0 +1,40 @@
+# Optional BaSyx Studio overlay. Combine it with a base values file, e.g.:
+#
+#   helm upgrade --install basyx charts/basyx -n basyx \
+#     -f values/values.secured.example.yaml \
+#     -f values/values.studio.example.yaml
+#
+# Studio is served at https://<host>/studio/ next to the other services. With
+# Keycloak enabled in the base file, users log in with the chart-managed realm
+# (client basyx-studio, added by the chart), and Studio calls the BaSyx
+# services with the signed-in user's token. The base file's services become
+# one read-only infrastructure in Studio.
+
+basyxStudio:
+  enabled: true
+  image:
+    # Pin a release or a SNAPSHOT-<yyyymmdd-hhmmss>-<sha> tag for production.
+    tag: SNAPSHOT
+  # Separate origin for Studio apps; it is routed to Studio and needs a DNS
+  # record and a certificate (see tls.hosts below).
+  apps:
+    url: https://apps.basyx.example.com
+  branding:
+    productName: BaSyx Studio
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      memory: 2Gi
+
+tls:
+  enabled: true
+  hosts:
+    - "{{ .Values.host }}"
+    - apps.basyx.example.com
+
+# Studio and the AAS Web UI can run side by side. Disable the Web UI once
+# Studio replaces it:
+# aasWebGui:
+#   enabled: false

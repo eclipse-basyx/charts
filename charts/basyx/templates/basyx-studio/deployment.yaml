@@ -1,0 +1,238 @@
+{{- if .Values.basyxStudio.enabled }}
+{{- include "basyx-studio.validate" . }}
+{{- $studio := .Values.basyxStudio }}
+{{- $basePath := include "basyx-studio.basePath" . }}
+{{- $secretsPath := include "basyx-studio.secretsMountPath" . }}
+{{- $authMode := include "basyx-studio.authMode" . }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "basyx-studio.fullname" . }}
+  {{- if .Values.argocd.enabled }}
+  annotations:
+    argocd.argoproj.io/sync-wave: {{ .Values.argocd.runtimeSyncWave | quote }}
+  {{- end }}
+  labels:
+    {{- include "basyx-studio.labels" . | nindent 4 }}
+spec:
+  # Studio runs as a single replica: PGlite allows one writer, and several
+  # replicas are not supported with PostgreSQL yet either.
+  replicas: 1
+  # Recreate releases the ReadWriteOnce volume before the new pod starts.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "basyx-studio.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        {{- if include "basyx-studio.createSecret" . }}
+        checksum/basyx-studio-secret: {{ include (print $.Template.BasePath "/basyx-studio/secret.yaml") . | sha256sum }}
+        {{- end }}
+        {{- if not $studio.infrastructures.existingConfigMap }}
+        checksum/basyx-studio-infrastructures: {{ include (print $.Template.BasePath "/basyx-studio/configmap-infrastructures.yaml") . | sha256sum }}
+        {{- end }}
+        {{- with $studio.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "basyx-studio.labels" . | nindent 8 }}
+        {{- with $studio.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with $studio.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "basyx-studio.serviceAccountName" . }}
+      automountServiceAccountToken: {{ $studio.serviceAccount.automount }}
+      securityContext:
+        {{- toYaml $studio.podSecurityContext | nindent 8 }}
+      terminationGracePeriodSeconds: {{ $studio.terminationGracePeriodSeconds }}
+      containers:
+        - name: studio
+          image: {{ include "basyx.image" (dict "image" $studio.image "root" .) | quote }}
+          imagePullPolicy: {{ $studio.image.pullPolicy }}
+          securityContext:
+            {{- toYaml $studio.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          env:
+            - name: NITRO_PORT
+              value: "3000"
+            - name: STUDIO_DATA_DIR
+              value: /data
+            - name: STUDIO_PUBLIC_URL
+              value: {{ include "basyx-studio.publicUrl" . | quote }}
+            - name: STUDIO_BASE_PATH
+              value: {{ include "basyx-studio.basePathPrefix" . | quote }}
+            - name: STUDIO_DATA_KEY_FILE
+              value: {{ printf "%s/data-key" $secretsPath | quote }}
+            {{- include "basyx-studio.env" (dict "name" "STUDIO_SESSION_TTL_HOURS" "value" $studio.sessionTtlHours) }}
+            {{- include "basyx-studio.env" (dict "name" "STUDIO_UPLOAD_MAX_BYTES" "value" $studio.uploadMaxBytes) }}
+            {{- include "basyx-studio.env" (dict "name" "STUDIO_PRIVATE_NETWORK_TARGETS" "value" $studio.privateNetworkTargets) }}
+            - name: STUDIO_AUTH_MODE
+              value: {{ $authMode | quote }}
+            {{- include "basyx-studio.env" (dict "name" "STUDIO_ADMIN_ROLE" "value" $studio.auth.adminRole) }}
+            {{- if eq $authMode "none" }}
+            {{- include "basyx-studio.env" (dict "name" "STUDIO_ANONYMOUS_ROLES" "value" (join "," $studio.auth.anonymousRoles)) }}
+            {{- else }}
+            - name: STUDIO_OIDC_ISSUER
+              value: {{ include "basyx-studio.oidcIssuer" . | quote }}
+            - name: STUDIO_OIDC_CLIENT_ID
+              value: {{ $studio.auth.oidc.clientId | quote }}
+            {{- include "basyx-studio.env" (dict "name" "STUDIO_OIDC_SCOPES" "value" $studio.auth.oidc.scopes) }}
+            {{- include "basyx-studio.env" (dict "name" "STUDIO_OIDC_ROLES_CLAIM" "value" $studio.auth.oidc.rolesClaim) }}
+            {{- if include "basyx-studio.oidcClientSecretEnabled" . }}
+            - name: STUDIO_OIDC_CLIENT_SECRET_FILE
+              value: {{ printf "%s/oidc-client-secret" $secretsPath | quote }}
+            {{- end }}
+            {{- end }}
+            {{- if include "basyx-studio.databaseEnabled" . }}
+            - name: STUDIO_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $studio.database.existingSecret | default (include "basyx-studio.secretName" .) | quote }}
+                  key: {{ $studio.database.existingSecretKey | quote }}
+            {{- end }}
+            {{- if include "basyx-studio.infrastructuresEnabled" . }}
+            - name: STUDIO_INFRASTRUCTURES_FILE
+              value: {{ printf "%s/infrastructures.yaml" (include "basyx-studio.infrastructuresMountPath" .) | quote }}
+            {{- end }}
+            - name: STUDIO_INFRASTRUCTURES_EDITABLE
+              value: {{ $studio.infrastructures.editable | quote }}
+            {{- with $studio.apps.url }}
+            - name: STUDIO_APPS_URL
+              value: {{ tpl (toString .) $ | trimSuffix "/" | quote }}
+            {{- end }}
+            - name: STUDIO_APPS_ALLOW_UNSIGNED
+              value: {{ $studio.apps.allowUnsigned | quote }}
+            - name: STUDIO_APPS_ALLOW_INSTALL
+              value: {{ $studio.apps.allowInstall | quote }}
+            {{- include "basyx-studio.env" (dict "name" "STUDIO_PRODUCT_NAME" "value" $studio.branding.productName) }}
+            {{- include "basyx-studio.env" (dict "name" "STUDIO_LOGO" "value" $studio.branding.logo) }}
+            {{- include "basyx-studio.env" (dict "name" "STUDIO_LOGO_LIGHT" "value" $studio.branding.logoLight) }}
+            {{- include "basyx-studio.env" (dict "name" "STUDIO_LOGO_DARK" "value" $studio.branding.logoDark) }}
+            {{- include "basyx-studio.env" (dict "name" "STUDIO_PRIMARY_COLOR" "value" $studio.branding.primaryColor) }}
+            {{- include "basyx-studio.env" (dict "name" "STUDIO_PRIMARY_COLOR_LIGHT" "value" $studio.branding.primaryColorLight) }}
+            {{- include "basyx-studio.env" (dict "name" "STUDIO_PRIMARY_COLOR_DARK" "value" $studio.branding.primaryColorDark) }}
+            {{- include "basyx-studio.env" (dict "name" "STUDIO_COPYRIGHT_NAME" "value" $studio.branding.copyrightName) }}
+            {{- include "basyx-studio.env" (dict "name" "STUDIO_LEGAL_NOTICE_URL" "value" $studio.legal.legalNoticeUrl) }}
+            {{- include "basyx-studio.env" (dict "name" "STUDIO_PRIVACY_POLICY_URL" "value" $studio.legal.privacyPolicyUrl) }}
+            - name: STUDIO_READ_ONLY
+              value: {{ $studio.switches.readOnly | quote }}
+            - name: STUDIO_ALLOW_UPLOADS
+              value: {{ $studio.switches.allowUploads | quote }}
+            {{- if .Values.tls.enabled }}
+            # Trust the internal CA of the release, like the BaSyx services do.
+            - name: NODE_EXTRA_CA_CERTS
+              value: /etc/ssl/certs/ca.crt
+            {{- end }}
+            {{- with $studio.extraEnv }}
+            {{- tpl (toYaml .) $ | nindent 12 }}
+            {{- end }}
+          {{- with $studio.extraEnvFrom }}
+          envFrom:
+            {{- tpl (toYaml .) $ | nindent 12 }}
+          {{- end }}
+          startupProbe:
+            httpGet:
+              path: {{ printf "%shealth/live" $basePath }}
+              port: http
+            {{- toYaml $studio.startupProbe | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: {{ printf "%shealth/live" $basePath }}
+              port: http
+            {{- toYaml $studio.livenessProbe | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: {{ printf "%shealth/ready" $basePath }}
+              port: http
+            {{- toYaml $studio.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml $studio.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+            - name: secrets
+              mountPath: {{ $secretsPath }}
+              readOnly: true
+            {{- if include "basyx-studio.infrastructuresEnabled" . }}
+            - name: infrastructures
+              mountPath: {{ include "basyx-studio.infrastructuresMountPath" . }}
+              readOnly: true
+            {{- end }}
+            {{- if .Values.tls.enabled }}
+            - name: certs
+              mountPath: /etc/ssl/certs/ca.crt
+              subPath: ca.crt
+              readOnly: true
+            {{- end }}
+            {{- with $studio.extraVolumeMounts }}
+            {{- tpl (toYaml .) $ | nindent 12 }}
+            {{- end }}
+      volumes:
+        - name: data
+          {{- if $studio.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ $studio.persistence.existingClaim | default (printf "%s-data" (include "basyx-studio.fullname" .)) }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: tmp
+          emptyDir:
+            {{- with $studio.tmpSizeLimit }}
+            sizeLimit: {{ . }}
+            {{- end }}
+        - name: secrets
+          projected:
+            defaultMode: 0440
+            sources:
+              - secret:
+                  name: {{ $studio.dataKey.existingSecret | default (include "basyx-studio.secretName" .) | quote }}
+                  items:
+                    - key: {{ $studio.dataKey.existingSecretKey | quote }}
+                      path: data-key
+              {{- if include "basyx-studio.oidcClientSecretEnabled" . }}
+              - secret:
+                  name: {{ $studio.auth.oidc.clientSecret.existingSecret | default (include "basyx-studio.secretName" .) | quote }}
+                  items:
+                    - key: {{ $studio.auth.oidc.clientSecret.existingSecretKey | quote }}
+                      path: oidc-client-secret
+              {{- end }}
+        {{- if include "basyx-studio.infrastructuresEnabled" . }}
+        - name: infrastructures
+          configMap:
+            name: {{ $studio.infrastructures.existingConfigMap | default (include "basyx-studio.infrastructuresConfigMapName" .) | quote }}
+            items:
+              - key: {{ $studio.infrastructures.existingConfigMapKey | quote }}
+                path: infrastructures.yaml
+        {{- end }}
+        {{- if .Values.tls.enabled }}
+        - name: certs
+          secret:
+            secretName: {{ .Values.internal.certificateIssuer.autocreateCaSecretName }}
+        {{- end }}
+        {{- with $studio.extraVolumes }}
+        {{- tpl (toYaml .) $ | nindent 8 }}
+        {{- end }}
+      {{- with $studio.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $studio.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $studio.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

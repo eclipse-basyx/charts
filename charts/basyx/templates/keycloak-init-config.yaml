@@ -11,6 +11,20 @@ data:
   roles.json: |
 {{ concat (.Values.keycloak.initialization.roles | default (list)) (.Values.keycloak.initialization.extraRoles | default (list)) | toJson | indent 4 }}
 
+{{- $clients := concat (.Values.keycloak.initialization.clients | default (list)) (.Values.keycloak.initialization.extraClients | default (list)) }}
+{{- if include "basyx-studio.keycloakClientEnabled" . }}
+{{- /* Skip the Studio client when a client with its ID is configured already. */}}
+{{- $declared := false }}
+{{- range $clients }}
+{{- if eq (tpl (toString .clientId) $) $.Values.basyxStudio.auth.oidc.clientId }}
+{{- $declared = true }}
+{{- end }}
+{{- end }}
+{{- if not $declared }}
+{{- $clients = append $clients (include "basyx-studio.keycloakClient" . | fromJson) }}
+{{- end }}
+{{- end }}
+
   clients.json: |
-{{ tpl (concat (.Values.keycloak.initialization.clients | default (list)) (.Values.keycloak.initialization.extraClients | default (list)) | toJson) . | indent 4 }}
+{{ tpl ($clients | toJson) . | indent 4 }}
 {{- end }}
