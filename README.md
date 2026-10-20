@@ -2155,11 +2155,58 @@ declared entries with a complete file.
 Studio keeps its metadata in an embedded PGlite database on a
 `ReadWriteOnce` volume (`basyxStudio.persistence`), or in PostgreSQL with
 `basyxStudio.database.url` or `basyxStudio.database.existingSecret`. It runs as
-one replica with the `Recreate` strategy. Its data key encrypts stored tokens
-and secrets; without `basyxStudio.dataKey`, the chart generates one, reuses it
-on upgrades and keeps its Secret (`<release>-studio`) and the data volume on
-uninstall. Back the key up: data encrypted with it cannot be read with a new
-one.
+one replica with the `Recreate` strategy. The data volume is kept on
+uninstall.
+
+#### Studio data key
+
+The data key (32 random bytes, base64url) encrypts the tokens and secrets
+Studio stores. Studio cannot read them with another key, and the chart offers
+no rotation: keep the key for the life of the data.
+
+Provision the key outside the chart and reference it, for example as a Secret
+from External Secrets or Sealed Secrets, or one you create once:
+
+```bash
+kubectl -n <namespace> create secret generic basyx-studio-data-key \
+  --from-literal=data-key="$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=')"
+```
+
+```yaml
+basyxStudio:
+  dataKey:
+    existingSecret: basyx-studio-data-key
+    existingSecretKey: data-key
+```
+
+The chart then never renders or changes the key. Without
+`basyxStudio.dataKey.existingSecret` or `basyxStudio.dataKey.value`,
+`helm install` generates a key into the Secret `<release>-studio`, and
+`helm upgrade` reuses it through `lookup`. That needs Helm's access to the
+cluster. Argo CD and `helm template` render without it and would put a new key
+into every render, so the chart refuses a generated key with
+`argocd.enabled: true`. Set `existingSecret` in every GitOps or render-only
+pipeline, also without `argocd.enabled`. The `helm.sh/resource-policy: keep`
+annotation on a generated Secret only stops Helm from deleting it; it does not
+stop a sync from replacing the key.
+
+To move an installation with a generated key to an existing Secret, for
+example before managing it with Argo CD, copy the key that is in use first:
+
+```bash
+kubectl -n <namespace> get secret <release>-studio \
+  -o jsonpath='{.data.data-key}' | base64 -d > studio-data-key
+kubectl -n <namespace> create secret generic basyx-studio-data-key \
+  --from-file=data-key=studio-data-key
+```
+
+Then set `basyxStudio.dataKey.existingSecret: basyx-studio-data-key`, or
+store the same value in your secret manager. Do not use `<release>-studio`
+itself: the chart still renders that Secret for an inline OIDC client secret
+or database URL, without the key, and rejects the name.
+
+Back up the key together with Studio's volume or database. A restore needs
+both from the same point in time.
 
 Apps are served from a separate origin: set `basyxStudio.apps.url`, for
 example `https://apps.basyx.example.com`, and add its host to `tls.hosts`. The

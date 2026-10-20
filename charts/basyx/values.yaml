@@ -2018,11 +2018,17 @@ basyxStudio:
     create: true
 
   # 32 random bytes, base64url, that encrypt tokens and stored secrets at
-  # rest, mounted as STUDIO_DATA_KEY_FILE. Without value or existingSecret,
-  # the chart generates a key once and keeps it across upgrades and
-  # uninstalls. A new key cannot read data encrypted with the old one: back
-  # it up.
+  # rest, mounted as STUDIO_DATA_KEY_FILE. Studio cannot read data encrypted
+  # with another key, and there is no rotation: keep the key for the life of
+  # the data and back it up together with the volume or database.
   #   openssl rand -base64 32 | tr '+/' '-_' | tr -d '='
+  # existingSecret is the recommended source, provisioned outside the chart,
+  # e.g. with External Secrets or Sealed Secrets; it is required with
+  # argocd.enabled unless value is set. Without either, `helm install` and
+  # `helm upgrade` generate a key once and reuse it through lookup. That needs
+  # Helm's access to the cluster: Argo CD and `helm template` would generate a
+  # new key on every render, and helm.sh/resource-policy: keep only stops
+  # Helm from deleting the Secret, not from replacing the key.
   dataKey:
     value: ""
     existingSecret: ""

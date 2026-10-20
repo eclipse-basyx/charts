@@ -131,7 +131,14 @@ must equal the base path, or https://<host><paths.basyxStudio>.
 {{- end -}}
 {{- end }}
 
-{{/* Whether the chart renders the Studio Secret: the data key, unless an existing Secret holds it, or an inline value. */}}
+{{/*
+Whether the chart renders the Studio Secret: the data key, unless an existing
+Secret holds it, or an inline value. A key without dataKey.value or
+dataKey.existingSecret is generated once and reused through lookup, which
+needs Helm's access to the cluster; renders without it (Argo CD, helm
+template) produce a new key each time, so validate rejects them with
+argocd.enabled.
+*/}}
 {{- define "basyx-studio.createSecret" -}}
 {{- $studio := .Values.basyxStudio -}}
 {{- if or (not $studio.dataKey.existingSecret) (include "basyx-studio.inlineOidcClientSecret" .) (and $studio.database.url (not $studio.database.existingSecret)) -}}
@@ -332,6 +339,12 @@ set. Large numbers may arrive as float64; render them without an exponent.
 {{- if eq $apps.hostname $public.hostname -}}
 {{- fail "basyxStudio.apps.url must have another host than the Studio URL" -}}
 {{- end -}}
+{{- end -}}
+{{- if and .Values.argocd.enabled (not $studio.dataKey.existingSecret) (not $studio.dataKey.value) -}}
+{{- fail "basyxStudio with argocd.enabled needs a stable data key: set basyxStudio.dataKey.existingSecret to a Secret provisioned outside the chart, for example with External Secrets or Sealed Secrets. Argo CD renders without access to the cluster, so the chart cannot reuse a generated key and would replace it on every sync." -}}
+{{- end -}}
+{{- if and $studio.dataKey.existingSecret (eq $studio.dataKey.existingSecret (include "basyx-studio.secretName" .)) (include "basyx-studio.createSecret" .) -}}
+{{- fail (printf "basyxStudio.dataKey.existingSecret must not be %q: the chart renders that Secret for the inline OIDC client secret or database URL and would drop the key from it. Store the key in a Secret of another name." (include "basyx-studio.secretName" .)) -}}
 {{- end -}}
 {{- if and $studio.infrastructures.existingConfigMap $studio.infrastructures.declared -}}
 {{- fail "set either basyxStudio.infrastructures.declared or basyxStudio.infrastructures.existingConfigMap, not both" -}}

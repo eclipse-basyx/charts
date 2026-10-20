@@ -15,6 +15,13 @@ basyxStudio:
   image:
     # Pin a release or a SNAPSHOT-<yyyymmdd-hhmmss>-<sha> tag for production.
     tag: SNAPSHOT
+  # The key that encrypts the tokens and secrets Studio stores, provisioned
+  # outside the chart (required with argocd.enabled), e.g.:
+  #   kubectl -n basyx create secret generic basyx-studio-data-key \
+  #     --from-literal=data-key="$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=')"
+  # Back it up together with Studio's volume: it cannot be rotated.
+  dataKey:
+    existingSecret: basyx-studio-data-key
   # Separate origin for Studio apps; it is routed to Studio and needs a DNS
   # record and a certificate (see tls.hosts below).
   apps:

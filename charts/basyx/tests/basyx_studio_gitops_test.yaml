@@ -1,0 +1,80 @@
+suite: basyx studio data key with gitops
+release:
+  name: basyx
+templates:
+  - templates/basyx-studio/deployment.yaml
+  - templates/basyx-studio/secret.yaml
+  - templates/basyx-studio/configmap-infrastructures.yaml
+  - templates/NOTES.txt
+tests:
+  - it: renders no Secret and no key with an existing key Secret under Argo CD
+    template: templates/basyx-studio/secret.yaml
+    set:
+      basyxStudio.enabled: true
+      argocd.enabled: true
+      basyxStudio.dataKey.existingSecret: basyx-studio-data-key
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: mounts the existing key Secret under Argo CD
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      argocd.enabled: true
+      basyxStudio.dataKey.existingSecret: basyx-studio-data-key
+      basyxStudio.dataKey.existingSecretKey: key
+    asserts:
+      - notExists:
+          path: spec.template.metadata.annotations["checksum/basyx-studio-secret"]
+      - contains:
+          path: spec.template.spec.volumes[?(@.name == "secrets")].projected.sources
+          content:
+            secret:
+              name: basyx-studio-data-key
+              items:
+                - key: key
+                  path: data-key
+
+  - it: keeps the key out of the chart Secret that holds inline values under Argo CD
+    template: templates/basyx-studio/secret.yaml
+    set:
+      basyxStudio.enabled: true
+      argocd.enabled: true
+      basyxStudio.dataKey.existingSecret: basyx-studio-data-key
+      basyxStudio.database.url: postgres://studio:pw@db/studio
+    asserts:
+      - notExists:
+          path: data["data-key"]
+      - notExists:
+          path: metadata.annotations
+      - exists:
+          path: data["database-url"]
+
+  - it: renders an inline key unchanged under Argo CD
+    template: templates/basyx-studio/secret.yaml
+    set:
+      basyxStudio.enabled: true
+      argocd.enabled: true
+      basyxStudio.dataKey.value: AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8
+    asserts:
+      - equal:
+          path: data["data-key"]
+          value: QUFFQ0F3UUZCZ2NJQ1FvTERBME9EeEFSRWhNVUZSWVhHQmthR3h3ZEhoOA==
+
+  - it: asks to back up a generated key
+    template: templates/NOTES.txt
+    set:
+      basyxStudio.enabled: true
+    asserts:
+      - matchRegexRaw:
+          pattern: "data key was generated into the Secret\n!! basyx-studio"
+
+  - it: does not mention a generated key when the key comes from a Secret
+    template: templates/NOTES.txt
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.dataKey.existingSecret: basyx-studio-data-key
+    asserts:
+      - notMatchRegexRaw:
+          pattern: "data key was generated"

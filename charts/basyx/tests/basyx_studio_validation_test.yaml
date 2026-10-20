@@ -41,3 +41,22 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: another host
+
+  - it: rejects a generated data key with Argo CD
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      argocd.enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: needs a stable data key
+
+  - it: rejects the chart's own Secret as the existing data key Secret
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.dataKey.existingSecret: basyx-studio
+      basyxStudio.database.url: postgres://studio:pw@db/studio
+    asserts:
+      - failedTemplate:
+          errorPattern: must not be "basyx-studio"
