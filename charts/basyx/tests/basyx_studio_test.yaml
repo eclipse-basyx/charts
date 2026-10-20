@@ -1,0 +1,593 @@
+suite: basyx studio
+release:
+  name: basyx
+templates:
+  - templates/basyx-studio/deployment.yaml
+  - templates/basyx-studio/secret.yaml
+  - templates/basyx-studio/configmap-infrastructures.yaml
+  - templates/basyx-studio/ingress.yaml
+  - templates/basyx-studio/httproute.yaml
+  - templates/basyx-studio/pvc.yaml
+  - templates/keycloak-init-config.yaml
+  - templates/tests/basyx-studio-health-test.yaml
+  - templates/NOTES.txt
+tests:
+  - it: renders nothing while disabled
+    template: templates/basyx-studio/deployment.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: runs one replica with Recreate, a read-only root file system and uid 1000
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+    asserts:
+      - equal:
+          path: metadata.name
+          value: basyx-studio
+      - equal:
+          path: spec.replicas
+          value: 1
+      - equal:
+          path: spec.strategy.type
+          value: Recreate
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 1000
+      - equal:
+          path: spec.template.spec.securityContext.fsGroup
+          value: 1000
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: eclipsebasyx/basyx-studio:SNAPSHOT
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: tmp
+            mountPath: /tmp
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: data
+            persistentVolumeClaim:
+              claimName: basyx-studio-data
+
+  - it: serves Studio under paths.basyxStudio on the release host
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      host: basyx.example.org
+      paths.basyxStudio: /workbench/
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.path
+          value: /workbench/health/live
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /workbench/health/ready
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: STUDIO_BASE_PATH
+            value: /workbench
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: STUDIO_PUBLIC_URL
+            value: https://basyx.example.org/workbench
+
+  - it: runs without login and without the internal CA when the release has neither
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      tls.enabled: false
+      basyxStudio.auth.anonymousRoles: [admin, viewer]
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: STUDIO_AUTH_MODE
+            value: none
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: STUDIO_ANONYMOUS_ROLES
+            value: admin,viewer
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: STUDIO_OIDC_ISSUER
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: NODE_EXTRA_CA_CERTS
+          any: true
+
+  - it: logs in with the chart-managed Keycloak and trusts the internal CA
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      keycloak.enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: STUDIO_AUTH_MODE
+            value: oidc
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: STUDIO_OIDC_ISSUER
+            value: https://basyx.example.com/identity-management/realms/basyx
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: STUDIO_OIDC_CLIENT_ID
+            value: basyx-studio
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: STUDIO_ADMIN_ROLE
+            value: admin
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: STUDIO_OIDC_CLIENT_SECRET_FILE
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: NODE_EXTRA_CA_CERTS
+            value: /etc/ssl/certs/ca.crt
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: certs
+            secret:
+              secretName: internal-issuer-ca
+
+  - it: logs in with an external issuer and a confidential client
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      keycloak.issuer: https://login.example.org/realms/basyx
+      basyxStudio.auth.oidc.rolesClaim: /realm_access/roles
+      basyxStudio.auth.oidc.clientSecret.existingSecret: studio-oidc
+      basyxStudio.auth.oidc.clientSecret.existingSecretKey: secret
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: STUDIO_OIDC_ISSUER
+            value: https://login.example.org/realms/basyx
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: STUDIO_OIDC_ROLES_CLAIM
+            value: /realm_access/roles
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: STUDIO_OIDC_CLIENT_SECRET_FILE
+            value: /run/secrets/basyx-studio/oidc-client-secret
+      - contains:
+          path: spec.template.spec.volumes[?(@.name == "secrets")].projected.sources
+          content:
+            secret:
+              name: studio-oidc
+              items:
+                - key: secret
+                  path: oidc-client-secret
+
+  - it: reads the database URL from the Studio Secret
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.database.url: postgres://studio:pw@db:5432/studio
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: STUDIO_DATABASE_URL
+            valueFrom:
+              secretKeyRef:
+                name: basyx-studio
+                key: database-url
+
+  - it: sets apps, branding, legal links and switches
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.apps.url: https://apps.basyx.example.com/
+      basyxStudio.apps.allowInstall: false
+      basyxStudio.branding.productName: Factory Studio
+      basyxStudio.branding.primaryColor: "#0077A6"
+      basyxStudio.legal.privacyPolicyUrl: https://example.org/privacy
+      basyxStudio.switches.readOnly: true
+      basyxStudio.uploadMaxBytes: 209715200
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: STUDIO_APPS_URL
+            value: https://apps.basyx.example.com
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: STUDIO_APPS_ALLOW_INSTALL
+            value: "false"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: STUDIO_PRODUCT_NAME
+            value: Factory Studio
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: STUDIO_PRIMARY_COLOR
+            value: "#0077A6"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: STUDIO_PRIVACY_POLICY_URL
+            value: https://example.org/privacy
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: STUDIO_READ_ONLY
+            value: "true"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: STUDIO_UPLOAD_MAX_BYTES
+            value: "209715200"
+
+  - it: derives a full infrastructure from separate services
+    template: templates/basyx-studio/configmap-infrastructures.yaml
+    values:
+      - ../../../values/values.example.yaml
+    set:
+      basyxStudio.enabled: true
+    asserts:
+      - matchRegex:
+          path: data["infrastructures.yaml"]
+          pattern: "template: full"
+      - matchRegex:
+          path: data["infrastructures.yaml"]
+          pattern: "- type: aasRegistry\n    url: https://basyx.example.com/aas-registry\n"
+      - matchRegex:
+          path: data["infrastructures.yaml"]
+          pattern: "- type: conceptDescriptionRepository\n    url: https://basyx.example.com/cd-repository\n"
+      - matchRegex:
+          path: data["infrastructures.yaml"]
+          pattern: "mode: unsecured"
+      - matchRegex:
+          path: data["infrastructures.yaml"]
+          pattern: "allowPrivateNetwork: true"
+
+  - it: derives mono-all from the AAS Environment alone
+    template: templates/basyx-studio/configmap-infrastructures.yaml
+    set:
+      basyxStudio.enabled: true
+      aasEnvironment.enabled: true
+    asserts:
+      - matchRegex:
+          path: data["infrastructures.yaml"]
+          pattern: "template: mono-all"
+      - matchRegex:
+          path: data["infrastructures.yaml"]
+          pattern: "- type: aasEnvironment\n    url: https://basyx.example.com/aas-environment\n"
+      - matchRegex:
+          path: data["infrastructures.yaml"]
+          pattern: "name: BaSyx Go example"
+
+  - it: derives mono-repo from the AAS Environment with registries
+    template: templates/basyx-studio/configmap-infrastructures.yaml
+    set:
+      basyxStudio.enabled: true
+      aasEnvironment.enabled: true
+      aasRegistry.enabled: true
+      submodelRegistry.enabled: true
+    asserts:
+      - matchRegex:
+          path: data["infrastructures.yaml"]
+          pattern: "template: mono-repo"
+      - notMatchRegex:
+          path: data["infrastructures.yaml"]
+          pattern: "type: aasRepository"
+
+  - it: uses the Digital Twin Registry as AAS registry and discovery
+    template: templates/basyx-studio/configmap-infrastructures.yaml
+    set:
+      basyxStudio.enabled: true
+      digitalTwinRegistry.enabled: true
+      submodelRepository.enabled: true
+    asserts:
+      - matchRegex:
+          path: data["infrastructures.yaml"]
+          pattern: "- type: aasRegistry\n    url: https://basyx.example.com/digital-twin-registry\n"
+      - matchRegex:
+          path: data["infrastructures.yaml"]
+          pattern: "- type: aasDiscovery\n    url: https://basyx.example.com/digital-twin-registry\n"
+
+  - it: sends the signed-in user's token when the release has an identity provider
+    template: templates/basyx-studio/configmap-infrastructures.yaml
+    set:
+      basyxStudio.enabled: true
+      keycloak.enabled: true
+      aasEnvironment.enabled: true
+    asserts:
+      - matchRegex:
+          path: data["infrastructures.yaml"]
+          pattern: "mode: delegated_user"
+      - matchRegex:
+          path: data["infrastructures.yaml"]
+          pattern: "clientId: basyx-studio"
+      - matchRegex:
+          path: data["infrastructures.yaml"]
+          pattern: "issuer: https://basyx.example.com/identity-management/realms/basyx"
+
+  - it: appends declared infrastructures rendered with tpl
+    template: templates/basyx-studio/configmap-infrastructures.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.infrastructures.derived.enabled: false
+      basyxStudio.infrastructures.declared:
+        - key: factory-a
+          name: Factory A
+          template: mono-all
+          endpoints:
+            - type: aasEnvironment
+              url: "https://{{ .Release.Name }}.example.org"
+          security:
+            mode: unsecured
+    asserts:
+      - matchRegex:
+          path: data["infrastructures.yaml"]
+          pattern: "^infrastructures:\n"
+      - matchRegex:
+          path: data["infrastructures.yaml"]
+          pattern: "url: https://basyx.example.org"
+      - matchRegex:
+          path: data["infrastructures.yaml"]
+          pattern: "version: 1"
+      - notMatchRegex:
+          path: data["infrastructures.yaml"]
+          pattern: "key: basyx\n"
+
+  - it: mounts no infrastructure file when nothing is derived or declared
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: STUDIO_INFRASTRUCTURES_FILE
+          any: true
+
+  - it: mounts an existing infrastructure ConfigMap instead
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.infrastructures.existingConfigMap: studio-infrastructures
+      basyxStudio.infrastructures.editable: false
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: STUDIO_INFRASTRUCTURES_FILE
+            value: /etc/basyx-studio/infrastructures.yaml
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: STUDIO_INFRASTRUCTURES_EDITABLE
+            value: "false"
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: infrastructures
+            configMap:
+              name: studio-infrastructures
+              items:
+                - key: infrastructures.yaml
+                  path: infrastructures.yaml
+
+  - it: adds a public Studio client with the Web UI mappers to the realm
+    template: templates/keycloak-init-config.yaml
+    set:
+      basyxStudio.enabled: true
+      keycloak.enabled: true
+    documentSelector:
+      path: metadata.name
+      value: basyx-keycloak-init-config
+    asserts:
+      - matchRegex:
+          path: data["clients.json"]
+          pattern: '"clientId":"basyx-studio"'
+      - matchRegex:
+          path: data["clients.json"]
+          pattern: '"redirectUris":\["https://basyx.example.com/studio/api/studio/v1/auth/callback"\]'
+      - matchRegex:
+          path: data["clients.json"]
+          pattern: '"post.logout.redirect.uris":"https://basyx.example.com/studio/"'
+      - matchRegex:
+          path: data["clients.json"]
+          pattern: '"name":"Studio Realm Roles"'
+      - matchRegex:
+          path: data["clients.json"]
+          pattern: '"clientId":"basyx-studio".*"name":"Clearance Mapper"'
+
+  - it: leaves the realm alone when the Studio client is configured already or not wanted
+    template: templates/keycloak-init-config.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.keycloakClient.create: false
+      keycloak.enabled: true
+    documentSelector:
+      path: metadata.name
+      value: basyx-keycloak-init-config
+    asserts:
+      - notMatchRegex:
+          path: data["clients.json"]
+          pattern: '"clientId":"basyx-studio"'
+
+  - it: does not add the Studio client twice
+    template: templates/keycloak-init-config.yaml
+    set:
+      basyxStudio.enabled: true
+      keycloak.enabled: true
+      keycloak.initialization.extraClients:
+        - clientId: basyx-studio
+          publicClient: false
+    documentSelector:
+      path: metadata.name
+      value: basyx-keycloak-init-config
+    asserts:
+      - notMatchRegex:
+          path: data["clients.json"]
+          pattern: '"clientId":"basyx-studio".*"clientId":"basyx-studio"'
+      - notMatchRegex:
+          path: data["clients.json"]
+          pattern: '"name":"Studio Realm Roles"'
+
+  - it: routes the Studio path on the release host
+    template: templates/basyx-studio/ingress.yaml
+    set:
+      basyxStudio.enabled: true
+    asserts:
+      - lengthEqual:
+          path: spec.rules
+          count: 1
+      - equal:
+          path: spec.rules[0].host
+          value: basyx.example.com
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: /studio
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.name
+          value: basyx-studio
+      - equal:
+          path: spec.tls[0].secretName
+          value: basyx-tls-secret
+
+  - it: adds the apps host derived from apps.url to the Ingress
+    template: templates/basyx-studio/ingress.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.apps.url: https://apps.basyx.example.com:8443
+    asserts:
+      - equal:
+          path: spec.rules[1].host
+          value: apps.basyx.example.com
+      - equal:
+          path: spec.rules[1].http.paths[0].path
+          value: /
+
+  - it: renders HTTPRoutes for the Studio path and the apps host
+    template: templates/basyx-studio/httproute.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.httpRoute.enabled: true
+      basyxStudio.apps.url: https://apps.basyx.example.com
+      gatewayApi.parentRefs:
+        - name: shared-gateway
+          namespace: gateway-system
+    asserts:
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: spec.rules[0].matches[0].path.value
+          value: /studio
+        documentIndex: 0
+      - equal:
+          path: spec.parentRefs[0].name
+          value: shared-gateway
+        documentIndex: 0
+      - equal:
+          path: spec.hostnames[0]
+          value: apps.basyx.example.com
+        documentIndex: 1
+
+  - it: generates a 32-byte base64url data key that is kept on uninstall
+    template: templates/basyx-studio/secret.yaml
+    set:
+      basyxStudio.enabled: true
+    asserts:
+      - equal:
+          path: metadata.annotations["helm.sh/resource-policy"]
+          value: keep
+      - matchRegex:
+          path: data["data-key"]
+          pattern: ^[A-Za-z0-9+/]{58}==$
+
+  - it: stores inline values without the keep policy
+    template: templates/basyx-studio/secret.yaml
+    set:
+      basyxStudio.enabled: true
+      keycloak.enabled: true
+      basyxStudio.dataKey.value: my-key
+      basyxStudio.auth.oidc.clientSecret.value: client-secret
+      basyxStudio.database.url: postgres://studio:pw@db/studio
+    asserts:
+      - notExists:
+          path: metadata.annotations
+      - equal:
+          path: data["data-key"]
+          value: bXkta2V5
+      - equal:
+          path: data["oidc-client-secret"]
+          value: Y2xpZW50LXNlY3JldA==
+      - exists:
+          path: data["database-url"]
+
+  - it: renders no Secret when every secret comes from existing Secrets
+    template: templates/basyx-studio/secret.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.dataKey.existingSecret: studio-credentials
+      basyxStudio.database.existingSecret: studio-credentials
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: keeps the data volume on uninstall
+    template: templates/basyx-studio/pvc.yaml
+    set:
+      basyxStudio.enabled: true
+    asserts:
+      - equal:
+          path: metadata.annotations["helm.sh/resource-policy"]
+          value: keep
+      - equal:
+          path: spec.resources.requests.storage
+          value: 2Gi
+
+  - it: checks the readiness endpoint in a helm test
+    template: templates/tests/basyx-studio-health-test.yaml
+    set:
+      basyxStudio.enabled: true
+    asserts:
+      - equal:
+          path: metadata.annotations["helm.sh/hook"]
+          value: test
+      - contains:
+          path: spec.containers[0].args
+          content: http://basyx-studio:3000/studio/health/ready
+
+  - it: lists Studio in the notes and mentions both UIs
+    template: templates/NOTES.txt
+    set:
+      basyxStudio.enabled: true
+      aasWebGui.enabled: true
+    asserts:
+      - matchRegexRaw:
+          pattern: "BaSyx Studio: +https://basyx.example.com/studio/"
+      - matchRegexRaw:
+          pattern: "Both the AAS Web UI and BaSyx Studio are enabled"

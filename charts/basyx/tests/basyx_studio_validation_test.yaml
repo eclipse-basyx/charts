@@ -1,0 +1,62 @@
+suite: basyx studio validation
+release:
+  name: basyx
+templates:
+  - templates/basyx-studio/deployment.yaml
+  - templates/basyx-studio/secret.yaml
+  - templates/basyx-studio/configmap-infrastructures.yaml
+tests:
+  - it: rejects a public URL whose path differs from paths.basyxStudio
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.publicUrl: https://basyx.example.org/other
+    asserts:
+      - failedTemplate:
+          errorPattern: must equal paths.basyxStudio
+
+  - it: rejects a Studio path that is not a plain path
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      paths.basyxStudio: /a/../b
+    asserts:
+      - failedTemplate:
+          errorPattern: plain URL path
+
+  - it: fails for OIDC without an issuer when the release has no identity provider
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.auth.mode: oidc
+    asserts:
+      - failedTemplate:
+          errorPattern: requires basyxStudio.auth.oidc.issuer
+
+  - it: rejects an apps origin on the Studio host
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.apps.url: https://basyx.example.com
+    asserts:
+      - failedTemplate:
+          errorPattern: another host
+
+  - it: rejects a generated data key with Argo CD
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      argocd.enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: needs a stable data key
+
+  - it: rejects the chart's own Secret as the existing data key Secret
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.dataKey.existingSecret: basyx-studio
+      basyxStudio.database.url: postgres://studio:pw@db/studio
+    asserts:
+      - failedTemplate:
+          errorPattern: must not be "basyx-studio"

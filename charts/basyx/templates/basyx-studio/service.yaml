@@ -1,0 +1,17 @@
+{{- if .Values.basyxStudio.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "basyx-studio.fullname" . }}
+  labels:
+    {{- include "basyx-studio.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.basyxStudio.service.type }}
+  ports:
+    - port: {{ .Values.basyxStudio.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "basyx-studio.selectorLabels" . | nindent 4 }}
+{{- end }}

@@ -1,0 +1,61 @@
+{{- if .Values.basyxStudio.enabled }}
+{{- if .Values.basyxStudio.httpRoute.enabled }}
+{{- $appsHost := include "basyx-studio.appsHost" . }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "basyx-studio.fullname" . }}
+  labels:
+    {{- include "basyx-studio.labels" . | nindent 4 }}
+  {{- with .Values.basyxStudio.httpRoute.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  parentRefs:
+    {{- include "common.httpRoute.parentRefs" (dict "root" $ "parentRefs" .Values.basyxStudio.httpRoute.parentRefs) | nindent 4 }}
+  hostnames:
+    {{- range .Values.basyxStudio.httpRoute.hosts }}
+    - {{ tpl .host $ | quote }}
+    {{- end }}
+  rules:
+    {{- range .Values.basyxStudio.httpRoute.hosts }}
+    {{- range .paths }}
+    - matches:
+        - path:
+            type: {{ .pathType }}
+            value: {{ tpl .path $ | quote }}
+      backendRefs:
+        - name: {{ include "basyx-studio.fullname" $ }}
+          port: {{ $.Values.basyxStudio.service.port }}
+    {{- end }}
+    {{- end }}
+{{- if $appsHost }}
+---
+# Apps origin: every path of its host goes to Studio.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "basyx-studio.fullname" . }}-apps
+  labels:
+    {{- include "basyx-studio.labels" . | nindent 4 }}
+  {{- with .Values.basyxStudio.httpRoute.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  parentRefs:
+    {{- include "common.httpRoute.parentRefs" (dict "root" $ "parentRefs" .Values.basyxStudio.httpRoute.parentRefs) | nindent 4 }}
+  hostnames:
+    - {{ $appsHost | quote }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: {{ include "basyx-studio.fullname" . }}
+          port: {{ .Values.basyxStudio.service.port }}
+{{- end }}
+{{- end }}
+{{- end }}

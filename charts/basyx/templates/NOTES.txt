@@ -36,6 +36,9 @@ Enabled components:
 {{- if .Values.aasWebGui.enabled }}
   - AAS Web UI:                 https://{{ .Values.host }}{{ .Values.paths.aasWebUi }}
 {{- end }}
+{{- if .Values.basyxStudio.enabled }}
+  - BaSyx Studio:               {{ include "basyx-studio.publicUrl" . }}/
+{{- end }}
 {{- if .Values.keycloak.enabled }}
   - Keycloak:                   https://{{ .Values.host }}{{ .Values.paths.keycloak }}
 {{- else if .Values.keycloak.issuer }}
@@ -49,6 +52,22 @@ Enabled components:
 !! WARNING: Keycloak is enabled. If you are using default or example credentials,
 !! change them immediately after the first login to prevent unauthorized access.
 !! Keycloak Admin Console: https://{{ .Values.host }}{{ .Values.paths.keycloak }}/admin
+{{- end }}
+{{- if and .Values.basyxStudio.enabled .Values.aasWebGui.enabled }}
+
+Both the AAS Web UI and BaSyx Studio are enabled. They work side by side; set
+aasWebGui.enabled to false once Studio replaces the Web UI.
+{{- end }}
+{{- if and .Values.basyxStudio.enabled (not .Values.basyxStudio.dataKey.existingSecret) (not .Values.basyxStudio.dataKey.value) }}
+
+!! BaSyx Studio's data key was generated into the Secret
+!! {{ include "basyx-studio.secretName" . }} (key {{ .Values.basyxStudio.dataKey.existingSecretKey }}). Back it up together with Studio's
+!! volume or database: data encrypted with it cannot be read with another key.
+{{- end }}
+{{- if and .Values.basyxStudio.enabled (eq (include "basyx-studio.authMode" .) "none") }}
+
+!! BaSyx Studio runs without login (basyxStudio.auth.mode "none"): every
+!! visitor is the shared user "anonymous".
 {{- end }}
 
 Next steps:

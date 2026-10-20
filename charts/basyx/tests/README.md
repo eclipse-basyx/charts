@@ -34,3 +34,5 @@ The suites cover stable chart contracts such as:
 - keycloak init resources and a runtime `helm test` realm check
 - Gateway API HTTPRoute rendering, parentRefs precedence and fail-fast validation
 - optional self-managed Gateway rendering, className validation and derived HTTPRoute parentRefs
+- optional BaSyx Studio deployment, derived infrastructure, Keycloak client, Ingress and HTTPRoute, and Secret handling
+- a Studio data key that GitOps renders (Argo CD) cannot generate or replace
