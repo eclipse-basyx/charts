@@ -341,6 +341,12 @@ helm diff upgrade basyx charts/basyx \
   -f values/values.example.yaml
 ```
 
+### Upgrading to chart 3.16.1
+
+Chart 3.16.1 updates the default BaSyx Go backend and Configuration Service
+images to 1.1.2. Explicit image tags or digests continue to override the chart's
+default application version.
+
 ### Upgrading to chart 3.16.0
 
 Chart 3.16.0 adds BaSyx Studio as the optional `basyxStudio` component; see
@@ -1433,7 +1439,7 @@ aasRepository:
   replicaCount: 1
   image:
     repository: eclipsebasyx/aasrepository-go
-    tag: "1.1.1"
+    tag: "1.1.2"
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
