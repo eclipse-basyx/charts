@@ -10,6 +10,8 @@ on:
       - 'values/**'
       - '!**/README.md'
       - '.github/workflows/tests.yml'
+      - '.github/workflows/update-aas-web-ui.yml'
+      - '.github/tests/**'
       - 'lintconf.yaml'
   
   push:
@@ -20,9 +22,23 @@ on:
       - 'values/**'
       - '!**/README.md'
       - '.github/workflows/tests.yml'
+      - '.github/workflows/update-aas-web-ui.yml'
+      - '.github/tests/**'
       - 'lintconf.yaml'
 
 jobs:
+  web-ui-updater:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Test Web UI updater
+        run: node --test .github/tests/update-aas-web-ui.test.cjs
+
   lint-test:
     runs-on: ubuntu-latest
     steps:
