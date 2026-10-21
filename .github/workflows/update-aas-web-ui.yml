@@ -1,0 +1,170 @@
+name: Update AAS Web UI
+
+on:
+  schedule:
+    - cron: '23 6 * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: update-aas-web-ui
+  cancel-in-progress: false
+
+jobs:
+  update:
+    if: github.repository == 'eclipse-basyx/charts' && !github.event.repository.fork
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Test updater
+        uses: actions/github-script@v8
+        with:
+          script: await exec.exec(process.execPath, ['--test', '.github/tests/update-aas-web-ui.test.cjs']);
+
+      - name: Prepare update if a newer release and image exist
+        id: update
+        uses: actions/github-script@v8
+        with:
+          retries: 3
+          script: |
+            const fs = require('node:fs');
+            const image = 'eclipsebasyx/aas-gui';
+            core.setOutput('changed', 'false');
+
+            function parseTag(tag) {
+              const match = /^v([1-9][0-9]*)-(\d{2})(\d{2})(\d{2})$/.exec(tag);
+              if (!match) return null;
+              const [, major, yy, mm, dd] = match;
+              const year = 2000 + Number(yy);
+              const month = Number(mm);
+              const day = Number(dd);
+              const date = new Date(Date.UTC(year, month - 1, day));
+              if (date.getUTCFullYear() !== year || date.getUTCMonth() + 1 !== month || date.getUTCDate() !== day) {
+                return null;
+              }
+              return { major, date: date.getTime() };
+            }
+
+            const valuesPath = 'charts/basyx/values.yaml';
+            const values = fs.readFileSync(valuesPath, 'utf8');
+            const block = /^aasWebGui:\n(?:(?:[ \t].*|)\n)*/m.exec(values);
+            const imageBlock = block && /^  image:\n(?:    .*\n)*/m.exec(block[0]);
+            if (!imageBlock || !/^    repository: eclipsebasyx\/aas-gui[ \t]*$/m.test(imageBlock[0])) {
+              throw new Error(`Expected aasWebGui.image.repository: ${image}`);
+            }
+            const tagMatch = /^    tag: (v[1-9][0-9]*-[0-9]{6})[ \t]*$/m.exec(imageBlock[0]);
+            const oldTag = tagMatch?.[1];
+            const current = oldTag && parseTag(oldTag);
+            if (!current) throw new Error('Expected a valid aasWebGui.image.tag: v<major>-YYMMDD');
+
+            const releases = await github.paginate(github.rest.repos.listReleases, {
+              owner: 'eclipse-basyx', repo: 'basyx-aas-web-ui', per_page: 100,
+            });
+            const candidates = releases
+              .filter(release => !release.draft && !release.prerelease && release.published_at)
+              .map(release => ({ tag: release.tag_name, version: parseTag(release.tag_name) }))
+              .filter(({ version }) => version && version.major === current.major && version.date > current.date)
+              .sort((a, b) => b.version.date - a.version.date);
+            if (!candidates.length) {
+              core.info(`AAS Web UI is current (${oldTag}).`);
+              return;
+            }
+            const newTag = candidates[0].tag;
+
+            const auth = await fetch(
+              `https://auth.docker.io/token?service=registry.docker.io&scope=repository:${image}:pull`,
+              { signal: AbortSignal.timeout(30000) },
+            );
+            if (!auth.ok) throw new Error(`Docker Hub authentication failed: HTTP ${auth.status}`);
+            const { token } = await auth.json();
+            if (!token) throw new Error('Docker Hub returned no pull token');
+            const manifest = await fetch(`https://registry-1.docker.io/v2/${image}/manifests/${newTag}`, {
+              method: 'HEAD',
+              headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: [
+                  'application/vnd.oci.image.index.v1+json',
+                  'application/vnd.oci.image.manifest.v1+json',
+                  'application/vnd.docker.distribution.manifest.list.v2+json',
+                  'application/vnd.docker.distribution.manifest.v2+json',
+                ].join(', '),
+              },
+              signal: AbortSignal.timeout(30000),
+            });
+            if (manifest.status === 404) {
+              core.info(`Waiting for ${image}:${newTag} to be published.`);
+              return;
+            }
+            if (!manifest.ok) throw new Error(`Docker Hub manifest check failed: HTTP ${manifest.status}`);
+
+            const chartPath = 'charts/basyx/Chart.yaml';
+            const chart = fs.readFileSync(chartPath, 'utf8');
+            const versionMatch = /^version: ([0-9]+)\.([0-9]+)\.([0-9]+)$/m.exec(chart);
+            if (!versionMatch) throw new Error('Expected a stable chart version');
+            const [, major, minor, patch] = versionMatch;
+            const version = `${major}.${minor}.${BigInt(patch) + 1n}`;
+            const readme = fs.readFileSync('README.md', 'utf8');
+            const noteIndex = readme.indexOf('### Upgrading to chart ');
+            if (noteIndex === -1) throw new Error('Cannot locate README upgrade notes');
+            const note = `### Upgrading to chart ${version}\n\nChart ${version} updates the default AAS Web UI image to \`${newTag}\`.\n\n`;
+            const tagStart = block.index + imageBlock.index + tagMatch.index + '    tag: '.length;
+
+            // Calculate and validate all edits before writing any file.
+            fs.writeFileSync(valuesPath, values.slice(0, tagStart) + newTag + values.slice(tagStart + oldTag.length));
+            fs.writeFileSync(chartPath, chart.replace(versionMatch[0], `version: ${version}`));
+            fs.writeFileSync('README.md', readme.slice(0, noteIndex) + note + readme.slice(noteIndex));
+            core.setOutput('tag', newTag);
+            core.setOutput('previous-tag', oldTag);
+            core.setOutput('chart-version', version);
+            core.setOutput('changed', 'true');
+            core.info(`Prepared chart ${version}: ${oldTag} -> ${newTag}`);
+
+      - name: Set up Helm
+        if: steps.update.outputs.changed == 'true'
+        uses: azure/setup-helm@v4.3.0
+        with:
+          version: v3.17.0
+
+      - name: Install helm-unittest
+        if: steps.update.outputs.changed == 'true'
+        run: helm plugin install https://github.com/helm-unittest/helm-unittest.git --version v0.8.0
+
+      - name: Validate updated chart
+        if: steps.update.outputs.changed == 'true'
+        run: |
+          helm lint charts/basyx --strict
+          helm unittest charts/basyx
+
+      # Creation happens after validation, so every ready PR has passed these checks.
+      # Repository settings must allow GitHub Actions to create pull requests.
+      - name: Create or update Web UI PR
+        if: steps.update.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: automation/aas-web-ui
+          base: main
+          add-paths: |
+            charts/basyx/values.yaml
+            charts/basyx/Chart.yaml
+            README.md
+          commit-message: 'chore(deps): update AAS Web UI to ${{ steps.update.outputs.tag }}'
+          title: 'chore(deps): update AAS Web UI to ${{ steps.update.outputs.tag }}'
+          body: |
+            Updates the default AAS Web UI image from `${{ steps.update.outputs.previous-tag }}` to `${{ steps.update.outputs.tag }}`.
+
+            - Release: https://github.com/eclipse-basyx/basyx-aas-web-ui/releases/tag/${{ steps.update.outputs.tag }}
+            - Verified Docker Hub manifest for `eclipsebasyx/aas-gui:${{ steps.update.outputs.tag }}`.
+            - Bumps the chart patch version to `${{ steps.update.outputs.chart-version }}` and adds an upgrade note.
+            - Validation passed: `helm lint charts/basyx --strict` and `helm unittest charts/basyx`.
+
+            Ready for maintainer review. Merging and deployment require a separate action.
+          draft: false
