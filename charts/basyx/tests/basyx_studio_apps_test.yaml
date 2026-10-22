@@ -1,0 +1,691 @@
+suite: basyx studio apps
+release:
+  name: basyx
+templates:
+  - templates/basyx-studio/deployment.yaml
+  - templates/basyx-studio/secret.yaml
+  - templates/basyx-studio/configmap-infrastructures.yaml
+  - templates/basyx-studio/configmap-trusted-publishers.yaml
+  - templates/basyx-studio/ingress.yaml
+  - templates/basyx-studio/httproute.yaml
+tests:
+  # One origin per installation (STUDIO_APPS_URL with {installation})
+
+  - it: passes an apps URL with {installation} to Studio unchanged
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.apps.url: https://{installation}.apps.example.org/
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: STUDIO_APPS_URL
+            value: https://{installation}.apps.example.org
+
+  - it: routes the wildcard apps host in the Ingress
+    template: templates/basyx-studio/ingress.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.apps.url: https://{installation}.apps.example.org
+    asserts:
+      - equal:
+          path: spec.rules[1].host
+          value: "*.apps.example.org"
+      - equal:
+          path: spec.rules[1].http.paths[0].path
+          value: /
+
+  - it: routes the wildcard apps host in the HTTPRoute
+    template: templates/basyx-studio/httproute.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.httpRoute.enabled: true
+      basyxStudio.apps.url: https://{installation}.apps.example.org:8443
+      gatewayApi.parentRefs:
+        - name: shared-gateway
+    asserts:
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: spec.hostnames
+          value:
+            - "*.apps.example.org"
+        documentIndex: 1
+
+  - it: adds a TLS entry of its own for the apps host
+    template: templates/basyx-studio/ingress.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.apps.url: https://{installation}.apps.example.org
+      basyxStudio.apps.tls.secretName: apps-wildcard-tls
+    asserts:
+      - equal:
+          path: spec.tls[0].secretName
+          value: basyx-tls-secret
+      - equal:
+          path: spec.tls[1]
+          value:
+            hosts:
+              - "*.apps.example.org"
+            secretName: apps-wildcard-tls
+
+  - it: renders the apps TLS entry alone while the release's TLS is off
+    template: templates/basyx-studio/ingress.yaml
+    set:
+      basyxStudio.enabled: true
+      tls.enabled: false
+      basyxStudio.apps.url: https://{installation}.apps.example.org
+      basyxStudio.apps.tls.secretName: apps-wildcard-tls
+    asserts:
+      - lengthEqual:
+          path: spec.tls
+          count: 1
+      - equal:
+          path: spec.tls[0].hosts[0]
+          value: "*.apps.example.org"
+
+  - it: keeps the release's TLS block unchanged without an apps TLS Secret
+    template: templates/basyx-studio/ingress.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.apps.url: https://{installation}.apps.example.org
+      tls.hosts:
+        - "{{ .Values.host }}"
+        - "*.apps.example.org"
+    asserts:
+      - lengthEqual:
+          path: spec.tls
+          count: 1
+      - equal:
+          path: spec.tls[0].hosts
+          value:
+            - basyx.example.com
+            - "*.apps.example.org"
+
+  - it: rejects {installation} anywhere but the first label
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.ingress.enabled: false
+      basyxStudio.apps.url: https://apps.{installation}.example.org
+    asserts:
+      - failedTemplate:
+          errorPattern: only as the first label of its host
+
+  - it: rejects {installation} as part of a label
+    template: templates/basyx-studio/ingress.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.apps.url: https://{installation}-apps.example.org
+    asserts:
+      - failedTemplate:
+          errorPattern: only as the first label of its host
+
+  - it: rejects an apps wildcard that covers the Studio host
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.apps.url: https://{installation}.example.com
+    asserts:
+      - failedTemplate:
+          errorPattern: "must not match the Studio host: \\*.example.com covers basyx.example.com"
+
+  - it: accepts an apps wildcard below the Studio host
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.apps.url: https://{installation}.basyx.example.com
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: STUDIO_APPS_URL
+            value: https://{installation}.basyx.example.com
+
+  # Trust store (STUDIO_APPS_TRUSTED_PUBLISHERS)
+
+  - it: renders the trusted publishers in Studio's trust store format
+    template: templates/basyx-studio/configmap-trusted-publishers.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.apps.url: https://{installation}.apps.example.org
+      basyxStudio.apps.trustedPublishers.publishers:
+        - name: Example GmbH
+          keys:
+            - |
+              -----BEGIN PUBLIC KEY-----
+              MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsFH9RFNyQ137X2dqZ+GNq8iQ9fOp
+              yS+zdf05mYiXi9oag7oWfwJjDYwcCvCe7Fg4p88J6KJOPTSpBIjJOxhifw==
+              -----END PUBLIC KEY-----
+          appIds: [org.example.*]
+          permissions: [studio.timeseries.read]
+          remoteCode: true
+    asserts:
+      - equal:
+          path: metadata.name
+          value: basyx-studio-trusted-publishers
+      - equal:
+          path: data["trusted-publishers.yaml"]
+          value: |
+            publishers:
+            - appIds:
+              - org.example.*
+              keys:
+              - |
+                -----BEGIN PUBLIC KEY-----
+                MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsFH9RFNyQ137X2dqZ+GNq8iQ9fOp
+                yS+zdf05mYiXi9oag7oWfwJjDYwcCvCe7Fg4p88J6KJOPTSpBIjJOxhifw==
+                -----END PUBLIC KEY-----
+              name: Example GmbH
+              permissions:
+              - studio.timeseries.read
+              remoteCode: true
+            version: 1
+
+  - it: mounts the trust store and points Studio at it
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.apps.url: https://apps.example.org
+      basyxStudio.apps.trustedPublishers.publishers:
+        - name: Example GmbH
+          keys: [keys/example.pub]
+          appIds: [org.example.*]
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: STUDIO_APPS_TRUSTED_PUBLISHERS
+            value: /etc/basyx-studio-trust/trusted-publishers.yaml
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: trusted-publishers
+            mountPath: /etc/basyx-studio-trust
+            readOnly: true
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: trusted-publishers
+            configMap:
+              name: basyx-studio-trusted-publishers
+      - exists:
+          path: spec.template.metadata.annotations["checksum/basyx-studio-trusted-publishers"]
+
+  - it: mounts an existing trust store ConfigMap as a whole
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.apps.url: https://apps.example.org
+      basyxStudio.apps.trustedPublishers.existingConfigMap: studio-trust
+      basyxStudio.apps.trustedPublishers.existingConfigMapKey: publishers.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: STUDIO_APPS_TRUSTED_PUBLISHERS
+            value: /etc/basyx-studio-trust/publishers.yaml
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: trusted-publishers
+            configMap:
+              name: studio-trust
+      - notExists:
+          path: spec.template.metadata.annotations["checksum/basyx-studio-trusted-publishers"]
+
+  - it: renders no trust store ConfigMap for an existing one
+    template: templates/basyx-studio/configmap-trusted-publishers.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.apps.url: https://apps.example.org
+      basyxStudio.apps.trustedPublishers.existingConfigMap: studio-trust
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: sets no trust store without publishers
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.apps.url: https://apps.example.org
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: STUDIO_APPS_TRUSTED_PUBLISHERS
+          any: true
+      - notContains:
+          path: spec.template.spec.volumes
+          content:
+            name: trusted-publishers
+          any: true
+      - notExists:
+          path: spec.template.spec.initContainers
+
+  - it: rejects inline publishers together with an existing ConfigMap
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.apps.url: https://apps.example.org
+      basyxStudio.apps.trustedPublishers.existingConfigMap: studio-trust
+      basyxStudio.apps.trustedPublishers.publishers:
+        - name: Example GmbH
+          keys: [keys/example.pub]
+          appIds: [org.example.*]
+    asserts:
+      - failedTemplate:
+          errorPattern: "set either basyxStudio.apps.trustedPublishers.publishers or basyxStudio.apps.trustedPublishers.existingConfigMap"
+
+  - it: rejects a trust store without an apps URL
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.apps.trustedPublishers.existingConfigMap: studio-trust
+    asserts:
+      - failedTemplate:
+          errorPattern: need basyxStudio.apps.url
+
+  - it: rejects a publisher without appIds
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.apps.url: https://apps.example.org
+      basyxStudio.apps.trustedPublishers.publishers:
+        - name: Example GmbH
+          keys: [keys/example.pub]
+    asserts:
+      - failedTemplate:
+          errorPattern: "publishers.0: appIds is required"
+
+  - it: rejects an app ID pattern Studio does not accept
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.apps.url: https://apps.example.org
+      basyxStudio.apps.trustedPublishers.publishers:
+        - name: Example GmbH
+          keys: [keys/example.pub]
+          appIds: [org.example*]
+    asserts:
+      - failedTemplate:
+          errorPattern: publishers.0.appIds.0
+
+  # Managed packages (STUDIO_APP_PACKAGES)
+
+  - it: downloads packages in an init container with the restrictive security context
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.apps.url: https://apps.example.org
+      basyxStudio.apps.packages.download:
+        - name: work-orders
+          url: https://packages.example.org/work-orders-1.0.0.zip
+          signatureUrl: https://packages.example.org/work-orders-1.0.0.zip.sig
+          sha256: 3A7BD3E2360A3D29EEA436FCFB7E44C735D117C42D1C1835420B6B9942DD4F1B
+        - name: asset-board
+          url: https://packages.example.org/asset-board.zip
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: download-app-packages
+      - equal:
+          path: spec.template.spec.initContainers[0].image
+          value: curlimages/curl:8.21.0
+      - equal:
+          path: spec.template.spec.initContainers[0].securityContext
+          value:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: PACKAGE_0_FILE
+            value: /opt/basyx-studio/downloaded-packages/work-orders.zip
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: PACKAGE_0_URL
+            value: https://packages.example.org/work-orders-1.0.0.zip
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: PACKAGE_0_SIGNATURE_URL
+            value: https://packages.example.org/work-orders-1.0.0.zip.sig
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: PACKAGE_0_SHA256
+            value: 3a7bd3e2360a3d29eea436fcfb7e44c735d117c42d1c1835420b6b9942dd4f1b
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: PACKAGE_1_HEADERS
+            value: ""
+      - matchRegex:
+          path: spec.template.spec.initContainers[0].command[2]
+          pattern: 'fetch "\$PACKAGE_0_SIGNATURE_URL" "\$PACKAGE_0_FILE.sig"'
+      - notMatchRegex:
+          path: spec.template.spec.initContainers[0].command[2]
+          pattern: PACKAGE_1_SIGNATURE_URL
+      - notMatchRegex:
+          path: spec.template.spec.initContainers[0].command[2]
+          pattern: packages.example.org
+      - contains:
+          path: spec.template.spec.initContainers[0].volumeMounts
+          content:
+            name: downloaded-app-packages
+            mountPath: /opt/basyx-studio/downloaded-packages
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: STUDIO_APP_PACKAGES
+            value: /opt/basyx-studio/downloaded-packages/work-orders.zip,/opt/basyx-studio/downloaded-packages/asset-board.zip
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: downloaded-app-packages
+            mountPath: /opt/basyx-studio/downloaded-packages
+            readOnly: true
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: downloaded-app-packages
+            emptyDir:
+              sizeLimit: 1Gi
+
+  - it: sends request headers from a Secret for a package and its signature
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.apps.url: https://apps.example.org
+      basyxStudio.apps.packages.download:
+        - name: work-orders
+          url: https://packages.example.org/work-orders.zip
+          signatureUrl: https://packages.example.org/work-orders.zip.sig
+          headersSecret: package-registry
+          headersSecretKey: registry-headers
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: PACKAGE_0_HEADERS
+            value: /run/secrets/basyx-studio-packages/work-orders.headers
+      - matchRegex:
+          path: spec.template.spec.initContainers[0].command[2]
+          pattern: 'fetch "\$PACKAGE_0_SIGNATURE_URL" "\$PACKAGE_0_FILE.sig" "\$PACKAGE_0_HEADERS"'
+      - contains:
+          path: spec.template.spec.initContainers[0].volumeMounts
+          content:
+            name: app-package-headers
+            mountPath: /run/secrets/basyx-studio-packages
+            readOnly: true
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: app-package-headers
+            projected:
+              defaultMode: 0440
+              sources:
+                - secret:
+                    name: package-registry
+                    items:
+                      - key: registry-headers
+                        path: work-orders.headers
+      - notContains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: app-package-headers
+          any: true
+
+  - it: uses a configured downloader image
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.apps.url: https://apps.example.org
+      basyxStudio.apps.packages.download:
+        - name: work-orders
+          url: https://packages.example.org/work-orders.zip
+      basyxStudio.apps.packages.downloader.image:
+        repository: registry.example.org/curl
+        tag: "8.21.0"
+        pullPolicy: Always
+      basyxStudio.apps.packages.downloader.resources:
+        limits:
+          memory: 64Mi
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].image
+          value: registry.example.org/curl:8.21.0
+      - equal:
+          path: spec.template.spec.initContainers[0].imagePullPolicy
+          value: Always
+      - equal:
+          path: spec.template.spec.initContainers[0].resources.limits.memory
+          value: 64Mi
+
+  - it: installs packages from an existing claim
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.apps.url: https://apps.example.org
+      basyxStudio.apps.packages.existingClaim: studio-packages
+      basyxStudio.apps.packages.subPath: released
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: STUDIO_APP_PACKAGES
+            value: /opt/basyx-studio/packages
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: app-packages
+            mountPath: /opt/basyx-studio/packages
+            subPath: released
+            readOnly: true
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: app-packages
+            persistentVolumeClaim:
+              claimName: studio-packages
+              readOnly: true
+      - notExists:
+          path: spec.template.spec.initContainers
+
+  - it: installs packages from any volume source next to downloaded ones
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.apps.url: https://apps.example.org
+      basyxStudio.apps.packages.download:
+        - name: work-orders
+          url: https://packages.example.org/work-orders.zip
+      basyxStudio.apps.packages.volume:
+        nfs:
+          server: nfs.example.org
+          path: /exports/studio-packages
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: STUDIO_APP_PACKAGES
+            value: /opt/basyx-studio/downloaded-packages/work-orders.zip,/opt/basyx-studio/packages
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: app-packages
+            nfs:
+              server: nfs.example.org
+              path: /exports/studio-packages
+
+  - it: rejects an existing claim together with a volume
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.apps.url: https://apps.example.org
+      basyxStudio.apps.packages.existingClaim: studio-packages
+      basyxStudio.apps.packages.volume:
+        emptyDir: {}
+    asserts:
+      - failedTemplate:
+          errorPattern: "set either basyxStudio.apps.packages.existingClaim or basyxStudio.apps.packages.volume"
+
+  - it: rejects two packages of the same name
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.apps.url: https://apps.example.org
+      basyxStudio.apps.packages.download:
+        - name: work-orders
+          url: https://packages.example.org/work-orders-1.zip
+        - name: work-orders
+          url: https://packages.example.org/work-orders-2.zip
+    asserts:
+      - failedTemplate:
+          errorPattern: names "work-orders" twice
+
+  - it: rejects packages without an apps URL
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.apps.packages.download:
+        - name: work-orders
+          url: https://packages.example.org/work-orders.zip
+    asserts:
+      - failedTemplate:
+          errorPattern: need basyxStudio.apps.url
+
+  - it: rejects a sha256 that is not a SHA-256 digest
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.apps.url: https://apps.example.org
+      basyxStudio.apps.packages.download:
+        - name: work-orders
+          url: https://packages.example.org/work-orders.zip
+          sha256: deadbeef
+    asserts:
+      - failedTemplate:
+          errorPattern: download.0.sha256
+
+  - it: rejects a package name that is not a plain file name
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.apps.url: https://apps.example.org
+      basyxStudio.apps.packages.download:
+        - name: ../work-orders
+          url: https://packages.example.org/work-orders.zip
+    asserts:
+      - failedTemplate:
+          errorPattern: download.0.name
+
+  # Connections and app settings of the derived infrastructure
+
+  - it: adds connections and app settings to the derived infrastructure
+    template: templates/basyx-studio/configmap-infrastructures.yaml
+    set:
+      basyxStudio.enabled: true
+      aasEnvironment.enabled: true
+      basyxStudio.infrastructures.derived.connections:
+        - key: work-orders
+          type: http
+          url: "http://work-orders.{{ .Release.Namespace }}.svc:8080/api/v1"
+          auth:
+            scheme: bearer
+            token: { ref: env:STUDIO_WORK_ORDERS_TOKEN }
+          allowPrivateNetwork: true
+          apps:
+            - { app: org.example.work-orders, connection: orders }
+      basyxStudio.infrastructures.derived.apps:
+        - app: org.example.work-orders
+          settings:
+            site: "{{ .Values.instanceName }}"
+    asserts:
+      - equal:
+          path: data["infrastructures.yaml"]
+          value: |
+            infrastructures:
+            - allowPrivateNetwork: true
+              apps:
+              - app: org.example.work-orders
+                settings:
+                  site: example
+              connections:
+              - allowPrivateNetwork: true
+                apps:
+                - app: org.example.work-orders
+                  connection: orders
+                auth:
+                  scheme: bearer
+                  token:
+                    ref: env:STUDIO_WORK_ORDERS_TOKEN
+                key: work-orders
+                type: http
+                url: http://work-orders.NAMESPACE.svc:8080/api/v1
+              endpoints:
+              - type: aasEnvironment
+                url: https://basyx.example.com/aas-environment
+              key: basyx
+              listSource: registry
+              name: BaSyx Go example
+              security:
+                mode: unsecured
+              template: mono-all
+            version: 1
+
+  - it: leaves connections and apps out of the derived infrastructure by default
+    template: templates/basyx-studio/configmap-infrastructures.yaml
+    set:
+      basyxStudio.enabled: true
+      aasEnvironment.enabled: true
+    asserts:
+      - notMatchRegex:
+          path: data["infrastructures.yaml"]
+          pattern: "(connections|apps):"
+
+  - it: rejects derived connections without a derived infrastructure
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.infrastructures.derived.connections:
+        - key: work-orders
+          type: http
+          url: http://work-orders:8080
+    asserts:
+      - failedTemplate:
+          errorPattern: need the derived infrastructure
+
+  - it: rejects derived app settings with an existing infrastructures ConfigMap
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      aasEnvironment.enabled: true
+      basyxStudio.infrastructures.existingConfigMap: studio-infrastructures
+      basyxStudio.infrastructures.derived.apps:
+        - app: org.example.work-orders
+          settings: { site: north }
+    asserts:
+      - failedTemplate:
+          errorPattern: replaces the derived infrastructure
+
+  - it: rejects an app binding whose connection ID Studio does not accept
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      aasEnvironment.enabled: true
+      basyxStudio.infrastructures.derived.connections:
+        - key: work-orders
+          type: http
+          url: http://work-orders:8080
+          apps:
+            - { app: org.example.work-orders, connection: Orders_1 }
+    asserts:
+      - failedTemplate:
+          errorPattern: connections.0.apps.0.connection

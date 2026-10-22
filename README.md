@@ -341,6 +341,22 @@ helm diff upgrade basyx charts/basyx \
   -f values/values.example.yaml
 ```
 
+### Upgrading to chart 3.17.0
+
+Chart 3.17.0 extends `basyxStudio` for signed apps; see
+[Studio apps](#studio-apps). Existing values render unchanged.
+
+- `basyxStudio.apps.url` accepts one origin per installation,
+  `https://{installation}.apps.example.org`; the Ingress and the `HTTPRoute`
+  route the wildcard host `*.apps.example.org`. `basyxStudio.apps.tls.secretName`
+  gives the apps host a TLS Secret of its own.
+- `basyxStudio.apps.trustedPublishers` renders Studio's trust store, or mounts
+  an existing ConfigMap.
+- `basyxStudio.apps.packages` installs managed packages: downloaded by an init
+  container, or from an existing volume.
+- `basyxStudio.infrastructures.derived.connections` and `.apps` add
+  connections and app settings to the derived infrastructure.
+
 ### Upgrading to chart 3.16.1
 
 Chart 3.16.1 updates the default BaSyx Go backend and Configuration Service
@@ -2214,11 +2230,164 @@ or database URL, without the key, and rejects the name.
 Back up the key together with Studio's volume or database. A restore needs
 both from the same point in time.
 
-Apps are served from a separate origin: set `basyxStudio.apps.url`, for
-example `https://apps.basyx.example.com`, and add its host to `tls.hosts`. The
-Ingress and the `HTTPRoute` route that host to Studio. The ingress controller
-must keep the original `Host` header and must not add `X-Frame-Options` or a
-`Content-Security-Policy` on the apps host.
+#### Studio apps
+
+Apps are served from a separate origin, `basyxStudio.apps.url`. Without it,
+apps are off. It has two forms
+([Studio: apps origins](https://github.com/eclipse-basyx/basyx-studio/blob/main/docs/deployment/README.md#apps-origins)):
+
+| Form | `basyxStudio.apps.url` | Routed host | Use |
+| --- | --- | --- | --- |
+| One origin per installation | `https://{installation}.apps.example.org` | `*.apps.example.org` | Apps that embed pages; each installation gets its own origin, cookies and storage. |
+| One shared origin | `https://apps.example.org` | `apps.example.org` | Every app frame runs in an opaque origin; embedded pages often stay blank. |
+
+The chart passes the value to `STUDIO_APPS_URL` as it is and routes the host to
+Studio in the Ingress and the `HTTPRoute`. The apps host must differ from
+Studio's host, and the wildcard must not cover it: `{installation}.example.org`
+next to Studio at `basyx.example.org` is refused. Prefer a registrable domain
+of its own for apps, such as `*.example-apps.net`.
+
+One origin per installation needs:
+
+- a wildcard DNS record, e.g. `*.apps.example.org`, to the ingress controller
+  or Gateway;
+- a wildcard TLS certificate for it. ACME issues wildcard certificates with the
+  DNS-01 challenge only. Either add the wildcard to `tls.hosts`, so the
+  release's TLS Secret covers it, or reference a Secret of its own:
+
+  ```yaml
+  basyxStudio:
+    apps:
+      url: https://{installation}.apps.example.org
+      tls:
+        secretName: studio-apps-wildcard-tls
+  ```
+
+  With a cert-manager annotation on the Ingress (such as `ingress.annotations`
+  with `cert-manager.io/issuer`), cert-manager manages every TLS Secret the
+  Ingress names, including this one, so its issuer must be able to issue the
+  wildcard. Leave the annotation off `basyxStudio.ingress.annotations` to use a
+  certificate provisioned elsewhere.
+- with `basyxStudio.httpRoute.enabled`, a Gateway listener that accepts the
+  wildcard host and terminates TLS for it. The chart's own Gateway
+  (`gatewayApi.gateway`) listens on `host` only, so use a shared Gateway in
+  `basyxStudio.httpRoute.parentRefs` or `gatewayApi.parentRefs`.
+
+The ingress controller must keep the original `Host` header and must not add
+`X-Frame-Options` or a `Content-Security-Policy` on the apps host.
+
+**Signed apps.** `basyxStudio.apps.trustedPublishers.publishers` lists the
+publishers whose keys may sign app packages. The chart renders them into a
+ConfigMap in Studio's trust store format, mounts it and sets
+`STUDIO_APPS_TRUSTED_PUBLISHERS`. Packages signed by them install without
+developer mode
+([Studio: signed apps](https://github.com/eclipse-basyx/basyx-studio/blob/main/docs/deployment/README.md#signed-apps)):
+
+```yaml
+basyxStudio:
+  apps:
+    url: https://{installation}.apps.example.org
+    trustedPublishers:
+      publishers:
+        - name: Example GmbH
+          keys:  # ECDSA P-256 public keys, e.g. cosign.pub of cosign generate-key-pair
+            - |
+              -----BEGIN PUBLIC KEY-----
+              ...
+              -----END PUBLIC KEY-----
+          appIds: [org.example.*]
+          permissions: [studio.timeseries.read]
+          remoteCode: false
+```
+
+`existingConfigMap` (and `existingConfigMapKey`) mounts a trust store
+provisioned elsewhere instead. It is mounted as a whole, so its `keys` may name
+key files in the same ConfigMap. Studio reads the trust store at startup and
+does not start with an invalid one; a changed inline trust store restarts the
+pod. Removing a key revokes the apps it signed.
+
+**Managed packages.** `basyxStudio.apps.packages` lists packages that Studio
+installs and updates at every start (`STUDIO_APP_PACKAGES`). Packages are too
+large for ConfigMaps, so an init container downloads them into an `emptyDir`:
+
+```yaml
+basyxStudio:
+  apps:
+    packages:
+      download:
+        - name: work-orders              # saved as work-orders.zip
+          url: https://packages.example.org/work-orders-1.2.0.zip
+          signatureUrl: https://packages.example.org/work-orders-1.2.0.zip.sig
+          sha256: 3a7bd3e2360a3d29eea436fcfb7e44c735d117c42d1c1835420b6b9942dd4f1b
+          headersSecret: package-registry  # optional
+```
+
+- `signatureUrl` is saved as `<name>.zip.sig` next to the package. A signature
+  must verify against the trust store, or Studio skips the package and keeps
+  its previous version. Unsigned managed packages are accepted: the operator
+  vouches for them.
+- `sha256` is checked before Studio sees the package.
+- `headersSecret` (key `headersSecretKey`, default `headers`) holds request
+  headers for a private registry, one `Name: value` per line, sent for the
+  package and its signature:
+
+  ```bash
+  kubectl -n <namespace> create secret generic package-registry     --from-literal=headers='Authorization: Bearer <token>'
+  ```
+
+  curl follows redirects and drops `Authorization` on a redirect to another
+  host, but sends other headers there too.
+- A failed download or a wrong digest keeps the pod from starting, so Studio
+  never runs with a package missing. The init container uses the image of
+  `basyxStudio.tests` (curl) unless `downloader.image` is set, and Studio's
+  restrictive `securityContext`.
+- Alternatively, `existingClaim` or `volume` (any volume source) mounts
+  packages that are provisioned elsewhere; the `.zip` files directly in its
+  directory, or in `subPath`, are installed.
+- **A managed app whose package leaves the list is uninstalled at the next
+  start.** Renaming a package or moving it to another source does not, as long
+  as the app is in one of the configured packages.
+
+**Connections and app settings.** Apps that call services through Studio
+declare connections in their manifest, and an infrastructure binds them to an
+`http` connection with the URL and the credential
+([Studio: HTTP connections](https://github.com/eclipse-basyx/basyx-studio/blob/main/docs/deployment/README.md#http-connections-for-apps)).
+`basyxStudio.infrastructures.derived.connections` and `.apps` add connections
+and per-infrastructure app settings to the derived infrastructure, so it need
+not be re-declared:
+
+```yaml
+basyxStudio:
+  infrastructures:
+    derived:
+      connections:
+        - key: work-orders
+          type: http
+          url: "http://work-orders.{{ .Release.Namespace }}.svc:8080/api/v1"
+          auth:
+            scheme: bearer
+            token: { ref: env:STUDIO_WORK_ORDERS_TOKEN }
+          allowPrivateNetwork: true
+          apps:
+            - { app: org.example.work-orders, connection: orders }
+      apps:
+        - app: org.example.work-orders
+          settings:
+            site: north
+  extraEnv:
+    - name: STUDIO_WORK_ORDERS_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: work-orders-token
+          key: token
+```
+
+Both are rendered with `tpl`. Secrets are references only (`{ ref: env:NAME }`
+with `extraEnv`, or `{ ref: file:/path }` with `extraVolumes`). App settings
+are not for secrets: Studio stores them in plain text and sends them to the
+browser. The derived infrastructure must exist for them: the chart refuses
+them when it is disabled, when the enabled services fit no Studio template, or
+with `infrastructures.existingConfigMap`.
 
 `basyxStudio.branding`, `basyxStudio.legal` and `basyxStudio.switches` set the
 product name, logos, colors, legal links, read-only mode and uploads. The

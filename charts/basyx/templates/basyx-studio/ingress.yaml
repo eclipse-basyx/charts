@@ -10,7 +10,18 @@ metadata:
   {{- include "common.ingress.metadataAnnotations" (dict "root" . "ingress" .Values.basyxStudio.ingress) | nindent 2 }}
 spec:
   {{- include "common.ingress.className" (dict "root" . "ingress" .Values.basyxStudio.ingress) | nindent 2 }}
-  {{ include "common.ingressTLS" . | nindent 2 }}
+  {{- $appsTlsSecret := and $appsHost .Values.basyxStudio.apps.tls.secretName }}
+  {{- if .Values.tls.enabled }}
+  {{- include "common.ingressTLS" . | nindent 2 }}
+  {{- else if $appsTlsSecret }}
+  tls:
+  {{- end }}
+  {{- if $appsTlsSecret }}
+    # The apps host with a certificate of its own, e.g. a wildcard certificate.
+    - hosts:
+        - {{ $appsHost | quote }}
+      secretName: {{ tpl (toString $appsTlsSecret) . | quote }}
+  {{- end }}
   rules:
     {{- range .Values.basyxStudio.ingress.hosts }}
     - host: {{ tpl .host $ | quote }}
@@ -27,7 +38,8 @@ spec:
           {{- end }}
     {{- end }}
     {{- if $appsHost }}
-    # Apps origin: every path of its host goes to Studio.
+    # Apps origin: every path of its host goes to Studio. For one origin per
+    # installation, the host is a wildcard such as *.apps.example.org.
     - host: {{ $appsHost | quote }}
       http:
         paths:

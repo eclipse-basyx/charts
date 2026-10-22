@@ -124,11 +124,141 @@ must equal the base path, or https://<host><paths.basyxStudio>.
 {{- end -}}
 {{- end }}
 
-{{/* Host of the apps origin, from basyxStudio.apps.url. */}}
-{{- define "basyx-studio.appsHost" -}}
+{{/*
+STUDIO_APPS_URL: basyxStudio.apps.url without a trailing slash, or nothing.
+One shared origin (https://apps.example.org) or one origin per installation
+with {installation} as the first label of the host
+(https://{installation}.apps.example.org).
+*/}}
+{{- define "basyx-studio.appsUrl" -}}
 {{- with .Values.basyxStudio.apps.url -}}
-{{- (urlParse (tpl (toString .) $)).hostname -}}
+{{- $url := tpl (toString .) $ | trimSuffix "/" -}}
+{{- $example := "use an http(s) origin such as https://apps.example.org, or https://{installation}.apps.example.org for one origin per installation" -}}
+{{- if and (contains "{" $url) (not (regexMatch "^https?://\\{installation\\}\\.[^/{}]+(/[^{}]*)?$" $url)) -}}
+{{- fail (printf "basyxStudio.apps.url may name {installation} only as the first label of its host, got %q; %s" $url $example) -}}
 {{- end -}}
+{{- $parsed := urlParse (replace "{installation}" "installation" $url) -}}
+{{- if or (not (has $parsed.scheme (list "http" "https"))) (not $parsed.hostname) -}}
+{{- fail (printf "basyxStudio.apps.url must be an http(s) origin, got %q; %s" $url $example) -}}
+{{- end -}}
+{{- $url -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+Host the Ingress and HTTPRoute route to Studio for apps: the host of
+basyxStudio.apps.url, or the wildcard *.apps.example.org for
+https://{installation}.apps.example.org.
+*/}}
+{{- define "basyx-studio.appsHost" -}}
+{{- with include "basyx-studio.appsUrl" . -}}
+{{- $hostname := (urlParse (replace "{installation}" "installation" .)).hostname -}}
+{{- if contains "{installation}" . -}}
+{{- printf "*.%s" (trimPrefix "installation." $hostname) -}}
+{{- else -}}
+{{- $hostname -}}
+{{- end -}}
+{{- end -}}
+{{- end }}
+
+{{- define "basyx-studio.trustedPublishersConfigMapName" -}}
+{{- printf "%s-trusted-publishers" (include "basyx-studio.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end }}
+
+{{- define "basyx-studio.trustedPublishersMountPath" -}}
+/etc/basyx-studio-trust
+{{- end }}
+
+{{/* The trust store of basyxStudio.apps.trustedPublishers.publishers, or nothing. */}}
+{{- define "basyx-studio.trustedPublishersFile" -}}
+{{- with .Values.basyxStudio.apps.trustedPublishers.publishers -}}
+{{- toYaml (dict "version" 1 "publishers" (fromYamlArray (tpl (toYaml .) $))) -}}
+{{- end -}}
+{{- end }}
+
+{{/* Whether a trust store is mounted (STUDIO_APPS_TRUSTED_PUBLISHERS). */}}
+{{- define "basyx-studio.trustedPublishersEnabled" -}}
+{{- $trust := .Values.basyxStudio.apps.trustedPublishers -}}
+{{- if or $trust.existingConfigMap $trust.publishers -}}
+true
+{{- end -}}
+{{- end }}
+
+{{- define "basyx-studio.downloadedPackagesPath" -}}
+/opt/basyx-studio/downloaded-packages
+{{- end }}
+
+{{- define "basyx-studio.mountedPackagesPath" -}}
+/opt/basyx-studio/packages
+{{- end }}
+
+{{- define "basyx-studio.packageHeadersPath" -}}
+/run/secrets/basyx-studio-packages
+{{- end }}
+
+{{/* Whether a download sends request headers from a Secret. */}}
+{{- define "basyx-studio.packageHeadersEnabled" -}}
+{{- range .Values.basyxStudio.apps.packages.download -}}
+{{- if .headersSecret -}}
+true
+{{- end -}}
+{{- end -}}
+{{- end }}
+
+{{/* Whether packages are mounted from an existing claim or volume. */}}
+{{- define "basyx-studio.mountedPackagesEnabled" -}}
+{{- $packages := .Values.basyxStudio.apps.packages -}}
+{{- if or $packages.existingClaim $packages.volume -}}
+true
+{{- end -}}
+{{- end }}
+
+{{/*
+STUDIO_APP_PACKAGES: the downloaded packages and the directory of mounted
+ones, comma-separated, or nothing.
+*/}}
+{{- define "basyx-studio.appPackages" -}}
+{{- $root := . -}}
+{{- $paths := list -}}
+{{- range .Values.basyxStudio.apps.packages.download -}}
+{{- $paths = append $paths (printf "%s/%s.zip" (include "basyx-studio.downloadedPackagesPath" $root) .name) -}}
+{{- end -}}
+{{- if include "basyx-studio.mountedPackagesEnabled" . -}}
+{{- $paths = append $paths (include "basyx-studio.mountedPackagesPath" .) -}}
+{{- end -}}
+{{- join "," $paths -}}
+{{- end }}
+
+{{/*
+Script of the init container that downloads basyxStudio.apps.packages.download
+into an emptyDir. URLs, files, header files and digests come from the
+container's environment, so no value becomes part of the script. A failed
+download or a wrong digest stops the pod from starting; Studio would
+otherwise uninstall the managed app.
+*/}}
+{{- define "basyx-studio.downloadPackagesScript" -}}
+set -eu
+# fetch <url> <file> <header file or ""> <sha256 or "">
+fetch() {
+  url=$1 target=$2 headers=$3 sha256=$4
+  set -- --fail --silent --show-error --location --proto =http,https --proto-redir =https --retry 3 --connect-timeout 30 --output "$target.part"
+  if [ -n "$headers" ]; then
+    set -- "$@" --header "@$headers"
+  fi
+  curl -q "$@" "$url"
+  if [ -n "$sha256" ] && ! echo "$sha256  $target.part" | sha256sum -c - >/dev/null; then
+    echo "$target: the SHA-256 digest is not $sha256" >&2
+    exit 1
+  fi
+  mv "$target.part" "$target"
+  echo "downloaded $target"
+}
+{{- range $index, $package := .Values.basyxStudio.apps.packages.download }}
+fetch "$PACKAGE_{{ $index }}_URL" "$PACKAGE_{{ $index }}_FILE" "$PACKAGE_{{ $index }}_HEADERS" "$PACKAGE_{{ $index }}_SHA256"
+{{- if $package.signatureUrl }}
+fetch "$PACKAGE_{{ $index }}_SIGNATURE_URL" "$PACKAGE_{{ $index }}_FILE.sig" "$PACKAGE_{{ $index }}_HEADERS" ""
+{{- end }}
+{{- end }}
 {{- end }}
 
 {{/*
@@ -230,6 +360,12 @@ registries or discovery and "mono-all" without.
 {{- $security = dict "mode" $securityMode "issuer" (include "basyx.oidcIssuer" .) "clientId" .Values.basyxStudio.auth.oidc.clientId "scopes" (list "openid" "profile") -}}
 {{- end -}}
 {{- $entry := dict "key" $derived.key "name" (tpl (toString $derived.name) .) "template" $template "endpoints" $endpoints "listSource" $listSource "security" $security "allowPrivateNetwork" true -}}
+{{- with $derived.connections -}}
+{{- $_ := set $entry "connections" (fromYamlArray (tpl (toYaml .) $root)) -}}
+{{- end -}}
+{{- with $derived.apps -}}
+{{- $_ := set $entry "apps" (fromYamlArray (tpl (toYaml .) $root)) -}}
+{{- end -}}
 {{- toYaml $entry -}}
 {{- end -}}
 {{- end -}}
@@ -330,21 +466,45 @@ set. Large numbers may arrive as float64; render them without an exponent.
 {{- if and (eq ($studio.infrastructures.derived.securityMode | default "") "delegated_user") (not (include "basyx-studio.identityProvider" .)) -}}
 {{- fail "basyxStudio.infrastructures.derived.securityMode \"delegated_user\" requires keycloak.issuer or keycloak.enabled" -}}
 {{- end -}}
-{{- with $studio.apps.url -}}
-{{- $apps := urlParse (tpl (toString .) $) -}}
-{{- if or (not (has $apps.scheme (list "http" "https"))) (not $apps.hostname) -}}
-{{- fail (printf "basyxStudio.apps.url must be an http(s) origin such as https://apps.example.org, got %q" .) -}}
-{{- end -}}
-{{- $public := urlParse (include "basyx-studio.publicUrl" $) -}}
-{{- if eq $apps.hostname $public.hostname -}}
+{{- with include "basyx-studio.appsHost" . -}}
+{{- $publicHost := (urlParse (include "basyx-studio.publicUrl" $)).hostname -}}
+{{- if eq . $publicHost -}}
 {{- fail "basyxStudio.apps.url must have another host than the Studio URL" -}}
 {{- end -}}
+{{- /* The wildcard covers one label, as in the Ingress. */ -}}
+{{- if and (hasPrefix "*." .) (eq (trimPrefix "*." .) (join "." (rest (splitList "." $publicHost)))) -}}
+{{- fail (printf "basyxStudio.apps.url must not match the Studio host: %s covers %s. Serve apps from another domain, e.g. https://{installation}.apps.example.org next to studio.example.org." . $publicHost) -}}
+{{- end -}}
+{{- end -}}
+{{- $apps := $studio.apps -}}
+{{- if and (not $apps.url) (or (include "basyx-studio.trustedPublishersEnabled" .) (include "basyx-studio.appPackages" .)) -}}
+{{- fail "basyxStudio.apps.trustedPublishers and basyxStudio.apps.packages need basyxStudio.apps.url: without it, apps are off" -}}
+{{- end -}}
+{{- if and $apps.trustedPublishers.existingConfigMap $apps.trustedPublishers.publishers -}}
+{{- fail "set either basyxStudio.apps.trustedPublishers.publishers or basyxStudio.apps.trustedPublishers.existingConfigMap, not both" -}}
+{{- end -}}
+{{- if and $apps.packages.existingClaim $apps.packages.volume -}}
+{{- fail "set either basyxStudio.apps.packages.existingClaim or basyxStudio.apps.packages.volume, not both" -}}
+{{- end -}}
+{{- $packageNames := list -}}
+{{- range $apps.packages.download -}}
+{{- if has .name $packageNames -}}
+{{- fail (printf "basyxStudio.apps.packages.download names %q twice; every package needs a name of its own" .name) -}}
+{{- end -}}
+{{- $packageNames = append $packageNames .name -}}
 {{- end -}}
 {{- if and .Values.argocd.enabled (not $studio.dataKey.existingSecret) (not $studio.dataKey.value) -}}
 {{- fail "basyxStudio with argocd.enabled needs a stable data key: set basyxStudio.dataKey.existingSecret to a Secret provisioned outside the chart, for example with External Secrets or Sealed Secrets. Argo CD renders without access to the cluster, so the chart cannot reuse a generated key and would replace it on every sync." -}}
 {{- end -}}
 {{- if and $studio.dataKey.existingSecret (eq $studio.dataKey.existingSecret (include "basyx-studio.secretName" .)) (include "basyx-studio.createSecret" .) -}}
 {{- fail (printf "basyxStudio.dataKey.existingSecret must not be %q: the chart renders that Secret for the inline OIDC client secret or database URL and would drop the key from it. Store the key in a Secret of another name." (include "basyx-studio.secretName" .)) -}}
+{{- end -}}
+{{- $derived := $studio.infrastructures.derived -}}
+{{- if and (or $derived.connections $derived.apps) (not (include "basyx-studio.derivedInfrastructure" .)) -}}
+{{- fail "basyxStudio.infrastructures.derived.connections and .apps need the derived infrastructure: set derived.enabled and enable the BaSyx services it is built from, or declare the infrastructure in basyxStudio.infrastructures.declared" -}}
+{{- end -}}
+{{- if and $studio.infrastructures.existingConfigMap (or $derived.connections $derived.apps) -}}
+{{- fail "basyxStudio.infrastructures.existingConfigMap replaces the derived infrastructure, so derived.connections and derived.apps would be ignored; put them into the ConfigMap instead" -}}
 {{- end -}}
 {{- if and $studio.infrastructures.existingConfigMap $studio.infrastructures.declared -}}
 {{- fail "set either basyxStudio.infrastructures.declared or basyxStudio.infrastructures.existingConfigMap, not both" -}}

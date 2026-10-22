@@ -1,0 +1,13 @@
+{{- if and .Values.basyxStudio.enabled (not .Values.basyxStudio.apps.trustedPublishers.existingConfigMap) }}
+{{- with include "basyx-studio.trustedPublishersFile" . }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "basyx-studio.trustedPublishersConfigMapName" $ }}
+  labels:
+    {{- include "basyx-studio.labels" $ | nindent 4 }}
+data:
+  {{ $.Values.basyxStudio.apps.trustedPublishers.existingConfigMapKey }}: |
+    {{- . | nindent 4 }}
+{{- end }}
+{{- end }}
