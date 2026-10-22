@@ -2059,6 +2059,28 @@ basyxStudio:
       # "delegated_user" (the signed-in user's token) or "unsecured". Empty
       # selects "delegated_user" when the release has an identity provider.
       securityMode: ""
+      # Connections of the infrastructure: services that are not AAS
+      # services, such as InfluxDB for time series or "http" connections that
+      # apps call through Studio, bound to app connections with "apps".
+      # Secrets are references only, e.g. { ref: env:NAME } with NAME set
+      # through extraEnv. Rendered with tpl.
+      connections: []
+      #  - key: work-orders
+      #    type: http
+      #    url: http://work-orders.example.svc:8080/api/v1
+      #    auth:
+      #      scheme: bearer
+      #      token: { ref: env:STUDIO_WORK_ORDERS_TOKEN }
+      #    allowPrivateNetwork: true
+      #    apps:
+      #      - { app: org.example.work-orders, connection: orders }
+      # Settings of apps on this infrastructure, for settings the apps declare
+      # with scope "infrastructure". Not for secrets: settings are stored in
+      # plain text and sent to the browser. Rendered with tpl.
+      apps: []
+      #  - app: org.example.asset-board
+      #    settings:
+      #      assetTypes: [https://example.org/types/pump]
     # Further entries in the format Studio exports (Infrastructures -> Export
     # all), without the surrounding "version" and "infrastructures" keys.
     # Secrets are references only, e.g. { ref: env:NAME } with NAME set
@@ -2073,11 +2095,80 @@ basyxStudio:
     editable: true
 
   apps:
-    # Separate origin app files are served from (STUDIO_APPS_URL), e.g.
-    # https://apps.basyx.example.com. It must be another host than host; the
-    # ingress and HTTPRoute route it to Studio too. Add it to tls.hosts.
-    # Without it, apps are off.
+    # Separate origin app files are served from (STUDIO_APPS_URL). Without
+    # it, apps are off. Two forms:
+    # - one origin per installation, with {installation} as the first label:
+    #   https://{installation}.apps.example.org. Apps that embed pages need
+    #   it. The Ingress and HTTPRoute route the wildcard *.apps.example.org to
+    #   Studio; it needs a wildcard DNS record and a wildcard certificate.
+    # - one shared origin, e.g. https://apps.example.org, routed as it is.
+    # Only an origin: scheme, host and an optional port, without user info,
+    # path, query or fragment. The host must differ from Studio's host, and a
+    # wildcard must not cover it. Add the host to tls.hosts, or set
+    # tls.secretName below.
     url: ""
+    tls:
+      # Existing TLS Secret for the apps host on the Studio Ingress, e.g. a
+      # wildcard certificate for *.apps.example.org. Empty: the release's tls
+      # Secret covers it, so tls.hosts must include the apps host.
+      secretName: ""
+    # Publishers whose keys may sign app packages
+    # (STUDIO_APPS_TRUSTED_PUBLISHERS). Signed packages install without
+    # developer mode. Studio reads the trust store at startup and does not
+    # start with an invalid one; removing a key revokes the apps it signed.
+    trustedPublishers:
+      # Rendered into a ConfigMap as { version: 1, publishers: [...] }, with tpl.
+      publishers: []
+      #  - name: Example GmbH            # shown as the verified publisher
+      #    keys:                         # ECDSA P-256 PEM public keys
+      #      - |
+      #        -----BEGIN PUBLIC KEY-----
+      #        ...
+      #        -----END PUBLIC KEY-----
+      #    appIds: [org.example.*]       # IDs, prefixes ending in .*, or *
+      #    permissions:                  # reserved permissions it may grant
+      #      - studio.timeseries.read
+      #    remoteCode: false             # connect origins with WebAssembly or workers
+      # An existing ConfigMap with the trust store instead. It is mounted as a
+      # whole, so keys may name key files of the same ConfigMap.
+      existingConfigMap: ""
+      existingConfigMapKey: trusted-publishers.yaml
+    # Packages Studio installs and updates at startup (STUDIO_APP_PACKAGES)
+    # and marks as managed. A <package>.zip.sig next to a package must verify
+    # against the trust store, or the package is skipped. A managed app whose
+    # package leaves this list is uninstalled at the next start.
+    packages:
+      # Downloaded by an init container into an emptyDir at every pod start.
+      # A failed download or a wrong sha256 keeps the pod from starting.
+      download: []
+      #  - name: asset-board             # saved as asset-board.zip
+      #    url: https://packages.example.org/asset-board-1.2.0.zip
+      #    # Optional: saved as asset-board.zip.sig.
+      #    signatureUrl: https://packages.example.org/asset-board-1.2.0.zip.sig
+      #    # Optional: checked before Studio sees the package.
+      #    sha256: ""
+      #    # Optional: a Secret whose key holds request headers, one
+      #    # "Name: value" per line, e.g. "Authorization: Bearer <token>".
+      #    # They are sent for the package and its signature.
+      #    headersSecret: package-registry
+      #    headersSecretKey: headers
+      downloader:
+        # Empty repository: the image of basyxStudio.tests (curl). The
+        # container runs with basyxStudio.securityContext.
+        image:
+          repository: ""
+          tag: ""
+          digest: ""
+          pullPolicy: ""
+        resources: {}
+        # Size limit of the emptyDir with the downloaded packages.
+        sizeLimit: 1Gi
+      # Or packages on an existing volume: the .zip files directly in its
+      # directory (or subPath) are installed. Set existingClaim, or volume
+      # with any volume source, e.g. { nfs: { server: ..., path: ... } }.
+      existingClaim: ""
+      volume: {}
+      subPath: ""
     # Developer-mode installs of unsigned packages (STUDIO_APPS_ALLOW_UNSIGNED).
     allowUnsigned: false
     # false keeps administrators from installing or removing apps; bundled

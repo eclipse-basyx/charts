@@ -1804,6 +1804,51 @@
                 "securityMode": {
                   "type": "string",
                   "enum": ["", "delegated_user", "unsecured"]
+                },
+                "connections": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["key", "type", "url"],
+                    "properties": {
+                      "key": { "type": "string", "minLength": 1 },
+                      "type": { "type": "string", "minLength": 1 },
+                      "url": { "type": "string", "minLength": 1 },
+                      "aliases": { "type": "array", "items": { "type": "string" } },
+                      "auth": {
+                        "type": "object",
+                        "required": ["scheme"],
+                        "properties": {
+                          "scheme": { "type": "string", "minLength": 1 }
+                        }
+                      },
+                      "settings": { "type": "object" },
+                      "allowPrivateNetwork": { "type": "boolean" },
+                      "timeoutSeconds": { "type": "integer", "minimum": 1, "maximum": 120 },
+                      "apps": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "required": ["app", "connection"],
+                          "properties": {
+                            "app": { "type": "string", "minLength": 1 },
+                            "connection": { "type": "string", "pattern": "^[a-z0-9-]{1,63}$" }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "apps": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["app", "settings"],
+                    "properties": {
+                      "app": { "type": "string", "minLength": 1 },
+                      "settings": { "type": "object" }
+                    }
+                  }
                 }
               }
             },
@@ -1848,8 +1893,90 @@
           "additionalProperties": false,
           "properties": {
             "url": { "type": "string", "pattern": "^(|https?://.+)$" },
+            "tls": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "secretName": { "type": "string" }
+              }
+            },
             "allowUnsigned": { "type": "boolean" },
-            "allowInstall": { "type": "boolean" }
+            "allowInstall": { "type": "boolean" },
+            "trustedPublishers": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "publishers": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["name", "keys", "appIds"],
+                    "properties": {
+                      "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+                      "keys": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": { "type": "string", "minLength": 1 }
+                      },
+                      "appIds": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                          "type": "string",
+                          "pattern": "^(\\*|[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)*(\\.\\*)?)$"
+                        }
+                      },
+                      "permissions": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+                      "remoteCode": { "type": "boolean" }
+                    }
+                  }
+                },
+                "existingConfigMap": { "type": "string" },
+                "existingConfigMapKey": { "type": "string", "minLength": 1 }
+              }
+            },
+            "packages": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "download": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["name", "url"],
+                    "properties": {
+                      "name": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$" },
+                      "url": { "type": "string", "pattern": "^https?://\\S+$" },
+                      "signatureUrl": { "type": "string", "pattern": "^(|https?://\\S+)$" },
+                      "sha256": { "type": "string", "pattern": "^(|[A-Fa-f0-9]{64})$" },
+                      "headersSecret": { "type": "string" },
+                      "headersSecretKey": { "type": "string", "minLength": 1 }
+                    }
+                  }
+                },
+                "downloader": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "image": {
+                      "type": "object",
+                      "properties": {
+                        "repository": { "type": "string" },
+                        "tag": { "type": ["string", "number"] },
+                        "digest": { "type": "string" },
+                        "pullPolicy": { "type": "string", "enum": ["", "Always", "IfNotPresent", "Never"] }
+                      }
+                    },
+                    "resources": { "type": "object" },
+                    "sizeLimit": { "type": ["string", "null"] }
+                  }
+                },
+                "existingClaim": { "type": "string" },
+                "volume": { "type": "object" },
+                "subPath": { "type": "string" }
+              }
+            }
           }
         },
         "branding": {

@@ -22,10 +22,52 @@ basyxStudio:
   # Back it up together with Studio's volume: it cannot be rotated.
   dataKey:
     existingSecret: basyx-studio-data-key
-  # Separate origin for Studio apps; it is routed to Studio and needs a DNS
-  # record and a certificate (see tls.hosts below).
+  # Studio apps run on an origin of their own per installation, e.g.
+  # https://app-0123456789abcdef.apps.basyx.example.com. The chart routes the
+  # wildcard *.apps.basyx.example.com to Studio; it needs a wildcard DNS
+  # record and a wildcard certificate (see tls.hosts below, or set
+  # apps.tls.secretName). https://apps.basyx.example.com would be one shared
+  # origin instead, where pages that apps embed often stay blank.
   apps:
-    url: https://apps.basyx.example.com
+    url: https://{installation}.apps.basyx.example.com
+    # Publishers whose keys may sign app packages; their packages install
+    # without developer mode.
+    # trustedPublishers:
+    #   publishers:
+    #     - name: Example GmbH
+    #       keys:
+    #         - |
+    #           -----BEGIN PUBLIC KEY-----
+    #           ...
+    #           -----END PUBLIC KEY-----
+    #       appIds: [org.example.*]
+    # Packages Studio installs at startup, downloaded by an init container.
+    # A managed app whose package leaves the list is uninstalled.
+    # packages:
+    #   download:
+    #     - name: work-orders
+    #       url: https://packages.example.org/work-orders-1.0.0.zip
+    #       signatureUrl: https://packages.example.org/work-orders-1.0.0.zip.sig
+  # Connections and app settings on the infrastructure of this release, e.g.
+  # a service an app calls through Studio:
+  # infrastructures:
+  #   derived:
+  #     connections:
+  #       - key: work-orders
+  #         type: http
+  #         url: http://work-orders:8080/api/v1
+  #         auth:
+  #           scheme: bearer
+  #           token: { ref: env:STUDIO_WORK_ORDERS_TOKEN }
+  #         allowPrivateNetwork: true
+  #         apps:
+  #           - { app: org.example.work-orders, connection: orders }
+  # extraEnv:
+  #   - name: STUDIO_WORK_ORDERS_TOKEN
+  #     valueFrom:
+  #       secretKeyRef:
+  #         name: work-orders-token
+  #         key: token
   branding:
     productName: BaSyx Studio
   resources:
@@ -39,7 +81,7 @@ tls:
   enabled: true
   hosts:
     - "{{ .Values.host }}"
-    - apps.basyx.example.com
+    - "*.apps.basyx.example.com"
 
 # Studio and the AAS Web UI can run side by side. Disable the Web UI once
 # Studio replaces it:

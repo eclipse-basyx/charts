@@ -4,6 +4,8 @@
 {{- $basePath := include "basyx-studio.basePath" . }}
 {{- $secretsPath := include "basyx-studio.secretsMountPath" . }}
 {{- $authMode := include "basyx-studio.authMode" . }}
+{{- $appPackages := include "basyx-studio.appPackages" . }}
+{{- $packages := $studio.apps.packages }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -33,6 +35,9 @@ spec:
         {{- if not $studio.infrastructures.existingConfigMap }}
         checksum/basyx-studio-infrastructures: {{ include (print $.Template.BasePath "/basyx-studio/configmap-infrastructures.yaml") . | sha256sum }}
         {{- end }}
+        {{- if $studio.apps.trustedPublishers.publishers }}
+        checksum/basyx-studio-trusted-publishers: {{ include (print $.Template.BasePath "/basyx-studio/configmap-trusted-publishers.yaml") . | sha256sum }}
+        {{- end }}
         {{- with $studio.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -51,6 +56,50 @@ spec:
       securityContext:
         {{- toYaml $studio.podSecurityContext | nindent 8 }}
       terminationGracePeriodSeconds: {{ $studio.terminationGracePeriodSeconds }}
+      {{- with $packages.download }}
+      initContainers:
+        # Downloads basyxStudio.apps.packages.download, which Studio installs
+        # at startup. Fails the pod on a failed download or a wrong digest.
+        - name: download-app-packages
+          {{- $image := $studio.tests.image }}
+          {{- if $packages.downloader.image.repository }}
+          {{- $image = $packages.downloader.image }}
+          {{- end }}
+          image: {{ include "basyx.image" (dict "image" $image "root" $) | quote }}
+          imagePullPolicy: {{ $image.pullPolicy | default "IfNotPresent" }}
+          securityContext:
+            {{- toYaml $studio.securityContext | nindent 12 }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              {{- include "basyx-studio.downloadPackagesScript" $ | nindent 14 }}
+          env:
+            {{- range $index, $package := . }}
+            - name: PACKAGE_{{ $index }}_FILE
+              value: {{ printf "%s/%s.zip" (include "basyx-studio.downloadedPackagesPath" $) $package.name | quote }}
+            - name: PACKAGE_{{ $index }}_URL
+              value: {{ tpl (toString $package.url) $ | quote }}
+            - name: PACKAGE_{{ $index }}_SIGNATURE_URL
+              value: {{ tpl (toString ($package.signatureUrl | default "")) $ | quote }}
+            - name: PACKAGE_{{ $index }}_SHA256
+              value: {{ $package.sha256 | default "" | lower | quote }}
+            - name: PACKAGE_{{ $index }}_HEADERS
+              value: {{ ternary (printf "%s/%s.headers" (include "basyx-studio.packageHeadersPath" $) $package.name) "" (not (empty $package.headersSecret)) | quote }}
+            {{- end }}
+          resources:
+            {{- toYaml $packages.downloader.resources | nindent 12 }}
+          volumeMounts:
+            - name: downloaded-app-packages
+              mountPath: {{ include "basyx-studio.downloadedPackagesPath" $ }}
+            - name: tmp
+              mountPath: /tmp
+            {{- if include "basyx-studio.packageHeadersEnabled" $ }}
+            - name: app-package-headers
+              mountPath: {{ include "basyx-studio.packageHeadersPath" $ }}
+              readOnly: true
+            {{- end }}
+      {{- end }}
       containers:
         - name: studio
           image: {{ include "basyx.image" (dict "image" $studio.image "root" .) | quote }}
@@ -105,9 +154,17 @@ spec:
             {{- end }}
             - name: STUDIO_INFRASTRUCTURES_EDITABLE
               value: {{ $studio.infrastructures.editable | quote }}
-            {{- with $studio.apps.url }}
+            {{- with include "basyx-studio.appsUrl" . }}
             - name: STUDIO_APPS_URL
-              value: {{ tpl (toString .) $ | trimSuffix "/" | quote }}
+              value: {{ . | quote }}
+            {{- end }}
+            {{- if include "basyx-studio.trustedPublishersEnabled" . }}
+            - name: STUDIO_APPS_TRUSTED_PUBLISHERS
+              value: {{ printf "%s/%s" (include "basyx-studio.trustedPublishersMountPath" .) $studio.apps.trustedPublishers.existingConfigMapKey | quote }}
+            {{- end }}
+            {{- with $appPackages }}
+            - name: STUDIO_APP_PACKAGES
+              value: {{ . | quote }}
             {{- end }}
             - name: STUDIO_APPS_ALLOW_UNSIGNED
               value: {{ $studio.apps.allowUnsigned | quote }}
@@ -169,6 +226,24 @@ spec:
               mountPath: {{ include "basyx-studio.infrastructuresMountPath" . }}
               readOnly: true
             {{- end }}
+            {{- if include "basyx-studio.trustedPublishersEnabled" . }}
+            - name: trusted-publishers
+              mountPath: {{ include "basyx-studio.trustedPublishersMountPath" . }}
+              readOnly: true
+            {{- end }}
+            {{- if $packages.download }}
+            - name: downloaded-app-packages
+              mountPath: {{ include "basyx-studio.downloadedPackagesPath" . }}
+              readOnly: true
+            {{- end }}
+            {{- if include "basyx-studio.mountedPackagesEnabled" . }}
+            - name: app-packages
+              mountPath: {{ include "basyx-studio.mountedPackagesPath" . }}
+              {{- with $packages.subPath }}
+              subPath: {{ . | quote }}
+              {{- end }}
+              readOnly: true
+            {{- end }}
             {{- if .Values.tls.enabled }}
             - name: certs
               mountPath: /etc/ssl/certs/ca.crt
@@ -214,6 +289,45 @@ spec:
             items:
               - key: {{ $studio.infrastructures.existingConfigMapKey | quote }}
                 path: infrastructures.yaml
+        {{- end }}
+        {{- if include "basyx-studio.trustedPublishersEnabled" . }}
+        # The whole ConfigMap, so keys in an existing one may name key files
+        # next to the trust store.
+        - name: trusted-publishers
+          configMap:
+            name: {{ $studio.apps.trustedPublishers.existingConfigMap | default (include "basyx-studio.trustedPublishersConfigMapName" .) | quote }}
+        {{- end }}
+        {{- if $packages.download }}
+        - name: downloaded-app-packages
+          emptyDir:
+            {{- with $packages.downloader.sizeLimit }}
+            sizeLimit: {{ . }}
+            {{- end }}
+        {{- if include "basyx-studio.packageHeadersEnabled" . }}
+        - name: app-package-headers
+          projected:
+            defaultMode: 0440
+            sources:
+              {{- range $packages.download }}
+              {{- if .headersSecret }}
+              - secret:
+                  name: {{ tpl (toString .headersSecret) $ | quote }}
+                  items:
+                    - key: {{ .headersSecretKey | default "headers" | quote }}
+                      path: {{ printf "%s.headers" .name | quote }}
+              {{- end }}
+              {{- end }}
+        {{- end }}
+        {{- end }}
+        {{- if include "basyx-studio.mountedPackagesEnabled" . }}
+        - name: app-packages
+          {{- if $packages.existingClaim }}
+          persistentVolumeClaim:
+            claimName: {{ tpl (toString $packages.existingClaim) . | quote }}
+            readOnly: true
+          {{- else }}
+          {{- tpl (toYaml $packages.volume) . | nindent 10 }}
+          {{- end }}
         {{- end }}
         {{- if .Values.tls.enabled }}
         - name: certs

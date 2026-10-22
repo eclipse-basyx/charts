@@ -32,7 +32,8 @@ spec:
     {{- end }}
 {{- if $appsHost }}
 ---
-# Apps origin: every path of its host goes to Studio.
+# Apps origin: every path of its host goes to Studio. For one origin per
+# installation, the host is a wildcard such as *.apps.example.org.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
