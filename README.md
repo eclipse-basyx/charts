@@ -2242,7 +2242,9 @@ apps are off. It has two forms
 | One shared origin | `https://apps.example.org` | `apps.example.org` | Every app frame runs in an opaque origin; embedded pages often stay blank. |
 
 The chart passes the value to `STUDIO_APPS_URL` as it is and routes the host to
-Studio in the Ingress and the `HTTPRoute`. The apps host must differ from
+Studio in the Ingress and the `HTTPRoute`. Only an origin is accepted: scheme,
+host and an optional port, without user info, path, query or fragment. The
+apps host must differ from
 Studio's host, and the wildcard must not cover it: `{installation}.example.org`
 next to Studio at `basyx.example.org` is refused. Prefer a registrable domain
 of its own for apps, such as `*.example-apps.net`.

@@ -128,18 +128,23 @@ must equal the base path, or https://<host><paths.basyxStudio>.
 STUDIO_APPS_URL: basyxStudio.apps.url without a trailing slash, or nothing.
 One shared origin (https://apps.example.org) or one origin per installation
 with {installation} as the first label of the host
-(https://{installation}.apps.example.org).
+(https://{installation}.apps.example.org). Only an origin is accepted:
+scheme, host and an optional port, without user info, path, query or
+fragment, so the host the chart routes is the host Studio serves.
 */}}
 {{- define "basyx-studio.appsUrl" -}}
 {{- with .Values.basyxStudio.apps.url -}}
 {{- $url := tpl (toString .) $ | trimSuffix "/" -}}
 {{- $example := "use an http(s) origin such as https://apps.example.org, or https://{installation}.apps.example.org for one origin per installation" -}}
-{{- if and (contains "{" $url) (not (regexMatch "^https?://\\{installation\\}\\.[^/{}]+(/[^{}]*)?$" $url)) -}}
+{{- if not (regexMatch "^https?://(\\{installation\\}\\.)?[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)*(:[0-9]{1,5})?$" $url) -}}
+{{- $rest := regexReplaceAll "^[A-Za-z][A-Za-z0-9+.-]*://" $url "" -}}
+{{- if regexMatch "[@/?#]" $rest -}}
+{{- fail (printf "basyxStudio.apps.url must be an origin: scheme, host and an optional port, without user info, path, query or fragment, got %q; %s" $url $example) -}}
+{{- else if contains "{" $url -}}
 {{- fail (printf "basyxStudio.apps.url may name {installation} only as the first label of its host, got %q; %s" $url $example) -}}
-{{- end -}}
-{{- $parsed := urlParse (replace "{installation}" "installation" $url) -}}
-{{- if or (not (has $parsed.scheme (list "http" "https"))) (not $parsed.hostname) -}}
+{{- else -}}
 {{- fail (printf "basyxStudio.apps.url must be an http(s) origin, got %q; %s" $url $example) -}}
+{{- end -}}
 {{- end -}}
 {{- $url -}}
 {{- end -}}
@@ -162,12 +167,18 @@ https://{installation}.apps.example.org.
 {{- end }}
 
 {{/*
-The suffix is kept for long release names, so the name never collides with
-the infrastructures ConfigMap: 44 characters of the fullname and
-"-trusted-publishers" fit into 63.
+<fullname>-trusted-publishers. When that exceeds 63 characters, the fullname
+is shortened to 35 characters plus the first 8 hex digits of its SHA-256, so
+the suffix stays (no collision with the infrastructures ConfigMap) and long
+release names that share a prefix still get names of their own.
 */}}
 {{- define "basyx-studio.trustedPublishersConfigMapName" -}}
-{{- printf "%s-trusted-publishers" (include "basyx-studio.fullname" . | trunc 44 | trimSuffix "-") -}}
+{{- $fullname := include "basyx-studio.fullname" . -}}
+{{- $name := printf "%s-trusted-publishers" $fullname -}}
+{{- if gt (len $name) 63 -}}
+{{- $name = printf "%s-%s-trusted-publishers" ($fullname | trunc 35 | trimSuffix "-") ($fullname | sha256sum | trunc 8) -}}
+{{- end -}}
+{{- $name -}}
 {{- end }}
 
 {{- define "basyx-studio.trustedPublishersMountPath" -}}

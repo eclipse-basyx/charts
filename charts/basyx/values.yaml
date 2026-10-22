@@ -2102,8 +2102,10 @@ basyxStudio:
     #   it. The Ingress and HTTPRoute route the wildcard *.apps.example.org to
     #   Studio; it needs a wildcard DNS record and a wildcard certificate.
     # - one shared origin, e.g. https://apps.example.org, routed as it is.
-    # The host must differ from Studio's host, and a wildcard must not cover
-    # it. Add the host to tls.hosts, or set tls.secretName below.
+    # Only an origin: scheme, host and an optional port, without user info,
+    # path, query or fragment. The host must differ from Studio's host, and a
+    # wildcard must not cover it. Add the host to tls.hosts, or set
+    # tls.secretName below.
     url: ""
     tls:
       # Existing TLS Secret for the apps host on the Studio Ingress, e.g. a

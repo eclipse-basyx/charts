@@ -143,6 +143,65 @@ tests:
       - failedTemplate:
           errorPattern: only as the first label of its host
 
+  - it: rejects user info that hides another host behind the placeholder
+    template: templates/basyx-studio/ingress.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.apps.url: https://{installation}.apps.example.org.evil@studio.example.org
+    asserts:
+      - failedTemplate:
+          errorPattern: must be an origin
+
+  - it: rejects user info in a shared apps origin
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.ingress.enabled: false
+      basyxStudio.apps.url: https://user:secret@apps.example.org
+    asserts:
+      - failedTemplate:
+          errorPattern: without user info, path, query or fragment
+
+  - it: rejects a path in the apps URL
+    template: templates/basyx-studio/ingress.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.apps.url: https://{installation}.apps.example.org/apps
+    asserts:
+      - failedTemplate:
+          errorPattern: must be an origin
+
+  - it: rejects a query in the apps URL
+    template: templates/basyx-studio/ingress.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.apps.url: https://apps.example.org?installation=1
+    asserts:
+      - failedTemplate:
+          errorPattern: must be an origin
+
+  - it: rejects a fragment in the apps URL
+    template: templates/basyx-studio/httproute.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.ingress.enabled: false
+      basyxStudio.httpRoute.enabled: true
+      gatewayApi.parentRefs:
+        - name: shared-gateway
+      basyxStudio.apps.url: https://apps.example.org#apps
+    asserts:
+      - failedTemplate:
+          errorPattern: must be an origin
+
+  - it: rejects a host that is not a DNS name
+    template: templates/basyx-studio/ingress.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.apps.url: https://apps_example.org
+    asserts:
+      - failedTemplate:
+          errorPattern: must be an http\(s\) origin
+
   - it: rejects an apps wildcard that covers the Studio host
     template: templates/basyx-studio/deployment.yaml
     set:
@@ -219,7 +278,39 @@ tests:
     asserts:
       - equal:
           path: metadata.name
-          value: rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr-trusted-publishers
+          value: rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr-9bc70da4-trusted-publishers
+
+  - it: gives long release names with a shared prefix trust store ConfigMaps of their own (first)
+    template: templates/basyx-studio/configmap-trusted-publishers.yaml
+    release:
+      name: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-first
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.apps.url: https://apps.example.org
+      basyxStudio.apps.trustedPublishers.publishers:
+        - name: Example GmbH
+          keys: [keys/example.pub]
+          appIds: [org.example.*]
+    asserts:
+      - equal:
+          path: metadata.name
+          value: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-a61551f7-trusted-publishers
+
+  - it: gives long release names with a shared prefix trust store ConfigMaps of their own (other)
+    template: templates/basyx-studio/configmap-trusted-publishers.yaml
+    release:
+      name: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-other
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.apps.url: https://apps.example.org
+      basyxStudio.apps.trustedPublishers.publishers:
+        - name: Example GmbH
+          keys: [keys/example.pub]
+          appIds: [org.example.*]
+    asserts:
+      - equal:
+          path: metadata.name
+          value: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-33dc60d7-trusted-publishers
 
   - it: mounts the trust store and points Studio at it
     template: templates/basyx-studio/deployment.yaml
