@@ -70,6 +70,27 @@ tests:
               - "*.apps.example.org"
             secretName: apps-wildcard-tls
 
+  - it: drops inherited cert-manager annotations with null overrides
+    template: templates/basyx-studio/ingress.yaml
+    set:
+      basyxStudio.enabled: true
+      ingress.clusterIssuer: letsencrypt
+      ingress.annotations:
+        cert-manager.io/issuer: other
+      basyxStudio.apps.url: https://{installation}.apps.example.org
+      basyxStudio.apps.tls.secretName: apps-wildcard-tls
+      basyxStudio.ingress.annotations:
+        cert-manager.io/issuer: null
+        cert-manager.io/cluster-issuer: null
+    asserts:
+      - notExists:
+          path: metadata.annotations["cert-manager.io/issuer"]
+      - notExists:
+          path: metadata.annotations["cert-manager.io/cluster-issuer"]
+      - equal:
+          path: spec.tls[1].secretName
+          value: apps-wildcard-tls
+
   - it: renders the apps TLS entry alone while the release's TLS is off
     template: templates/basyx-studio/ingress.yaml
     set:
@@ -182,6 +203,23 @@ tests:
               - studio.timeseries.read
               remoteCode: true
             version: 1
+
+  - it: keeps the trust store ConfigMap apart from the infrastructures ConfigMap for long release names
+    template: templates/basyx-studio/configmap-trusted-publishers.yaml
+    release:
+      name: rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
+    set:
+      basyxStudio.enabled: true
+      aasEnvironment.enabled: true
+      basyxStudio.apps.url: https://apps.example.org
+      basyxStudio.apps.trustedPublishers.publishers:
+        - name: Example GmbH
+          keys: [keys/example.pub]
+          appIds: [org.example.*]
+    asserts:
+      - equal:
+          path: metadata.name
+          value: rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr-trusted-publishers
 
   - it: mounts the trust store and points Studio at it
     template: templates/basyx-studio/deployment.yaml

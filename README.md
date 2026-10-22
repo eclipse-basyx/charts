@@ -2263,11 +2263,24 @@ One origin per installation needs:
         secretName: studio-apps-wildcard-tls
   ```
 
-  With a cert-manager annotation on the Ingress (such as `ingress.annotations`
-  with `cert-manager.io/issuer`), cert-manager manages every TLS Secret the
-  Ingress names, including this one, so its issuer must be able to issue the
-  wildcard. Leave the annotation off `basyxStudio.ingress.annotations` to use a
-  certificate provisioned elsewhere.
+  With a cert-manager annotation on the Studio Ingress, cert-manager manages
+  every TLS Secret the Ingress names, including this one, so its issuer must
+  be able to issue the wildcard. The Studio Ingress inherits that annotation
+  from `ingress.issuer`, `ingress.clusterIssuer`,
+  `ingress.certificateIssuer.enabled` and `ingress.annotations`. To use a
+  certificate provisioned elsewhere, remove the inherited annotation with a
+  `null` override:
+
+  ```yaml
+  basyxStudio:
+    ingress:
+      annotations:
+        cert-manager.io/issuer: null
+        cert-manager.io/cluster-issuer: null
+  ```
+
+  The Studio Ingress then no longer requests the release's TLS Secret either;
+  the other Ingresses of the release still do.
 - with `basyxStudio.httpRoute.enabled`, a Gateway listener that accepts the
   wildcard host and terminates TLS for it. The chart's own Gateway
   (`gatewayApi.gateway`) listens on `host` only, so use a shared Gateway in

@@ -161,8 +161,13 @@ https://{installation}.apps.example.org.
 {{- end -}}
 {{- end }}
 
+{{/*
+The suffix is kept for long release names, so the name never collides with
+the infrastructures ConfigMap: 44 characters of the fullname and
+"-trusted-publishers" fit into 63.
+*/}}
 {{- define "basyx-studio.trustedPublishersConfigMapName" -}}
-{{- printf "%s-trusted-publishers" (include "basyx-studio.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- printf "%s-trusted-publishers" (include "basyx-studio.fullname" . | trunc 44 | trimSuffix "-") -}}
 {{- end }}
 
 {{- define "basyx-studio.trustedPublishersMountPath" -}}
