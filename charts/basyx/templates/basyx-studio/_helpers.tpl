@@ -469,6 +469,23 @@ set. Large numbers may arrive as float64; render them without an exponent.
 {{- end -}}
 {{- end }}
 
+{{/*
+HTTP_PROXY, HTTPS_PROXY and NO_PROXY from basyxStudio.proxy, each also in
+lower case (curl reads http_proxy in lower case only), indented for the
+deployment. noProxy is rendered with tpl; whitespace is removed, so the list
+may span lines. Nothing for empty values.
+*/}}
+{{- define "basyx-studio.proxyEnv" -}}
+{{- $proxy := .Values.basyxStudio.proxy -}}
+{{- $values := dict "HTTP_PROXY" ($proxy.http | default "") "HTTPS_PROXY" ($proxy.https | default "") "NO_PROXY" (tpl (toString ($proxy.noProxy | default "")) .) -}}
+{{- range $name := list "HTTP_PROXY" "HTTPS_PROXY" "NO_PROXY" -}}
+{{- with nospace (index $values $name) -}}
+{{- include "basyx-studio.env" (dict "name" $name "value" .) -}}
+{{- include "basyx-studio.env" (dict "name" (lower $name) "value" .) -}}
+{{- end -}}
+{{- end -}}
+{{- end }}
+
 {{/* Fail early on settings Studio would reject at startup. */}}
 {{- define "basyx-studio.validate" -}}
 {{- $studio := .Values.basyxStudio -}}

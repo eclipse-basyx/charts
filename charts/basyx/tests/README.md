@@ -37,3 +37,4 @@ The suites cover stable chart contracts such as:
 - optional BaSyx Studio deployment, derived infrastructure, Keycloak client, Ingress and HTTPRoute, and Secret handling
 - a Studio data key that GitOps renders (Argo CD) cannot generate or replace
 - Studio apps: one origin per installation with wildcard routing and TLS, the trust store of signed apps, managed packages downloaded by an init container or mounted, and connections and app settings on the derived infrastructure
+- the Studio outbound proxy: proxy variables on Studio and the package download init container, and none without `basyxStudio.proxy`

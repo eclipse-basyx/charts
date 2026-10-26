@@ -2009,6 +2009,15 @@
             "allowUploads": { "type": "boolean" }
           }
         },
+        "proxy": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "http": { "type": "string", "pattern": "^(|[A-Za-z][A-Za-z0-9+.-]*://\\S+)$" },
+            "https": { "type": "string", "pattern": "^(|[A-Za-z][A-Za-z0-9+.-]*://\\S+)$" },
+            "noProxy": { "type": "string" }
+          }
+        },
         "extraEnv": { "type": "array" },
         "extraEnvFrom": { "type": "array" },
         "extraVolumes": { "type": "array" },

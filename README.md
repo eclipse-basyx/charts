@@ -341,6 +341,14 @@ helm diff upgrade basyx charts/basyx \
   -f values/values.example.yaml
 ```
 
+### Upgrading to chart 3.18.0
+
+Chart 3.18.0 adds `basyxStudio.proxy` for clusters whose pods reach external
+hosts only through an HTTP proxy; see
+[Studio outbound proxy](#studio-outbound-proxy). It sets the proxy variables on
+Studio and on the init container that downloads app packages. Existing values
+render unchanged.
+
 ### Upgrading to chart 3.17.0
 
 Chart 3.17.0 extends `basyxStudio` for signed apps; see
@@ -2229,6 +2237,29 @@ or database URL, without the key, and rejects the name.
 
 Back up the key together with Studio's volume or database. A restore needs
 both from the same point in time.
+
+#### Studio outbound proxy
+
+Where pods reach external hosts only through an HTTP proxy, set
+`basyxStudio.proxy`. Each value set renders `HTTP_PROXY`, `HTTPS_PROXY` or
+`NO_PROXY`, and the same variable in lower case, on Studio and on the init
+container that downloads `basyxStudio.apps.packages.download`.
+`basyxStudio.extraEnv` reaches the Studio container only.
+
+```yaml
+basyxStudio:
+  proxy:
+    http: http://proxy.example.org:3128
+    https: http://proxy.example.org:3128
+    noProxy: "localhost,127.0.0.1,.svc,.cluster.local,{{ .Values.host }}"
+```
+
+`noProxy` lists the hosts reached directly and is rendered with `tpl`. Add the
+in-cluster service names, `.svc` and `.cluster.local`. Studio calls the
+services of the release at their public URLs `https://<host><paths.*>`, like
+the OIDC issuer, so add `host` too when it is reached directly rather than
+through the proxy. Credentials in a proxy URL are stored in the Deployment in
+plain text. Empty values render nothing.
 
 #### Studio apps
 

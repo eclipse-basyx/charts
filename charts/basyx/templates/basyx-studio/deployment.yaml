@@ -87,6 +87,7 @@ spec:
             - name: PACKAGE_{{ $index }}_HEADERS
               value: {{ ternary (printf "%s/%s.headers" (include "basyx-studio.packageHeadersPath" $) $package.name) "" (not (empty $package.headersSecret)) | quote }}
             {{- end }}
+            {{- include "basyx-studio.proxyEnv" $ }}
           resources:
             {{- toYaml $packages.downloader.resources | nindent 12 }}
           volumeMounts:
@@ -189,6 +190,7 @@ spec:
             - name: NODE_EXTRA_CA_CERTS
               value: /etc/ssl/certs/ca.crt
             {{- end }}
+            {{- include "basyx-studio.proxyEnv" . }}
             {{- with $studio.extraEnv }}
             {{- tpl (toYaml .) $ | nindent 12 }}
             {{- end }}
