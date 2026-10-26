@@ -2244,7 +2244,10 @@ Where pods reach external hosts only through an HTTP proxy, set
 `basyxStudio.proxy`. Each value set renders `HTTP_PROXY`, `HTTPS_PROXY` or
 `NO_PROXY`, and the same variable in lower case, on Studio and on the init
 container that downloads `basyxStudio.apps.packages.download`.
-`basyxStudio.extraEnv` reaches the Studio container only.
+`basyxStudio.extraEnv` reaches the Studio container only. The package download
+uses the proxy with any Studio image; Studio's own requests (infrastructures,
+OIDC, connections) only with an image that includes
+[basyx-studio#100](https://github.com/eclipse-basyx/basyx-studio/pull/100).
 
 ```yaml
 basyxStudio:
