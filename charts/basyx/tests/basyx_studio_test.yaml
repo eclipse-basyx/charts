@@ -591,3 +591,117 @@ tests:
           pattern: "BaSyx Studio: +https://basyx.example.com/studio/"
       - matchRegexRaw:
           pattern: "Both the AAS Web UI and BaSyx Studio are enabled"
+
+  # Outbound proxy (basyxStudio.proxy)
+
+  - it: sets the proxy variables on the package download and on Studio
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.apps.url: https://apps.example.org
+      basyxStudio.apps.packages.download:
+        - name: work-orders
+          url: https://packages.example.org/work-orders-1.0.0.zip
+      basyxStudio.proxy.http: http://proxy.example.org:3128
+      basyxStudio.proxy.https: http://proxy.example.org:3128
+      basyxStudio.proxy.noProxy: >-
+        localhost,127.0.0.1,
+        .svc,.cluster.local,{{ .Values.host }}
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: HTTP_PROXY
+            value: http://proxy.example.org:3128
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: http_proxy
+            value: http://proxy.example.org:3128
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: HTTPS_PROXY
+            value: http://proxy.example.org:3128
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: https_proxy
+            value: http://proxy.example.org:3128
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: NO_PROXY
+            value: localhost,127.0.0.1,.svc,.cluster.local,basyx.example.com
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: no_proxy
+            value: localhost,127.0.0.1,.svc,.cluster.local,basyx.example.com
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HTTP_PROXY
+            value: http://proxy.example.org:3128
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: http_proxy
+            value: http://proxy.example.org:3128
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HTTPS_PROXY
+            value: http://proxy.example.org:3128
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: https_proxy
+            value: http://proxy.example.org:3128
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: NO_PROXY
+            value: localhost,127.0.0.1,.svc,.cluster.local,basyx.example.com
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: no_proxy
+            value: localhost,127.0.0.1,.svc,.cluster.local,basyx.example.com
+
+  - it: sets only the proxy variables whose values are set
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.proxy.https: http://proxy.example.org:3128
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: https_proxy
+            value: http://proxy.example.org:3128
+      - notExists:
+          path: spec.template.spec.containers[0].env[?(@.name =~ /^(HTTP_PROXY|http_proxy|NO_PROXY|no_proxy)$/)]
+
+  - it: sets no proxy variables without basyxStudio.proxy
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.apps.url: https://apps.example.org
+      basyxStudio.apps.packages.download:
+        - name: work-orders
+          url: https://packages.example.org/work-orders-1.0.0.zip
+    asserts:
+      - notExists:
+          path: spec.template.spec.initContainers[0].env[?(@.name =~ /(?i)_proxy$/)]
+      - notExists:
+          path: spec.template.spec.containers[0].env[?(@.name =~ /(?i)_proxy$/)]
+
+  - it: rejects a proxy URL without a scheme
+    template: templates/basyx-studio/deployment.yaml
+    set:
+      basyxStudio.enabled: true
+      basyxStudio.proxy.http: proxy.example.org:3128
+    asserts:
+      - failedTemplate:
+          errorPattern: basyxStudio.proxy.http

@@ -2203,6 +2203,23 @@ basyxStudio:
     # File uploads to targets (STUDIO_ALLOW_UPLOADS).
     allowUploads: true
 
+  # Proxy for outbound connections of Studio and of the init container that
+  # downloads apps.packages.download, for clusters whose pods reach external
+  # hosts only through an HTTP proxy. Each value set renders HTTP_PROXY,
+  # HTTPS_PROXY or NO_PROXY, and the same variable in lower case, on both
+  # containers; empty values render nothing.
+  # noProxy lists the hosts reached directly, comma-separated, rendered with
+  # tpl. Studio calls the services of this release at their public URLs
+  # (https://<host><paths.*>), and so does the OIDC issuer: when they are
+  # reached directly, add host. Add the in-cluster service names, .svc and
+  # .cluster.local, too, e.g.
+  #   noProxy: "localhost,127.0.0.1,.svc,.cluster.local,{{ .Values.host }}"
+  # Credentials in a proxy URL are stored in the Deployment in plain text.
+  proxy:
+    http: ""   # e.g. http://proxy.example.org:3128
+    https: ""  # e.g. http://proxy.example.org:3128
+    noProxy: ""
+
   # Additional environment variables, e.g. secrets referenced by declared
   # infrastructures as env:NAME, or settings this chart has no value for.
   extraEnv: []
