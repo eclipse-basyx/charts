@@ -2600,11 +2600,15 @@ With ABAC enabled for the AAS Environment, the endpoint requires a bearer token:
 
 When `keycloak.enabled` is `true` and the AAS Environment trust list contains
 the chart-managed Keycloak issuer with an audience, the Keycloak initialization
-Job prepares the realm, also on existing realms and on every upgrade:
+Job prepares the realm, also on existing realms and on every upgrade. The
+chart-managed issuer is `https://<host><paths.keycloak>/realms/<keycloak.realm>`;
+`keycloak.issuer` does not change it, and `keycloak.initialization.mcp.audience`
+does not replace the trust list entry.
 
 - It creates the client scope `keycloak.initialization.mcp.clientScope`
-  (`basyx-aas-environment`) with the protocol mappers of the Web UI client and
-  an audience mapper for the issuer's audience in the trust list, or
+  (`basyx-aas-environment`) with the protocol mappers of the Web UI client
+  (from `keycloak.initialization.clients` and `extraClients`) and an audience
+  mapper for the issuer's audience in the trust list, or
   `keycloak.initialization.mcp.audience` when set, and adds it to the realm's
   default client scopes. Clients that register themselves receive it, so their
   tokens carry the claims the default ABAC rules evaluate. Clients created later

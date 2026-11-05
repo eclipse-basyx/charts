@@ -561,6 +561,8 @@ keycloak:
       # Audience the client scope adds to access tokens. Empty uses the
       # audience of the chart-managed Keycloak issuer in the AAS Environment
       # trust list. A different value must also be accepted by that trust list.
+      # The realm is only prepared when the trust list contains that issuer
+      # with an audience, also when this value is set.
       audience: ""
       # Hosts allowed in the redirect URIs of anonymously registered clients.
       # An empty list rejects every anonymous registration.

@@ -31,8 +31,16 @@ managed identity providers; otherwise preserve the chart-managed Keycloak URL.
 {{- if .Values.keycloak.issuer -}}
 {{- .Values.keycloak.issuer -}}
 {{- else -}}
-{{- printf "https://%s%s/realms/%s" .Values.host .Values.paths.keycloak .Values.keycloak.realm -}}
+{{- include "basyx.keycloakManagedIssuer" . -}}
 {{- end -}}
+{{- end }}
+
+{{/*
+Issuer of the realm in the chart-managed Keycloak, derived from host,
+paths.keycloak and realm, independent of keycloak.issuer.
+*/}}
+{{- define "basyx.keycloakManagedIssuer" -}}
+{{- printf "https://%s%s/realms/%s" .Values.host .Values.paths.keycloak .Values.keycloak.realm -}}
 {{- end }}
 
 {{/* Preserve the legacy client name unless an explicit UI client ID is set. */}}
@@ -40,12 +48,16 @@ managed identity providers; otherwise preserve the chart-managed Keycloak URL.
 {{- .Values.keycloak.webUiClientId | default .Values.keycloak.secrets.client.name -}}
 {{- end }}
 
-{{/* The protocol mappers of the chart-managed Web UI client, as a JSON list. */}}
+{{/*
+The protocol mappers of the chart-managed Web UI client, as a JSON list. Like
+the initialization Job, it reads clients and then extraClients, so a mapper
+declared again under the same name comes later and wins.
+*/}}
 {{- define "basyx.webUiClientProtocolMappers" -}}
 {{- $root := . -}}
 {{- $mappers := list -}}
 {{- $webUiClientId := include "basyx.webUiClientId" . -}}
-{{- range (.Values.keycloak.initialization.clients | default list) -}}
+{{- range (concat (.Values.keycloak.initialization.clients | default list) (.Values.keycloak.initialization.extraClients | default list)) -}}
 {{- if eq (tpl (toString .clientId) $root) $webUiClientId -}}
 {{- $mappers = concat $mappers (.protocolMappers | default list) -}}
 {{- end -}}

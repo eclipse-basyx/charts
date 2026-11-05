@@ -336,6 +336,86 @@ tests:
           value: |
             {}
 
+  - it: ignores an explicit MCP audience when the AAS Environment does not trust the managed realm
+    template: templates/keycloak-init-config.yaml
+    set:
+      keycloak.enabled: true
+      aasEnvironment.enabled: true
+      aasEnvironment.mcp.enabled: true
+      abac.enabled: true
+      keycloak.initialization.mcp.audience: aas-environment
+      aasEnvironment.oidc.providers:
+        - issuer: https://idp.example.org/realms/basyx
+          audience: basyx-api
+    asserts:
+      - equal:
+          path: data["mcp.json"]
+          value: |
+            {}
+
+  - it: matches the managed realm issuer instead of keycloak.issuer
+    template: templates/keycloak-init-config.yaml
+    set:
+      keycloak.enabled: true
+      keycloak.issuer: https://idp.example.org/realms/basyx
+      aasEnvironment.enabled: true
+      aasEnvironment.mcp.enabled: true
+      abac.enabled: true
+      aasEnvironment.oidc.providers:
+        - issuer: https://idp.example.org/realms/basyx
+          audience: external-api
+        - issuer: https://basyx.example.com/identity-management/realms/basyx
+          audience: basyx-api
+    asserts:
+      - matchRegex:
+          path: data["mcp.json"]
+          pattern: '"included.custom.audience":"basyx-api"'
+      - notMatchRegex:
+          path: data["mcp.json"]
+          pattern: 'external-api'
+
+  - it: leaves the realm unchanged when only keycloak.issuer is trusted
+    template: templates/keycloak-init-config.yaml
+    set:
+      keycloak.enabled: true
+      keycloak.issuer: https://idp.example.org/realms/basyx
+      aasEnvironment.enabled: true
+      aasEnvironment.mcp.enabled: true
+      abac.enabled: true
+      aasEnvironment.oidc.providers:
+        - issuer: https://idp.example.org/realms/basyx
+          audience: external-api
+    asserts:
+      - equal:
+          path: data["mcp.json"]
+          value: |
+            {}
+
+  - it: adds Web UI claim mappers declared in extraClients to the MCP scope
+    template: templates/keycloak-init-config.yaml
+    set:
+      keycloak.enabled: true
+      aasEnvironment.enabled: true
+      aasEnvironment.mcp.enabled: true
+      abac.enabled: true
+      keycloak.initialization.extraClients:
+        - clientId: basyx-ui
+          protocolMappers:
+            - name: Department Mapper
+              protocol: openid-connect
+              protocolMapper: oidc-usermodel-attribute-mapper
+              config:
+                user.attribute: department
+                claim.name: department
+                access.token.claim: "true"
+    asserts:
+      - matchRegex:
+          path: data["mcp.json"]
+          pattern: '"name":"Role Mapper"'
+      - matchRegex:
+          path: data["mcp.json"]
+          pattern: '"name":"Department Mapper"'
+
   - it: prepares the realm idempotently in the initialization script
     template: templates/keycloak-init-script.yaml
     set:

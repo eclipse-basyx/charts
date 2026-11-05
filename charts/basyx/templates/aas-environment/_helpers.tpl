@@ -77,21 +77,23 @@ an audience. Fail at render time instead when the chart mounts the trust list.
 
 {{/*
 Audience that the MCP client scope of the chart-managed Keycloak adds to access
-tokens: keycloak.initialization.mcp.audience, otherwise the audience of the
-Keycloak issuer in the AAS Environment trust list. Empty when the AAS
-Environment does not trust Keycloak with an audience.
+tokens. Empty unless the AAS Environment trust list contains the issuer of the
+chart-managed realm with an audience; keycloak.issuer is not considered, because
+the initialization Job always configures the chart-managed realm. The audience
+is keycloak.initialization.mcp.audience when set, otherwise the audience of that
+trust list entry.
 */}}
 {{- define "basyx-aasEnvironment.mcpKeycloakAudience" -}}
-{{- $issuer := include "basyx.oidcIssuer" . -}}
-{{- $audience := dig "mcp" "audience" "" .Values.keycloak.initialization -}}
-{{- if not $audience -}}
+{{- $issuer := include "basyx.keycloakManagedIssuer" . | trimSuffix "/" -}}
+{{- $trusted := "" -}}
 {{- range (include "basyx-aasEnvironment.trustListEntries" . | fromJsonArray) -}}
-{{- if eq (toString .issuer) $issuer -}}
-{{- $audience = toString (.audience | default "") -}}
+{{- if eq (toString .issuer | trimSuffix "/") $issuer -}}
+{{- $trusted = trim (toString (.audience | default "")) -}}
 {{- end -}}
 {{- end -}}
+{{- if $trusted -}}
+{{- trim (dig "mcp" "audience" "" $.Values.keycloak.initialization) | default $trusted -}}
 {{- end -}}
-{{- trim $audience -}}
 {{- end }}
 
 {{/*
