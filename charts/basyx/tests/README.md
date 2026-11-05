@@ -38,3 +38,4 @@ The suites cover stable chart contracts such as:
 - a Studio data key that GitOps renders (Argo CD) cannot generate or replace
 - Studio apps: one origin per installation with wildcard routing and TLS, the trust store of signed apps, managed packages downloaded by an init container or mounted, and connections and app settings on the derived infrastructure
 - the Studio outbound proxy: proxy variables on Studio and the package download init container, and none without `basyxStudio.proxy`
+- the experimental AAS Environment MCP endpoint: `MCP_*` variables, the protected resource metadata route on the Ingress and the HTTPRoute, the trust list audience check and the Keycloak realm preparation for MCP clients

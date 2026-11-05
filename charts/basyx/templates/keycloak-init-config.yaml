@@ -27,4 +27,7 @@ data:
 
   clients.json: |
 {{ tpl ($clients | toJson) . | indent 4 }}
+
+  mcp.json: |
+{{ tpl (include "basyx-aasEnvironment.mcpKeycloakConfig" .) . | indent 4 }}
 {{- end }}

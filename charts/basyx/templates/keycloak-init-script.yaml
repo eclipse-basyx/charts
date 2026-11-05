@@ -43,6 +43,62 @@ data:
     echo "Admin token acquired"
 
     ############################################
+    # PROTOCOL MAPPERS
+    ############################################
+
+    # Create, replace or update the protocol mappers of a client or client
+    # scope by name: upsert_protocol_mappers <mappers URL> <owner> <mappers>
+    upsert_protocol_mappers() {
+      MAPPERS_URL="$1"
+      MAPPERS_OWNER="$2"
+
+      echo "$3" | jq -c '.[]?' | while read -r MAPPER
+      do
+        MAPPER_NAME=$(echo "$MAPPER" | jq -r '.name')
+        EXISTING_MAPPER=$(curl -s \
+          "$MAPPERS_URL/models" \
+          -H "Authorization: Bearer $TOKEN" \
+          | jq -c --arg NAME "$MAPPER_NAME" '.[] | select(.name == $NAME)' \
+          | head -n 1)
+        EXISTING_MAPPER_ID=$(echo "$EXISTING_MAPPER" | jq -r '.id // empty')
+        EXISTING_MAPPER_TYPE=$(echo "$EXISTING_MAPPER" | jq -r '.protocolMapper // empty')
+        DESIRED_MAPPER_TYPE=$(echo "$MAPPER" | jq -r '.protocolMapper')
+
+        if [ -z "$EXISTING_MAPPER_ID" ]; then
+          echo "Creating protocol mapper '$MAPPER_NAME' for $MAPPERS_OWNER"
+
+          curl -s -X POST \
+            "$MAPPERS_URL/add-models" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "[$MAPPER]"
+        elif [ "$EXISTING_MAPPER_TYPE" != "$DESIRED_MAPPER_TYPE" ]; then
+          echo "Replacing protocol mapper '$MAPPER_NAME' for $MAPPERS_OWNER ($EXISTING_MAPPER_TYPE -> $DESIRED_MAPPER_TYPE)"
+
+          curl -s -X DELETE \
+            "$MAPPERS_URL/models/$EXISTING_MAPPER_ID" \
+            -H "Authorization: Bearer $TOKEN"
+
+          curl -s -X POST \
+            "$MAPPERS_URL/add-models" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "[$MAPPER]"
+        else
+          echo "Updating protocol mapper '$MAPPER_NAME' for $MAPPERS_OWNER"
+
+          MAPPER_WITH_ID=$(echo "$MAPPER" | jq --arg ID "$EXISTING_MAPPER_ID" '. + {id: $ID}')
+
+          curl -s -X PUT \
+            "$MAPPERS_URL/models/$EXISTING_MAPPER_ID" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "$MAPPER_WITH_ID"
+        fi
+      done
+    }
+
+    ############################################
     # REALM
     ############################################
 
@@ -155,51 +211,143 @@ data:
           -d "$CLIENT_PAYLOAD"
       fi
 
-      echo "$CLIENT_MAPPERS" | jq -c '.[]?' | while read MAPPER
-      do
-        MAPPER_NAME=$(echo "$MAPPER" | jq -r '.name')
-        EXISTING_MAPPER=$(curl -s \
-          "$BASE_URL/admin/realms/$REALM/clients/$CLIENT_UUID/protocol-mappers/models" \
+      upsert_protocol_mappers \
+        "$BASE_URL/admin/realms/$REALM/clients/$CLIENT_UUID/protocol-mappers" \
+        "client '$CLIENT_ID'" \
+        "$CLIENT_MAPPERS"
+    done
+
+    ############################################
+    # MCP CLIENTS
+    ############################################
+
+    if [ "$(jq 'length' /config/mcp.json)" != "0" ]; then
+      echo "Preparing the realm for MCP clients"
+
+      REALM_JSON=$(curl -s \
+        "$BASE_URL/admin/realms/$REALM" \
+        -H "Authorization: Bearer $TOKEN")
+      REALM_ID=$(echo "$REALM_JSON" | jq -r '.id')
+      DEFAULT_ROLE=$(echo "$REALM_JSON" | jq -r '.defaultRole.name // empty')
+
+      find_client_scope_id() {
+        curl -s \
+          "$BASE_URL/admin/realms/$REALM/client-scopes" \
           -H "Authorization: Bearer $TOKEN" \
-          | jq -c --arg NAME "$MAPPER_NAME" '.[] | select(.name == $NAME)' \
-          | head -n 1)
-        EXISTING_MAPPER_ID=$(echo "$EXISTING_MAPPER" | jq -r '.id // empty')
-        EXISTING_MAPPER_TYPE=$(echo "$EXISTING_MAPPER" | jq -r '.protocolMapper // empty')
-        DESIRED_MAPPER_TYPE=$(echo "$MAPPER" | jq -r '.protocolMapper')
+          | jq -r --arg NAME "$1" '[.[] | select(.name == $NAME)][0].id // empty'
+      }
 
-        if [ -z "$EXISTING_MAPPER_ID" ]; then
-          echo "Creating protocol mapper '$MAPPER_NAME' for client '$CLIENT_ID'"
+      SCOPE_NAME=$(jq -r '.clientScope.name' /config/mcp.json)
+      SCOPE_PAYLOAD=$(jq -c '.clientScope | del(.protocolMappers)' /config/mcp.json)
+      SCOPE_MAPPERS=$(jq -c '.clientScope.protocolMappers // []' /config/mcp.json)
+      SCOPE_ID=$(find_client_scope_id "$SCOPE_NAME")
+
+      if [ -z "$SCOPE_ID" ]; then
+        echo "Creating client scope: $SCOPE_NAME"
+
+        curl -s -X POST \
+          "$BASE_URL/admin/realms/$REALM/client-scopes" \
+          -H "Authorization: Bearer $TOKEN" \
+          -H "Content-Type: application/json" \
+          -d "$SCOPE_PAYLOAD"
+
+        SCOPE_ID=$(find_client_scope_id "$SCOPE_NAME")
+      else
+        echo "Updating client scope: $SCOPE_NAME"
+
+        curl -s -X PUT \
+          "$BASE_URL/admin/realms/$REALM/client-scopes/$SCOPE_ID" \
+          -H "Authorization: Bearer $TOKEN" \
+          -H "Content-Type: application/json" \
+          -d "$(echo "$SCOPE_PAYLOAD" | jq --arg ID "$SCOPE_ID" '. + {id: $ID}')"
+      fi
+
+      if [ -z "$SCOPE_ID" ]; then
+        echo "Failed to create client scope: $SCOPE_NAME"
+        exit 1
+      fi
+
+      upsert_protocol_mappers \
+        "$BASE_URL/admin/realms/$REALM/client-scopes/$SCOPE_ID/protocol-mappers" \
+        "client scope '$SCOPE_NAME'" \
+        "$SCOPE_MAPPERS"
+
+      SCOPE_IS_DEFAULT=$(curl -s \
+        "$BASE_URL/admin/realms/$REALM/default-default-client-scopes" \
+        -H "Authorization: Bearer $TOKEN" \
+        | jq -r --arg ID "$SCOPE_ID" '[.[] | select(.id == $ID)] | length')
+
+      if [ "$SCOPE_IS_DEFAULT" = "0" ]; then
+        echo "Adding client scope '$SCOPE_NAME' to the realm's default client scopes"
+
+        curl -s -X PUT \
+          "$BASE_URL/admin/realms/$REALM/default-default-client-scopes/$SCOPE_ID" \
+          -H "Authorization: Bearer $TOKEN"
+      else
+        echo "Client scope '$SCOPE_NAME' is a default client scope already"
+      fi
+
+      OFFLINE_ROLE=$(curl -s \
+        "$BASE_URL/admin/realms/$REALM/roles/offline_access" \
+        -H "Authorization: Bearer $TOKEN")
+      OFFLINE_SCOPE_ID=$(find_client_scope_id offline_access)
+
+      if [ -n "$OFFLINE_SCOPE_ID" ]; then
+        echo "Mapping role 'offline_access' in client scope 'offline_access'"
+
+        curl -s -X POST \
+          "$BASE_URL/admin/realms/$REALM/client-scopes/$OFFLINE_SCOPE_ID/scope-mappings/realm" \
+          -H "Authorization: Bearer $TOKEN" \
+          -H "Content-Type: application/json" \
+          -d "[$OFFLINE_ROLE]"
+      else
+        echo "Client scope 'offline_access' not found; MCP clients cannot obtain offline tokens"
+      fi
+
+      if [ -n "$DEFAULT_ROLE" ]; then
+        echo "Adding role 'offline_access' to the default role '$DEFAULT_ROLE'"
+
+        curl -s -X POST \
+          "$BASE_URL/admin/realms/$REALM/roles/$DEFAULT_ROLE/composites" \
+          -H "Authorization: Bearer $TOKEN" \
+          -H "Content-Type: application/json" \
+          -d "[$OFFLINE_ROLE]"
+      fi
+
+      POLICY_TYPE="org.keycloak.services.clientregistration.policy.ClientRegistrationPolicy"
+
+      jq -c '.registrationPolicies[]?' /config/mcp.json | while read -r POLICY
+      do
+        POLICY_PROVIDER=$(echo "$POLICY" | jq -r '.providerId')
+        POLICY_ID=$(curl -s \
+          "$BASE_URL/admin/realms/$REALM/components?parent=$REALM_ID&type=$POLICY_TYPE" \
+          -H "Authorization: Bearer $TOKEN" \
+          | jq -r --arg PROVIDER "$POLICY_PROVIDER" \
+            '[.[] | select(.providerId == $PROVIDER and .subType == "anonymous")][0].id // empty')
+        POLICY_PAYLOAD=$(echo "$POLICY" | jq -c \
+          --arg PARENT "$REALM_ID" \
+          --arg TYPE "$POLICY_TYPE" \
+          '. + {parentId: $PARENT, providerType: $TYPE, subType: "anonymous"}')
+
+        if [ -z "$POLICY_ID" ]; then
+          echo "Creating anonymous client registration policy: $POLICY_PROVIDER"
 
           curl -s -X POST \
-            "$BASE_URL/admin/realms/$REALM/clients/$CLIENT_UUID/protocol-mappers/add-models" \
+            "$BASE_URL/admin/realms/$REALM/components" \
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/json" \
-            -d "[$MAPPER]"
-        elif [ "$EXISTING_MAPPER_TYPE" != "$DESIRED_MAPPER_TYPE" ]; then
-          echo "Replacing protocol mapper '$MAPPER_NAME' for client '$CLIENT_ID' ($EXISTING_MAPPER_TYPE -> $DESIRED_MAPPER_TYPE)"
-
-          curl -s -X DELETE \
-            "$BASE_URL/admin/realms/$REALM/clients/$CLIENT_UUID/protocol-mappers/models/$EXISTING_MAPPER_ID" \
-            -H "Authorization: Bearer $TOKEN"
-
-          curl -s -X POST \
-            "$BASE_URL/admin/realms/$REALM/clients/$CLIENT_UUID/protocol-mappers/add-models" \
-            -H "Authorization: Bearer $TOKEN" \
-            -H "Content-Type: application/json" \
-            -d "[$MAPPER]"
+            -d "$POLICY_PAYLOAD"
         else
-          echo "Updating protocol mapper '$MAPPER_NAME' for client '$CLIENT_ID'"
-
-          MAPPER_WITH_ID=$(echo "$MAPPER" | jq --arg ID "$EXISTING_MAPPER_ID" '. + {id: $ID}')
+          echo "Updating anonymous client registration policy: $POLICY_PROVIDER"
 
           curl -s -X PUT \
-            "$BASE_URL/admin/realms/$REALM/clients/$CLIENT_UUID/protocol-mappers/models/$EXISTING_MAPPER_ID" \
+            "$BASE_URL/admin/realms/$REALM/components/$POLICY_ID" \
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/json" \
-            -d "$MAPPER_WITH_ID"
+            -d "$(echo "$POLICY_PAYLOAD" | jq -c --arg ID "$POLICY_ID" '. + {id: $ID}')"
         fi
       done
-    done
+    fi
 
     ############################################
     # USERS

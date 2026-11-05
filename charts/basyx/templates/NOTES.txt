@@ -14,6 +14,9 @@ Enabled components:
 {{- end }}
 {{- if .Values.aasEnvironment.enabled }}
   - AAS Environment:            https://{{ .Values.host }}{{ .Values.paths.aasEnvironment }}
+{{- if include "basyx-aasEnvironment.mcpEnabled" . }}
+  - AAS Environment MCP:        https://{{ .Values.host }}{{ include "basyx-aasEnvironment.mcpEndpointPath" . }} (experimental)
+{{- end }}
 {{- end }}
 {{- if .Values.dppApi.enabled }}
   - DPP API:                    https://{{ .Values.host }}{{ .Values.paths.dppApi }}

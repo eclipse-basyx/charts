@@ -423,9 +423,8 @@ ID token claim, and the protocol mappers of the Web UI client, so the tokens
 Studio sends to the BaSyx services carry the same claims as the Web UI's.
 */}}
 {{- define "basyx-studio.keycloakClient" -}}
-{{- $root := . -}}
 {{- $publicUrl := include "basyx-studio.publicUrl" . -}}
-{{- $mappers := list (dict
+{{- $realmRolesMapper := dict
   "name" "Studio Realm Roles"
   "protocol" "openid-connect"
   "protocolMapper" "oidc-usermodel-realm-role-mapper"
@@ -437,13 +436,8 @@ Studio sends to the BaSyx services carry the same claims as the Web UI's.
     "id.token.claim" "true"
     "access.token.claim" "false"
     "userinfo.token.claim" "true"
-    "introspection.token.claim" "false")) -}}
-{{- $webUiClientId := include "basyx.webUiClientId" . -}}
-{{- range (.Values.keycloak.initialization.clients | default list) -}}
-{{- if eq (tpl (toString .clientId) $root) $webUiClientId -}}
-{{- $mappers = concat $mappers (.protocolMappers | default list) -}}
-{{- end -}}
-{{- end -}}
+    "introspection.token.claim" "false") -}}
+{{- $mappers := prepend (include "basyx.webUiClientProtocolMappers" . | fromJsonArray) $realmRolesMapper -}}
 {{- toJson (dict
   "clientId" .Values.basyxStudio.auth.oidc.clientId
   "name" "BaSyx Studio"

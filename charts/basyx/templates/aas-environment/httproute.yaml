@@ -29,5 +29,14 @@ spec:
           port: {{ $.Values.aasEnvironment.service.port }}
     {{- end }}
     {{- end }}
+    {{- with include "basyx-aasEnvironment.mcpMetadataPath" . }}
+    - matches:
+        - path:
+            type: Exact
+            value: {{ . | quote }}
+      backendRefs:
+        - name: {{ include "basyx-aasEnvironment.fullname" $ }}
+          port: {{ $.Values.aasEnvironment.service.port }}
+    {{- end }}
 {{- end }}
 {{- end }}

@@ -11,6 +11,7 @@ spec:
   {{- include "common.ingress.className" (dict "root" . "ingress" .Values.aasEnvironment.ingress) | nindent 2 }}
   {{- include "common.ingressTLS" . | nindent 2 }}
   rules:
+    {{- $mcpMetadataPath := include "basyx-aasEnvironment.mcpMetadataPath" . }}
     {{- range .Values.aasEnvironment.ingress.hosts }}
     - host: {{ tpl .host $ | quote }}
       http:
@@ -18,6 +19,15 @@ spec:
           {{- range .paths }}
           - path: {{ tpl .path $ | quote }}
             pathType: {{ .pathType }}
+            backend:
+              service:
+                name: {{ include "basyx-aasEnvironment.fullname" $ }}
+                port:
+                  number: {{ $.Values.aasEnvironment.service.port }}
+          {{- end }}
+          {{- if $mcpMetadataPath }}
+          - path: {{ $mcpMetadataPath | quote }}
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: {{ include "basyx-aasEnvironment.fullname" $ }}

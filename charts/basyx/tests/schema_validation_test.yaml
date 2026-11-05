@@ -442,3 +442,31 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "server.pagination.maxLimit"
+
+  - it: fails when the MCP path has a trailing slash
+    set:
+      aasEnvironment.mcp.path: /mcp/
+    asserts:
+      - failedTemplate:
+          errorPattern: "aasEnvironment.mcp.path"
+
+  - it: fails when the MCP path climbs up
+    set:
+      aasEnvironment.mcp.path: /mcp/../health
+    asserts:
+      - failedTemplate:
+          errorPattern: "aasEnvironment.mcp.path"
+
+  - it: fails when the MCP result budget is below 1024 bytes
+    set:
+      aasEnvironment.mcp.maxResultBytes: 512
+    asserts:
+      - failedTemplate:
+          errorPattern: "aasEnvironment.mcp.maxResultBytes"
+
+  - it: fails when the MCP client scope name contains spaces
+    set:
+      keycloak.initialization.mcp.clientScope: aas environment
+    asserts:
+      - failedTemplate:
+          errorPattern: "keycloak.initialization.mcp.clientScope"

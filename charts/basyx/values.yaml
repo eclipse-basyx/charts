@@ -543,6 +543,33 @@ keycloak:
     # Extra users appended to the defaults above. Helm cannot merge lists, so
     # this lets deployments add realm users without re-declaring the defaults.
     extraUsers: []
+
+    # EXPERIMENTAL: prepares the realm for MCP clients such as Claude Code and
+    # Codex while the AAS Environment serves MCP with ABAC
+    # (aasEnvironment.mcp.enabled) and its trust list contains this Keycloak's
+    # issuer with an audience. The initialization then
+    # - creates the client scope below with the protocol mappers of the Web UI
+    #   client and an audience mapper, and adds it to the realm's default client
+    #   scopes, so clients that register themselves receive it
+    # - lets anonymous clients register with redirect URIs on trustedHosts only
+    #   and request allowedClientScopes besides the realm's default scopes
+    # - lets all users obtain offline tokens: the offline_access role becomes
+    #   a default role and the offline_access client scope maps it
+    # The other anonymous client registration policies stay as they are.
+    mcp:
+      clientScope: basyx-aas-environment
+      # Audience the client scope adds to access tokens. Empty uses the
+      # audience of the chart-managed Keycloak issuer in the AAS Environment
+      # trust list. A different value must also be accepted by that trust list.
+      audience: ""
+      # Hosts allowed in the redirect URIs of anonymously registered clients.
+      # An empty list rejects every anonymous registration.
+      trustedHosts:
+        - localhost
+        - 127.0.0.1
+      # Codex requests openid when it registers.
+      allowedClientScopes:
+        - openid
   environment:
     KC_PROXY: edge
     jgroups_dns_query: keycloak
@@ -1318,6 +1345,25 @@ aasEnvironment:
   eventing: {}
   rebac: {}
   oidc: {}
+
+  # EXPERIMENTAL: Model Context Protocol (MCP) endpoint for clients such as
+  # Claude Code and Codex, served at GENERAL_EXTERNALURL + path, by default
+  # https://<host><paths.aasEnvironment>/mcp. Every tool call is an AAS
+  # Environment API request with the caller's token. Without ABAC the endpoint
+  # has no authentication; do not expose it then. With ABAC, the Ingress and the
+  # HTTPRoute also route the protected resource metadata
+  # /.well-known/oauth-protected-resource<paths.aasEnvironment><path>, every
+  # issuer of the AAS Environment trust list needs an audience, and a
+  # chart-managed Keycloak is prepared for MCP clients
+  # (keycloak.initialization.mcp).
+  mcp:
+    enabled: false
+    # Offer the tools that create, change and delete data.
+    writesEnabled: false
+    # Endpoint path below paths.aasEnvironment, without a trailing slash.
+    path: /mcp
+    # Largest API response in bytes a tool returns.
+    maxResultBytes: 262144
 
   resources: {}
     # limits:

@@ -1,0 +1,361 @@
+suite: aas environment mcp
+release:
+  name: basyx
+templates:
+  - templates/aas-environment/deployment.yaml
+  - templates/aas-environment/ingress.yaml
+  - templates/aas-environment/httproute.yaml
+  - templates/aas-repository/deployment.yaml
+  - templates/keycloak-init-config.yaml
+  - templates/keycloak-init-script.yaml
+  - templates/NOTES.txt
+tests:
+  - it: lists the MCP endpoint in the release notes
+    template: templates/NOTES.txt
+    set:
+      paths.aasEnvironment: /env/
+      aasEnvironment.enabled: true
+      aasEnvironment.mcp.enabled: true
+    asserts:
+      - matchRegexRaw:
+          pattern: 'AAS Environment MCP: +https://basyx\.example\.com/env/mcp \(experimental\)'
+
+  - it: renders MCP disabled with read-only tools by default
+    template: templates/aas-environment/deployment.yaml
+    set:
+      aasEnvironment.enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MCP_ENABLED
+            value: "false"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MCP_WRITESENABLED
+            value: "false"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MCP_PATH
+            value: /mcp
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MCP_MAXRESULTBYTES
+            value: "262144"
+
+  - it: renders the MCP settings of the AAS Environment
+    template: templates/aas-environment/deployment.yaml
+    set:
+      aasEnvironment.enabled: true
+      aasEnvironment.mcp.enabled: true
+      aasEnvironment.mcp.writesEnabled: true
+      aasEnvironment.mcp.path: /agents
+      aasEnvironment.mcp.maxResultBytes: 1048576
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MCP_ENABLED
+            value: "true"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MCP_WRITESENABLED
+            value: "true"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MCP_PATH
+            value: /agents
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MCP_MAXRESULTBYTES
+            value: "1048576"
+
+  - it: lets the raw AAS Environment environment override the MCP settings
+    template: templates/aas-environment/deployment.yaml
+    set:
+      aasEnvironment.enabled: true
+      aasEnvironment.environment.MCP_ENABLED: "true"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MCP_ENABLED
+            value: "true"
+          count: 1
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MCP_ENABLED
+            value: "false"
+
+  - it: renders no MCP settings for other services
+    template: templates/aas-repository/deployment.yaml
+    set:
+      aasRepository.enabled: true
+      aasEnvironment.enabled: true
+      aasEnvironment.mcp.enabled: true
+    asserts:
+      - notMatchRegex:
+          path: spec.template.spec.containers[0].env[*].name
+          pattern: ^MCP_
+
+  - it: routes no protected resource metadata while MCP is disabled
+    template: templates/aas-environment/ingress.yaml
+    set:
+      aasEnvironment.enabled: true
+      abac.enabled: true
+    asserts:
+      - lengthEqual:
+          path: spec.rules[0].http.paths
+          count: 1
+
+  - it: routes no protected resource metadata for MCP without ABAC
+    template: templates/aas-environment/ingress.yaml
+    set:
+      aasEnvironment.enabled: true
+      aasEnvironment.mcp.enabled: true
+    asserts:
+      - lengthEqual:
+          path: spec.rules[0].http.paths
+          count: 1
+
+  - it: routes the MCP endpoint and its protected resource metadata through the Ingress
+    template: templates/aas-environment/ingress.yaml
+    set:
+      aasEnvironment.enabled: true
+      aasEnvironment.mcp.enabled: true
+      abac.enabled: true
+    asserts:
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: /aas-environment
+      - equal:
+          path: spec.rules[0].http.paths[0].pathType
+          value: Prefix
+      - equal:
+          path: spec.rules[0].http.paths[1]
+          value:
+            path: /.well-known/oauth-protected-resource/aas-environment/mcp
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: basyx-aas-environment
+                port:
+                  number: 8082
+
+  - it: derives the metadata path from the context path and the effective MCP path
+    template: templates/aas-environment/ingress.yaml
+    set:
+      paths.aasEnvironment: /env/
+      aasEnvironment.enabled: true
+      aasEnvironment.mcp.enabled: true
+      aasEnvironment.environment.MCP_PATH: /agents
+      aasEnvironment.abac.enabled: true
+    asserts:
+      - equal:
+          path: spec.rules[0].http.paths[1].path
+          value: /.well-known/oauth-protected-resource/env/agents
+
+  - it: routes the protected resource metadata through the HTTPRoute
+    template: templates/aas-environment/httproute.yaml
+    set:
+      aasEnvironment.enabled: true
+      aasEnvironment.mcp.enabled: true
+      aasEnvironment.httpRoute.enabled: true
+      abac.enabled: true
+      gatewayApi.parentRefs:
+        - name: shared-gateway
+    asserts:
+      - equal:
+          path: spec.rules[0].matches[0].path.value
+          value: /aas-environment
+      - equal:
+          path: spec.rules[1]
+          value:
+            matches:
+              - path:
+                  type: Exact
+                  value: /.well-known/oauth-protected-resource/aas-environment/mcp
+            backendRefs:
+              - name: basyx-aas-environment
+                port: 8082
+
+  - it: routes no protected resource metadata through the HTTPRoute while MCP is disabled
+    template: templates/aas-environment/httproute.yaml
+    set:
+      aasEnvironment.enabled: true
+      aasEnvironment.httpRoute.enabled: true
+      abac.enabled: true
+      gatewayApi.parentRefs:
+        - name: shared-gateway
+    asserts:
+      - lengthEqual:
+          path: spec.rules
+          count: 1
+
+  - it: fails when an issuer of the trust list has no audience while MCP runs with ABAC
+    template: templates/aas-environment/deployment.yaml
+    set:
+      aasEnvironment.enabled: true
+      aasEnvironment.mcp.enabled: true
+      abac.enabled: true
+      oidc.providers:
+        - issuer: https://idp-a.example.org/realms/basyx
+          audience: basyx-api
+        - issuer: https://idp-b.example.org/realms/basyx
+    asserts:
+      - failedTemplate:
+          errorPattern: issuer "https://idp-b.example.org/realms/basyx" of the AAS Environment trust list has no audience
+
+  - it: accepts issuers without an audience while MCP is disabled
+    template: templates/aas-environment/deployment.yaml
+    set:
+      aasEnvironment.enabled: true
+      abac.enabled: true
+      oidc.providers:
+        - issuer: https://idp-b.example.org/realms/basyx
+    asserts:
+      - isKind:
+          of: Deployment
+
+  - it: leaves the Keycloak realm unchanged while MCP is disabled
+    template: templates/keycloak-init-config.yaml
+    set:
+      keycloak.enabled: true
+      aasEnvironment.enabled: true
+      abac.enabled: true
+    asserts:
+      - equal:
+          path: data["mcp.json"]
+          value: |
+            {}
+
+  - it: leaves the Keycloak realm unchanged for MCP without ABAC
+    template: templates/keycloak-init-config.yaml
+    set:
+      keycloak.enabled: true
+      aasEnvironment.enabled: true
+      aasEnvironment.mcp.enabled: true
+    asserts:
+      - equal:
+          path: data["mcp.json"]
+          value: |
+            {}
+
+  - it: prepares the Keycloak realm for MCP clients
+    template: templates/keycloak-init-config.yaml
+    set:
+      keycloak.enabled: true
+      aasEnvironment.enabled: true
+      aasEnvironment.mcp.enabled: true
+      abac.enabled: true
+    asserts:
+      - matchRegex:
+          path: data["mcp.json"]
+          pattern: '"clientScope":\{"attributes":\{[^}]*"include.in.token.scope":"true"\},"name":"basyx-aas-environment"'
+      - matchRegex:
+          path: data["mcp.json"]
+          pattern: '"included.custom.audience":"discovery-service"[^}]*\},"consentRequired":false,"name":"aas-environment-audience","protocol":"openid-connect","protocolMapper":"oidc-audience-mapper"'
+      - matchRegex:
+          path: data["mcp.json"]
+          pattern: '"name":"Role Mapper"'
+      - matchRegex:
+          path: data["mcp.json"]
+          pattern: '"name":"Clearance Mapper"'
+      - matchRegex:
+          path: data["mcp.json"]
+          pattern: '\{"config":\{"client-uris-must-match":\["true"\],"host-sending-registration-request-must-match":\["false"\],"trusted-hosts":\["localhost","127.0.0.1"\]\},"name":"Trusted Hosts","providerId":"trusted-hosts"\}'
+      - matchRegex:
+          path: data["mcp.json"]
+          pattern: '\{"config":\{"allow-default-scopes":\["true"\],"allowed-client-scopes":\["openid"\]\},"name":"Allowed Client Scopes","providerId":"allowed-client-templates"\}'
+      - matchRegex:
+          path: data["clients.json"]
+          pattern: '"clientId":"basyx-ui"'
+
+  - it: uses the audience of the Keycloak issuer in the AAS Environment trust list
+    template: templates/keycloak-init-config.yaml
+    set:
+      keycloak.enabled: true
+      aasEnvironment.enabled: true
+      aasEnvironment.mcp.enabled: true
+      abac.enabled: true
+      aasEnvironment.oidc.providers:
+        - issuer: https://idp.example.org/realms/basyx
+          audience: other
+        - issuer: https://basyx.example.com/identity-management/realms/basyx
+          audience: basyx-api
+    asserts:
+      - matchRegex:
+          path: data["mcp.json"]
+          pattern: '"included.custom.audience":"basyx-api"'
+
+  - it: uses an explicit MCP audience and client registration settings
+    template: templates/keycloak-init-config.yaml
+    set:
+      keycloak.enabled: true
+      aasEnvironment.enabled: true
+      aasEnvironment.mcp.enabled: true
+      abac.enabled: true
+      keycloak.initialization.mcp.clientScope: aas-environment-mcp
+      keycloak.initialization.mcp.audience: aas-environment
+      keycloak.initialization.mcp.trustedHosts: [localhost]
+      keycloak.initialization.mcp.allowedClientScopes: [openid, offline_access]
+    asserts:
+      - matchRegex:
+          path: data["mcp.json"]
+          pattern: '"name":"aas-environment-mcp"'
+      - matchRegex:
+          path: data["mcp.json"]
+          pattern: '"included.custom.audience":"aas-environment"'
+      - matchRegex:
+          path: data["mcp.json"]
+          pattern: '"trusted-hosts":\["localhost"\]'
+      - matchRegex:
+          path: data["mcp.json"]
+          pattern: '"allowed-client-scopes":\["openid","offline_access"\]'
+
+  - it: leaves the Keycloak realm unchanged when the AAS Environment does not trust it
+    template: templates/keycloak-init-config.yaml
+    set:
+      keycloak.enabled: true
+      aasEnvironment.enabled: true
+      aasEnvironment.mcp.enabled: true
+      abac.enabled: true
+      aasEnvironment.oidc.providers:
+        - issuer: https://idp.example.org/realms/basyx
+          audience: basyx-api
+    asserts:
+      - equal:
+          path: data["mcp.json"]
+          value: |
+            {}
+
+  - it: prepares the realm idempotently in the initialization script
+    template: templates/keycloak-init-script.yaml
+    set:
+      keycloak.enabled: true
+    asserts:
+      - matchRegex:
+          path: data["init.sh"]
+          pattern: 'if \[ "\$\(jq ''length'' /config/mcp\.json\)" != "0" \]; then'
+      - matchRegex:
+          path: data["init.sh"]
+          pattern: '/default-default-client-scopes/\$SCOPE_ID'
+      - matchRegex:
+          path: data["init.sh"]
+          pattern: '/client-scopes/\$SCOPE_ID/protocol-mappers'
+      - matchRegex:
+          path: data["init.sh"]
+          pattern: '/client-scopes/\$OFFLINE_SCOPE_ID/scope-mappings/realm'
+      - matchRegex:
+          path: data["init.sh"]
+          pattern: '/roles/\$DEFAULT_ROLE/composites'
+      - matchRegex:
+          path: data["init.sh"]
+          pattern: 'select\(\.providerId == \$PROVIDER and \.subType == "anonymous"\)'
