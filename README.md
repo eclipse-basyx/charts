@@ -2621,15 +2621,21 @@ does not replace the trust list entry.
 - It sets the anonymous policy *Allowed Client Scopes* to allow the realm's
   default scopes and `keycloak.initialization.mcp.allowedClientScopes`
   (`openid`, which Codex requests when it registers).
+- It sets the anonymous policy *Allowed Protocol Mapper Types* to an empty
+  list, so clients that register themselves cannot add protocol mappers.
+  Keycloak's default list allows user attribute and user property mappers with
+  any claim name. A client could then map a value the user can edit, such as
+  the first name, to a claim that ABAC rules evaluate, such as `role`, while
+  the client scope above adds the trusted audience. Mappers that MCP clients
+  need belong in client scopes that an administrator manages, such as
+  `keycloak.initialization.mcp.clientScope`.
 - It adds the role `offline_access` to the realm's default role and maps it in
   the `offline_access` client scope. Codex requests offline tokens, and
   self-registered clients only receive roles through their scopes.
 
-The other anonymous registration policies, such as *Allowed Protocol Mapper
-Types*, *Consent Required*, *Max Clients Limit* and *Full Scope Disabled*, stay
-as they are. They keep self-registered clients from adding protocol mappers that
-put arbitrary claims, which ABAC rules may evaluate, into their tokens. Disabling
-MCP later does not undo these realm changes.
+The other anonymous registration policies, such as *Consent Required*, *Max
+Clients Limit* and *Full Scope Disabled*, stay as they are. Disabling MCP later
+does not undo these realm changes.
 
 MCP clients open sign-in pages only over HTTPS with a certificate they trust.
 Keycloak must therefore be reachable at its issuer URL over HTTPS with a

@@ -275,6 +275,9 @@ tests:
           path: data["mcp.json"]
           pattern: '\{"config":\{"allow-default-scopes":\["true"\],"allowed-client-scopes":\["openid"\]\},"name":"Allowed Client Scopes","providerId":"allowed-client-templates"\}'
       - matchRegex:
+          path: data["mcp.json"]
+          pattern: '\{"config":\{"allowed-protocol-mapper-types":\[\]\},"name":"Allowed Protocol Mapper Types","providerId":"allowed-protocol-mappers"\}'
+      - matchRegex:
           path: data["clients.json"]
           pattern: '"clientId":"basyx-ui"'
 
@@ -415,6 +418,20 @@ tests:
       - matchRegex:
           path: data["mcp.json"]
           pattern: '"name":"Department Mapper"'
+
+  - it: keeps an empty protocol mapper allowlist for anonymous registration with custom settings
+    template: templates/keycloak-init-config.yaml
+    set:
+      keycloak.enabled: true
+      aasEnvironment.enabled: true
+      aasEnvironment.mcp.enabled: true
+      abac.enabled: true
+      keycloak.initialization.mcp.trustedHosts: [localhost]
+      keycloak.initialization.mcp.allowedClientScopes: [openid, offline_access]
+    asserts:
+      - matchRegex:
+          path: data["mcp.json"]
+          pattern: '\{"config":\{"allowed-protocol-mapper-types":\[\]\},"name":"Allowed Protocol Mapper Types","providerId":"allowed-protocol-mappers"\}\]\}'
 
   - it: prepares the realm idempotently in the initialization script
     template: templates/keycloak-init-script.yaml

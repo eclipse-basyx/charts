@@ -102,7 +102,11 @@ initialization Job; {} unless the MCP endpoint requires tokens and an audience
 for Keycloak tokens is known. The client scope gives clients that register
 themselves the protocol mappers of the Web UI client and the audience of the
 AAS Environment. The registration policies replace the config of the anonymous
-policies of the same provider.
+policies of the same provider. Allowed Protocol Mapper Types gets an empty
+allowlist: Keycloak's default allows user attribute and property mappers with
+any claim name, so a client that registers itself could otherwise put a value
+the user can edit into a claim that ABAC rules evaluate, such as role, while
+the client scope adds the trusted audience.
 */}}
 {{- define "basyx-aasEnvironment.mcpKeycloakConfig" -}}
 {{- $audience := "" -}}
@@ -136,6 +140,10 @@ policies of the same provider.
   "config" (dict
     "allow-default-scopes" (list "true")
     "allowed-client-scopes" ($mcp.allowedClientScopes | default list)) -}}
+{{- $allowedProtocolMappers := dict
+  "name" "Allowed Protocol Mapper Types"
+  "providerId" "allowed-protocol-mappers"
+  "config" (dict "allowed-protocol-mapper-types" list) -}}
 {{- toJson (dict
   "clientScope" (dict
     "name" $mcp.clientScope
@@ -145,7 +153,7 @@ policies of the same provider.
       "display.on.consent.screen" "true"
       "consent.screen.text" "Access the BaSyx AAS Environment")
     "protocolMappers" (append (include "basyx.webUiClientProtocolMappers" . | fromJsonArray) $audienceMapper))
-  "registrationPolicies" (list $trustedHosts $allowedClientScopes)) -}}
+  "registrationPolicies" (list $trustedHosts $allowedClientScopes $allowedProtocolMappers)) -}}
 {{- else -}}
 {}
 {{- end -}}
