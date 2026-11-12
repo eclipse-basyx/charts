@@ -1307,7 +1307,22 @@
             "clients": { "type": "array" },
             "extraClients": { "type": "array" },
             "users": { "type": "array" },
-            "extraUsers": { "type": "array" }
+            "extraUsers": { "type": "array" },
+            "mcp": {
+              "type": "object",
+              "properties": {
+                "clientScope": { "type": "string", "pattern": "^[A-Za-z0-9_.:-]+$" },
+                "audience": { "type": "string" },
+                "trustedHosts": {
+                  "type": "array",
+                  "items": { "type": "string", "minLength": 1 }
+                },
+                "allowedClientScopes": {
+                  "type": "array",
+                  "items": { "type": "string", "minLength": 1 }
+                }
+              }
+            }
           }
         }
       }
@@ -1702,7 +1717,27 @@
     "aasDiscovery": { "$ref": "#/definitions/serviceRuntimeOverrides" },
     "aasRegistry": { "$ref": "#/definitions/serviceRuntimeOverrides" },
     "aasRepository": { "$ref": "#/definitions/serviceRuntimeOverrides" },
-    "aasEnvironment": { "$ref": "#/definitions/serviceRuntimeOverrides" },
+    "aasEnvironment": {
+      "allOf": [
+        { "$ref": "#/definitions/serviceRuntimeOverrides" },
+        {
+          "properties": {
+            "mcp": {
+              "type": "object",
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "writesEnabled": { "type": "boolean" },
+                "path": {
+                  "type": "string",
+                  "pattern": "^(/[A-Za-z0-9_~-]+(\\.[A-Za-z0-9_~-]+)*)+$"
+                },
+                "maxResultBytes": { "type": "integer", "minimum": 1024 }
+              }
+            }
+          }
+        }
+      ]
+    },
     "dppApi": { "$ref": "#/definitions/serviceRuntimeOverrides" },
     "submodelRegistry": { "$ref": "#/definitions/serviceRuntimeOverrides" },
     "submodelRepository": { "$ref": "#/definitions/serviceRuntimeOverrides" },

@@ -1,4 +1,5 @@
 {{- if .Values.aasEnvironment.enabled -}}
+{{- include "basyx-aasEnvironment.mcpValidate" . -}}
 {{- include "basyx.service.deployment" (dict
   "root" .
   "component" "aasEnvironment"

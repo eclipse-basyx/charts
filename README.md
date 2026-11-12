@@ -341,6 +341,17 @@ helm diff upgrade basyx charts/basyx \
   -f values/values.example.yaml
 ```
 
+### Upgrading to chart 3.19.0
+
+Chart 3.19.0 uses BaSyx Go 1.1.3 by default. It adds the experimental MCP
+endpoint of the AAS Environment as `aasEnvironment.mcp`; see
+[AAS Environment MCP Endpoint](#aas-environment-mcp-endpoint). MCP is disabled
+by default, so existing deployments are unchanged except for the new `MCP_*`
+variables with their defaults on the AAS Environment. When you enable it with
+ABAC, the chart routes the endpoint's protected resource metadata, fails to
+render if an issuer of the AAS Environment trust list has no audience, and the
+Keycloak initialization prepares a chart-managed realm for MCP clients.
+
 ### Upgrading to chart 3.18.0
 
 Chart 3.18.0 adds `basyxStudio.proxy` for clusters whose pods reach external
@@ -1338,6 +1349,7 @@ that CA through `internal.CACertificates.trustStore`.
 | `environment.common.OIDC_AUDIENCE` | Audience expected by BaSyx backend services and included in the default ABAC trust list. |
 | `oidc.providers` | Structured list of OIDC providers trusted by all secured BaSyx backend services. An empty list uses the default single-provider trust list. |
 | `<service>.oidc.providers` | Replaces the global provider list for one backend service. |
+| `keycloak.initialization.mcp.*` | Experimental. Realm settings for MCP clients, applied while the AAS Environment serves MCP with ABAC; see [AAS Environment MCP Endpoint](#aas-environment-mcp-endpoint). |
 
 #### Multiple OIDC issuers
 
@@ -1463,7 +1475,7 @@ aasRepository:
   replicaCount: 1
   image:
     repository: eclipsebasyx/aasrepository-go
-    tag: "1.1.2"
+    tag: "1.1.3"
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
@@ -2527,6 +2539,130 @@ chart's Keycloak realm provides `sub`; add a *Group Membership* mapper named
 administrators. The default ABAC rules already allow `/description` for
 everyone, which clients use to detect ReBAC. The BaSyx Configuration Service
 applies the ReBAC database schema before the services start.
+
+### AAS Environment MCP Endpoint
+
+> **Experimental.** The endpoint, its tools and these values may change in
+> later releases.
+
+The AAS Environment can serve a [Model Context Protocol](https://modelcontextprotocol.io)
+(MCP) endpoint next to its REST API (BaSyx Go 1.1.3 or newer). MCP clients such
+as Claude Code and Codex then read and, if allowed, change shells, Submodels and
+Submodel elements through it. Each tool call is an AAS Environment API request
+with the caller's token, so authentication, ABAC and ReBAC rules, validation,
+history and eventing apply as for REST calls. See the
+[BaSyx Go MCP documentation](https://github.com/eclipse-basyx/basyx-go-components/blob/main/docu/mcp/README.md)
+for the tools.
+
+```yaml
+abac:
+  enabled: true
+
+aasEnvironment:
+  enabled: true
+  mcp:
+    enabled: true
+    writesEnabled: false
+```
+
+| Value | Rendered environment variable | Default | Description |
+| --- | --- | --- | --- |
+| `aasEnvironment.mcp.enabled` | `MCP_ENABLED` | `false` | Serves the MCP endpoint. |
+| `aasEnvironment.mcp.writesEnabled` | `MCP_WRITESENABLED` | `false` | Offers the tools that create, change and delete data. ABAC still decides what each user may change. |
+| `aasEnvironment.mcp.path` | `MCP_PATH` | `/mcp` | Endpoint path below `paths.aasEnvironment`, without a trailing slash. |
+| `aasEnvironment.mcp.maxResultBytes` | `MCP_MAXRESULTBYTES` | `262144` | Largest API response a tool returns. Larger reads fail with a hint to page or narrow the request. |
+
+The endpoint is `GENERAL_EXTERNALURL` followed by `aasEnvironment.mcp.path`, by
+default `https://<host><paths.aasEnvironment>/mcp`, for example
+`https://basyx.example.com/aas-environment/mcp`. It lies below the AAS
+Environment path, so the AAS Environment Ingress or HTTPRoute already serves it.
+
+Without ABAC the endpoint has no authentication, like the REST API. Do not
+expose it then, and do not enable writes on an endpoint others can reach.
+
+With ABAC enabled for the AAS Environment, the endpoint requires a bearer token:
+
+- BaSyx Go publishes OAuth 2.0 protected resource metadata (RFC 9728) at
+  `/.well-known/oauth-protected-resource<paths.aasEnvironment><aasEnvironment.mcp.path>`,
+  for example `/.well-known/oauth-protected-resource/aas-environment/mcp`, and
+  links it in the `WWW-Authenticate` challenge of HTTP 401 responses. The chart
+  routes this path to the AAS Environment: the Ingress with `pathType:
+  ImplementationSpecific`, because ingress-nginx rejects the dot of
+  `.well-known` in `Exact` and `Prefix` paths, and the HTTPRoute with an `Exact`
+  match. The challenge derives the URL from `GENERAL_EXTERNALURL`; if you point
+  it at another path, route the metadata path yourself.
+- The metadata names the issuers of the AAS Environment trust list as
+  authorization servers. Every issuer needs an `audience`, otherwise BaSyx Go
+  does not start; the chart fails to render instead. The default trust list
+  uses `environment.common.OIDC_AUDIENCE` (`discovery-service`).
+
+#### Keycloak for MCP clients
+
+When `keycloak.enabled` is `true` and the AAS Environment trust list contains
+the chart-managed Keycloak issuer with an audience, the Keycloak initialization
+Job prepares the realm, also on existing realms and on every upgrade. The
+chart-managed issuer is `https://<host><paths.keycloak>/realms/<keycloak.realm>`;
+`keycloak.issuer` does not change it, and `keycloak.initialization.mcp.audience`
+does not replace the trust list entry.
+
+- It creates the client scope `keycloak.initialization.mcp.clientScope`
+  (`basyx-aas-environment`) with the protocol mappers of the Web UI client
+  (from `keycloak.initialization.clients` and `extraClients`) and an audience
+  mapper for the issuer's audience in the trust list, or
+  `keycloak.initialization.mcp.audience` when set, and adds it to the realm's
+  default client scopes. Clients that register themselves receive it, so their
+  tokens carry the claims the default ABAC rules evaluate. Clients created later
+  by an administrator receive it as well; existing clients are unchanged.
+- It sets the anonymous client registration policy *Trusted Hosts* to
+  `keycloak.initialization.mcp.trustedHosts` (`localhost`, `127.0.0.1`): the
+  redirect URIs must use these hosts, the host sending the registration request
+  is not checked. Claude Code and Codex register themselves with loopback
+  redirect URIs.
+- It sets the anonymous policy *Allowed Client Scopes* to allow the realm's
+  default scopes and `keycloak.initialization.mcp.allowedClientScopes`
+  (`openid`, which Codex requests when it registers).
+- It sets the anonymous policy *Allowed Protocol Mapper Types* to an empty
+  list, so clients that register themselves cannot add protocol mappers.
+  Keycloak's default list allows user attribute and user property mappers with
+  any claim name. A client could then map a value the user can edit, such as
+  the first name, to a claim that ABAC rules evaluate, such as `role`, while
+  the client scope above adds the trusted audience. Mappers that MCP clients
+  need belong in client scopes that an administrator manages, such as
+  `keycloak.initialization.mcp.clientScope`.
+- It adds the role `offline_access` to the realm's default role and maps it in
+  the `offline_access` client scope. Codex requests offline tokens, and
+  self-registered clients only receive roles through their scopes.
+
+The other anonymous registration policies, such as *Consent Required*, *Max
+Clients Limit* and *Full Scope Disabled*, stay as they are. Disabling MCP later
+does not undo these realm changes.
+
+MCP clients open sign-in pages only over HTTPS with a certificate they trust.
+Keycloak must therefore be reachable at its issuer URL over HTTPS with a
+certificate that the client machine trusts.
+
+An external identity provider must offer dynamic client registration (RFC 7591)
+or a public client registered by an administrator with the redirect URI
+`http://localhost:<port>/callback`, support the authorization code flow with
+PKCE (`S256`) and put the trust list audience into the access tokens.
+
+#### Connect a client
+
+Claude Code:
+
+```bash
+claude mcp add --transport http basyx https://basyx.example.com/aas-environment/mcp
+```
+
+Start `claude`, run `/mcp`, select `basyx` and choose *Authenticate*. With a
+client registered by an administrator, add `--client-id <id> --callback-port <port>`.
+
+Codex:
+
+```bash
+codex mcp add basyx --url https://basyx.example.com/aas-environment/mcp
+codex mcp login basyx
+```
 
 ## Network Policies
 
