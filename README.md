@@ -341,6 +341,10 @@ helm diff upgrade basyx charts/basyx \
   -f values/values.example.yaml
 ```
 
+### Upgrading to chart 3.19.1
+
+Chart 3.19.1 updates the default AAS Web UI image to `v2-261113`.
+
 ### Upgrading to chart 3.19.0
 
 Chart 3.19.0 uses BaSyx Go 1.1.3 by default. It adds the experimental MCP
