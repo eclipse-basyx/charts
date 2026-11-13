@@ -6,7 +6,7 @@ description: >
   or BaSyx Studio, and optional Keycloak authentication with ABAC and ReBAC
   authorization.
 type: application
-version: 3.19.0
+version: 3.19.1
 appVersion: "1.1.3"
 home: https://github.com/eclipse-basyx/charts
 sources:
