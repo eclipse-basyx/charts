@@ -341,6 +341,31 @@ helm diff upgrade basyx charts/basyx \
   -f values/values.example.yaml
 ```
 
+### Upgrading to chart 3.19.2
+
+Chart 3.19.2 updates the default BaSyx Go backend and Configuration Service
+images to 1.1.5. Explicit image tags or digests continue to override the chart's
+default application version.
+
+With ABAC enabled, BaSyx Go 1.1.4 changed how ROUTE rules are matched. The
+chart's default policy is not affected. Before upgrading, review the ROUTE
+rules in custom policies (`abac.accessRules`, `<service>.abac.accessRules`,
+and policies stored in the policy repository, including older versions that
+may be activated again):
+
+- A value containing `/` must be written as `%2F`, and a `%` inside a value as
+  `%25`. An existing `%2F` or `%25` now means a slash or percent sign.
+- Policies with ROUTE rules that contain any other `%`, `.` or `..` segments,
+  empty segments, or leading or trailing whitespace no longer load. If such a
+  policy is active in the policy repository, the service does not start; fix
+  the policy and start once with `abac.policyFileImport: always`.
+- Requests whose path contains `.` or `..` segments, empty segments or control
+  characters are rejected with HTTP `400`.
+
+See the [BaSyx Go 1.1.4](https://github.com/eclipse-basyx/basyx-go-components/releases/tag/v1.1.4)
+and [1.1.5](https://github.com/eclipse-basyx/basyx-go-components/releases/tag/v1.1.5)
+release notes for all changes.
+
 ### Upgrading to chart 3.19.1
 
 Chart 3.19.1 updates the default AAS Web UI image to `v2-261113`.
@@ -1479,7 +1504,7 @@ aasRepository:
   replicaCount: 1
   image:
     repository: eclipsebasyx/aasrepository-go
-    tag: "1.1.3"
+    tag: "1.1.5"
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
